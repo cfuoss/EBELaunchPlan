@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Amazon Review Upload Test</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --navy: #0f172a;
+        --blue: #2563eb;
+        --blue-light: #eff6ff;
+        --green: #15803d;
+        --green-light: #f0fdf4;
+        --red: #b91c1c;
+        --red-light: #fef2f2;
+        --border: #dbe3ee;
+        --muted: #64748b;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #f8fafc;
+        color: var(--navy);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(760px, calc(100% - 32px));
+        margin: 56px auto;
+      }
+
+      .top-link {
+        display: inline-block;
+        margin-bottom: 20px;
+        color: var(--blue);
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      .card {
+        padding: clamp(24px, 5vw, 44px);
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+      }
+
+      h1 { margin: 0 0 10px; font-size: clamp(28px, 4vw, 40px); }
+      p { color: #475569; line-height: 1.6; }
+
+      .privacy-note {
+        margin: 24px 0;
+        padding: 14px 16px;
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        background: var(--blue-light);
+        color: #1e3a8a;
+      }
+
+      label { display: block; margin-bottom: 8px; font-weight: 700; }
+
+      input[type="file"] {
+        width: 100%;
+        padding: 22px;
+        border: 2px dashed #94a3b8;
+        border-radius: 12px;
+        background: #f8fafc;
+      }
+
+      .help { margin: 8px 0 20px; color: var(--muted); font-size: 14px; }
+
+      button {
+        width: 100%;
+        padding: 14px 18px;
+        border: 0;
+        border-radius: 10px;
+        background: var(--blue);
+        color: white;
+        font-size: 16px;
+        font-weight: 750;
+        cursor: pointer;
+      }
+
+      button:disabled { cursor: wait; opacity: 0.6; }
+
+      #result {
+        display: none;
+        margin-top: 24px;
+        padding: 18px;
+        border-radius: 12px;
+      }
+
+      #result.success { display: block; color: #14532d; background: var(--green-light); border: 1px solid #bbf7d0; }
+      #result.error { display: block; color: #7f1d1d; background: var(--red-light); border: 1px solid #fecaca; }
+      #result h2 { margin: 0 0 12px; font-size: 20px; }
+
+      dl {
+        display: grid;
+        grid-template-columns: minmax(150px, 1fr) 2fr;
+        gap: 8px 16px;
+        margin: 0;
+      }
+
+      dt { font-weight: 700; }
+      dd { margin: 0; overflow-wrap: anywhere; }
+
+      @media (max-width: 540px) {
+        main { margin: 24px auto; }
+        dl { grid-template-columns: 1fr; }
+        dd { margin-bottom: 8px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="top-link" href="/">← Return to the current report</a>
+      <section class="card">
+        <h1>Test an Amazon review upload</h1>
+        <p>
+          Select a JSON review file. This first checkpoint only validates the file and reports what it found.
+        </p>
+
+        <div class="privacy-note">
+          The file is processed temporarily by the Worker for validation. This version does not save the file or send it to an AI model.
+        </div>
+
+        <form id="upload-form">
+          <label for="reviews">Amazon review JSON</label>
+          <input id="reviews" name="reviews" type="file" accept="application/json,.json" required />
+          <div class="help">Accepted: .json files up to 5 MB</div>
+          <button id="submit-button" type="submit">Validate review file</button>
+        </form>
+
+        <section id="result" aria-live="polite"></section>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById("upload-form");
+      const button = document.getElementById("submit-button");
+      const result = document.getElementById("result");
+
+      function showError(message) {
+        result.className = "error";
+        result.innerHTML = `<h2>Upload not accepted</h2><div>${escapeHtml(message)}</div>`;
+      }
+
+      function escapeHtml(value) {
+        const element = document.createElement("div");
+        element.textContent = String(value ?? "");
+        return element.innerHTML;
+      }
+
+      function listText(values) {
+        return Array.isArray(values) && values.length ? values.join(", ") : "Not supplied";
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        result.style.display = "none";
+        result.className = "";
+        button.disabled = true;
+        button.textContent = "Validating…";
+
+        try {
+          const response = await fetch("/api/validate-reviews", {
+            method: "POST",
+            body: new FormData(form),
+            credentials: "same-origin",
+          });
+
+          const data = await response.json();
+          if (!response.ok || !data.ok) {
+            throw new Error(data.error || "The upload could not be validated.");
+          }
+
+          result.className = "success";
+          result.innerHTML = `
+            <h2>File validated successfully</h2>
+            <dl>
+              <dt>File</dt><dd>${escapeHtml(data.file.name)}</dd>
+              <dt>Detected format</dt><dd>${escapeHtml(data.file.format)}</dd>
+              <dt>Total reviews</dt><dd>${data.summary.totalReviews}</dd>
+              <dt>Valid reviews</dt><dd>${data.summary.validReviews}</dd>
+              <dt>Invalid reviews</dt><dd>${data.summary.invalidReviews}</dd>
+              <dt>Unique review IDs</dt><dd>${data.summary.uniqueReviewIds}</dd>
+              <dt>Product groups</dt><dd>${escapeHtml(listText(data.summary.productGroups))}</dd>
+              <dt>Flavors</dt><dd>${escapeHtml(listText(data.summary.flavors))}</dd>
+            </dl>`;
+        } catch (error) {
+          showError(error.message);
+        } finally {
+          result.style.display = "block";
+          button.disabled = false;
+          button.textContent = "Validate review file";
+        }
+      });
+    </script>
+  </body>
+</html>

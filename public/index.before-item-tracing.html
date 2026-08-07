@@ -642,7 +642,7 @@
         { name: "Marketing Analytics", icon: "i-megaphone", tone: "orange", description: "Customer voice, campaigns, content, retail media, and acquisition.", count: 1 },
         { name: "Sales Analytics", icon: "i-dollar", tone: "green", description: "Retailer, channel, SKU, velocity, and distribution performance.", count: 0 },
         { name: "Marketing/Sales Summaries", icon: "i-merge", tone: "violet", description: "One shared narrative connecting marketing activity to commercial results.", count: 0 },
-        { name: "Operations Analytics", icon: "i-gear", tone: "green", description: "Inventory, demand planning, fulfillment, and supply chain visibility.", count: 1 }
+        { name: "Operations Analytics", icon: "i-gear", tone: "green", description: "Inventory, demand planning, fulfillment, and supply chain visibility.", count: 0 }
       ];
 
       const software = [
@@ -719,19 +719,7 @@
               <a class="button primary" href="/amazon-review-sentiment.html">${icon("i-eye")}Open report</a>
               <a class="button" href="/upload.html">${icon("i-upload")}Upload data</a>
             </div>
-          </article>` : "";
-
-        const operationsTool = item.name === "Operations Analytics" ? `
-          <article class="card tool-card">
-            <div class="tool-top"><div class="tool-icon green">${icon("i-gear")}</div><span class="badge live">Ready</span></div>
-            <h3>Item Tracing Decomposition</h3>
-            <p>Trace item movements from origin to usage and back, including production, transfers, adjustments, and sales shipments.</p>
-            <div class="actions">
-              <a class="button primary" href="/item-tracing-decomposition.html">${icon("i-eye")}Open tool</a>
-            </div>
-          </article>` : "";
-
-        const categoryTools = marketingTool || operationsTool || `
+          </article>` : `
           <div class="empty-state"><div class="tool-icon ${item.tone}">${icon(item.icon)}</div><h3>This workspace is ready</h3><p>The navigation and category are in place. The next ${item.name.toLowerCase()} tool can be added here without rebuilding the hub.</p></div>`;
 
         container.innerHTML = `
@@ -739,7 +727,7 @@
           <div class="eyebrow"><span class="eyebrow-dot"></span>${item.name}</div>
           <h1>${item.name}</h1><p class="lede">${item.description}</p>
           <div class="section-head"><div><h2>Available tools</h2><p>${item.count ? "Ready to open and use." : "New tools will appear here."}</p></div></div>
-          <div class="grid grid-2">${categoryTools}</div>`;
+          <div class="grid grid-2">${marketingTool}</div>`;
         document.getElementById("all-dashboards").addEventListener("click", () => showPage("dashboards"));
       }
 

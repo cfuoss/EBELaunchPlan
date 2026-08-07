@@ -1,0 +1,2066 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Item Tracing Decomposition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="/vendor/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#FFFFFF;
+    --bg-soft:#F7F5EE;        /* warm off-white for panels/sections */
+    --panel:#F7F5EE;
+    --card:#FFFFFF;
+    --card-alt:#F7F5EE;
+    --card-border:#E8E4D6;
+    --line:#E8E4D6;
+    --text:#1A1A1A;
+    --text-dim:#6B6B64;
+    --text-dimmer:#78766E;
+    --pretzel:#2878FF;       /* Sea Salt Pretzel — apex / primary accent */
+    --pretzel-text:#1E5FDB;  /* deepened for AA text contrast on white */
+    --lime:#CADC30;          /* Fiery Chile Lime — incoming / positive */
+    --lime-text:#5C6B0A;     /* darkened lime, legible on white */
+    --orange:#F99420;        /* Cheese-less orange — production consumption */
+    --teal:#0099F3;          /* Sea Salt Chia — production output */
+    --sky:#87CCF4;           /* light blue tint — transfer receipt */
+    --magenta:#CC1F97;       /* Chive & Garlic — transfer shipment */
+    --rose:#ED1C24;          /* bold red — sales shipment */
+    --rose-text:#B0181D;     /* darkened red, legible on white */
+    --grey:#878787;          /* ledger entry / adjustment */
+    --ink:#1A1A1A;
+    --focus:#2878FF;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Barlow Semi Condensed', system-ui, sans-serif;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+  }
+  ::selection{background:var(--lime); color:var(--ink);}
+
+  /* ---------- header ---------- */
+  header{
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap:20px;
+    padding:14px 22px;
+    background:var(--bg);
+    border-bottom:2px solid var(--ink);
+    z-index:20;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding-right:18px;
+    border-right:1px solid var(--card-border);
+  }
+  .brand .mark{
+    width:38px;height:38px;border-radius:50%;
+    background:var(--lime);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Anton',sans-serif;
+    font-size:15px;
+    color:var(--ink);
+    flex:none;
+    box-shadow:0 0 0 2px var(--ink) inset;
+  }
+  .brand h1{
+    font-family:'Anton', sans-serif;
+    font-weight:400;
+    font-size:20px;
+    letter-spacing:.01em;
+    margin:0;
+    line-height:1;
+  }
+  .brand p{
+    margin:3px 0 0;
+    font-size:12.5px;
+    color:var(--text-dim);
+    letter-spacing:.01em;
+  }
+
+  .view-switch{
+    position:relative;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .view-switch label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--text-dimmer);
+    font-weight:600;
+  }
+  select#viewSelect{
+    appearance:none;
+    background:var(--card) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0L5 6L10 0Z' fill='%236B6B64'/></svg>") no-repeat right 14px center;
+    border:2px solid var(--ink);
+    color:var(--text);
+    font-family:'Barlow Semi Condensed', sans-serif;
+    font-weight:600;
+    font-size:14.5px;
+    padding:9px 36px 9px 16px;
+    border-radius:999px;
+    cursor:pointer;
+    min-width:230px;
+  }
+  select#viewSelect:hover{border-color:var(--pretzel);}
+  select#viewSelect:focus{outline:2px solid var(--focus); outline-offset:1px;}
+
+  .search-wrap{
+    position:relative;
+    flex:1;
+    max-width:380px;
+  }
+  .search-wrap input{
+    width:100%;
+    background:var(--bg-soft);
+    border:1px solid var(--card-border);
+    color:var(--text);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    padding:9px 14px 9px 34px;
+    border-radius:999px;
+  }
+  .search-wrap input::placeholder{color:var(--text-dimmer); font-family:'Barlow Semi Condensed',sans-serif;}
+  .search-wrap input:focus{outline:2px solid var(--focus); outline-offset:1px;}
+  .search-wrap svg{position:absolute; left:13px; top:50%; transform:translateY(-50%); pointer-events:none;}
+  .search-results{
+    position:absolute;
+    top:calc(100% + 6px);
+    left:0; right:0;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    max-height:320px;
+    overflow-y:auto;
+    display:none;
+    box-shadow:0 14px 32px rgba(20,20,10,.14);
+    z-index:50;
+  }
+  .search-results.open{display:block;}
+  .sr-item{
+    padding:9px 13px;
+    cursor:pointer;
+    border-bottom:1px solid var(--card-border);
+    font-size:13px;
+  }
+  .sr-item:last-child{border-bottom:none;}
+  .sr-item:hover, .sr-item.active{background:var(--bg-soft);}
+  .sr-item .sr-doc{font-family:'IBM Plex Mono',monospace; color:var(--pretzel-text); font-weight:600;}
+  .sr-item .sr-meta{color:var(--text-dim); font-size:11.5px; margin-top:2px;}
+  .sr-empty{padding:14px; color:var(--text-dimmer); font-size:13px;}
+
+  .header-actions{
+    margin-left:auto;
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  .btn{
+    background:var(--card);
+    border:1px solid var(--ink);
+    color:var(--ink);
+    font-family:'Barlow Semi Condensed',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    padding:8px 16px;
+    border-radius:999px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .btn:hover{background:var(--ink); color:#fff;}
+  .btn:focus-visible{outline:2px solid var(--focus); outline-offset:1px;}
+
+  /* ---------- legend ---------- */
+  .legend{
+    display:flex;
+    gap:14px;
+    padding:9px 22px;
+    background:var(--bg-soft);
+    border-bottom:1px solid var(--card-border);
+    flex-wrap:wrap;
+    font-size:11.5px;
+    color:var(--text-dim);
+    align-items:center;
+  }
+  .legend .lg-title{color:var(--text-dimmer); text-transform:uppercase; letter-spacing:.08em; font-weight:700; font-size:10.5px; margin-right:2px;}
+  .lg-item{display:flex; align-items:center; gap:6px;}
+  .lg-dot{width:9px; height:9px; border-radius:3px; flex:none;}
+
+  /* ---------- narrative summary panel ---------- */
+  .narrative{
+    flex:none;
+    background:linear-gradient(180deg,#FBFAF3,var(--bg-soft) 65%);
+    border-bottom:1px solid var(--card-border);
+    max-height:40vh;
+    overflow-y:auto;
+  }
+  .narrative.collapsed{max-height:none; overflow:visible;}
+  .narrative-head{
+    position:sticky;
+    top:0;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:12px 22px;
+    background:#FBFAF3ee;
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--card-border);
+    z-index:5;
+    cursor:pointer;
+  }
+  .narrative-head h2{
+    font-family:'Anton', sans-serif;
+    font-weight:400;
+    font-size:19px;
+    letter-spacing:.01em;
+    margin:0;
+    color:var(--text);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .narrative-head h2 .chev{
+    font-size:13px;
+    color:var(--pretzel);
+    transition:transform .15s ease;
+    display:inline-block;
+  }
+  .narrative.collapsed .narrative-head h2 .chev{transform:rotate(-90deg);}
+  .narrative-controls{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  .toggle{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:12.5px;
+    color:var(--text-dim);
+    cursor:pointer;
+    user-select:none;
+  }
+  .toggle input{accent-color:var(--pretzel); cursor:pointer;}
+  .btn-mini{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    color:var(--text-dim);
+    font-family:'Barlow Semi Condensed',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    padding:5px 10px;
+    border-radius:999px;
+    cursor:pointer;
+  }
+  .btn-mini:hover{color:var(--ink); border-color:var(--pretzel);}
+  .narrative-body{
+    padding:14px 22px 22px;
+    display:none;
+  }
+  .narrative:not(.collapsed) .narrative-body{display:block;}
+  .narrative-stats{
+    font-size:14.5px;
+    line-height:1.55;
+    color:var(--text-dim);
+    margin:0 0 16px;
+    max-width:900px;
+  }
+  .narrative-stats b{color:var(--text); font-weight:600;}
+  .narrative-stats .stat-chip{
+    display:inline-block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--lime-text);
+    background:rgba(202,220,48,.22);
+    border:1px solid rgba(150,166,20,.35);
+    border-radius:5px;
+    padding:1px 6px;
+    margin:0 2px;
+  }
+
+  .narrative-list, .narrative-list ul{
+    list-style:none;
+    margin:0;
+    padding:0;
+  }
+  .narrative-list ul{
+    margin-left:20px;
+    padding-left:16px;
+    border-left:1px dashed var(--card-border);
+    margin-top:4px;
+  }
+  .narrative-list li{
+    margin-bottom:3px;
+  }
+  .narr-row{
+    display:flex;
+    align-items:flex-start;
+    gap:8px;
+    padding:6px 8px;
+    border-radius:7px;
+    cursor:pointer;
+    font-size:13.5px;
+    line-height:1.5;
+  }
+  .narr-row:hover{background:rgba(40,120,255,.06);}
+  .narr-row.expanded{background:rgba(40,120,255,.05);}
+  .narr-row.hit{background:rgba(202,220,48,.28); outline:1px solid rgba(150,166,20,.5);}
+  .narr-caret{
+    flex:none;
+    width:16px;
+    text-align:center;
+    color:var(--pretzel);
+    font-size:11px;
+    margin-top:3px;
+    transition:transform .12s ease;
+  }
+  .narr-caret.leaf{color:var(--card-border);}
+  .narr-row.expanded .narr-caret{transform:rotate(90deg);}
+  .narr-dot{
+    flex:none;
+    width:8px;height:8px;
+    border-radius:2.5px;
+    margin-top:6px;
+  }
+  .narr-text{color:var(--text-dim); flex:1;}
+  .narr-text b{color:var(--text); font-weight:600;}
+  .narr-text .doc-ref{
+    color:var(--pretzel-text);
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    text-decoration:underline;
+    text-decoration-color:rgba(40,120,255,.4);
+    text-underline-offset:2px;
+  }
+  .narr-text .traced-flag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:9.5px;
+    color:var(--text-dim);
+    border:1px solid var(--card-border);
+    border-radius:4px;
+    padding:0 4px;
+    margin-left:4px;
+  }
+  .narr-badge{
+    flex:none;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    color:var(--text-dimmer);
+    margin-top:2px;
+  }
+  .narrative-empty{color:var(--text-dimmer); font-size:13px; padding:8px;}
+
+  /* ---------- guide panel (explainer + upload) ---------- */
+  .guide{
+    flex:none;
+    background:linear-gradient(180deg,#F4F8FF,var(--bg-soft) 70%);
+    border-bottom:1px solid var(--card-border);
+    max-height:70vh;
+    overflow-y:auto;
+  }
+  .guide.collapsed{max-height:none; overflow:visible;}
+  .guide-head{
+    position:sticky;
+    top:0;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:12px 22px;
+    background:#F4F8FFee;
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--card-border);
+    z-index:5;
+    cursor:pointer;
+  }
+  .guide-head h2{
+    font-family:'Anton', sans-serif;
+    font-weight:400;
+    font-size:19px;
+    letter-spacing:.01em;
+    margin:0;
+    color:var(--text);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .guide-head h2 .chev{
+    font-size:13px;
+    color:var(--pretzel);
+    transition:transform .15s ease;
+    display:inline-block;
+  }
+  .guide.collapsed .guide-head h2 .chev{transform:rotate(-90deg);}
+  .guide-head #guideToggleBtn{margin-left:auto;}
+  .guide-body{
+    padding:18px 22px 26px;
+    display:block;
+    max-width:920px;
+  }
+  .guide.collapsed .guide-body{display:none;}
+
+  .guide-intro{
+    font-size:15px;
+    line-height:1.6;
+    color:var(--text-dim);
+    margin:0 0 20px;
+  }
+  .guide-intro b{color:var(--text); font-weight:600;}
+
+  .guide-methods{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-bottom:24px;
+  }
+  .method-card{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    padding:16px 18px;
+    box-shadow:0 1px 3px rgba(20,20,10,.05);
+  }
+  .method-icon{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:34px;height:34px;
+    border-radius:50%;
+    font-family:'Anton',sans-serif;
+    font-size:17px;
+    margin-bottom:10px;
+  }
+  .m-origin .method-icon{background:var(--lime); color:var(--ink);}
+  .m-usage .method-icon{background:var(--pretzel); color:#fff;}
+  .method-card h3{
+    font-family:'Anton',sans-serif;
+    font-weight:400;
+    font-size:16px;
+    margin:0 0 8px;
+    letter-spacing:.01em;
+  }
+  .method-def{font-size:13.5px; line-height:1.5; color:var(--text-dim); margin:0 0 10px;}
+  .method-def b{color:var(--text); font-weight:600;}
+  .method-use{font-size:12.5px; line-height:1.5; color:var(--text-dimmer); margin:0;}
+  .method-use i{font-style:italic;}
+
+  .guide-steps h3, .guide-upload h3{
+    font-family:'Anton',sans-serif;
+    font-weight:400;
+    font-size:15.5px;
+    letter-spacing:.01em;
+    margin:0 0 12px;
+    color:var(--text);
+  }
+  .guide-steps ol{
+    list-style:none;
+    margin:0 0 12px;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    gap:11px;
+  }
+  .guide-steps li{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    font-size:13.5px;
+    line-height:1.5;
+    color:var(--text-dim);
+  }
+  .guide-steps li b{color:var(--text); font-weight:600;}
+  .step-num{
+    flex:none;
+    width:24px;height:24px;
+    border-radius:50%;
+    background:var(--ink);
+    color:#fff;
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    font-size:12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-top:1px;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--pretzel-text); background:rgba(40,120,255,.08); padding:1px 5px; border-radius:4px;}
+  .guide-tip{
+    font-size:12.5px;
+    color:var(--text-dimmer);
+    line-height:1.5;
+    margin:14px 0 24px;
+    padding:10px 14px;
+    background:var(--bg-soft);
+    border:1px dashed var(--card-border);
+    border-radius:10px;
+  }
+
+  .guide-upload{
+    background:rgba(202,220,48,.16);
+    border:1px solid rgba(150,166,20,.3);
+    border-radius:14px;
+    padding:16px 18px;
+    margin-bottom:20px;
+  }
+  .uploader-inner{
+    display:flex;
+    align-items:flex-end;
+    gap:18px;
+    flex-wrap:wrap;
+  }
+  .upload-slot{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+  }
+  .upload-slot > label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:var(--text-dimmer);
+    font-weight:700;
+  }
+  .upload-pick{
+    display:flex;
+    align-items:center;
+    gap:9px;
+  }
+  .upload-pick input[type=file]{
+    max-width:0.1px;
+    max-height:0.1px;
+    opacity:0;
+    overflow:hidden;
+    position:absolute;
+  }
+  .upload-pick .upload-btn{
+    background:var(--card);
+    border:1px solid var(--ink);
+    color:var(--ink);
+    font-family:'Barlow Semi Condensed',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    padding:8px 15px;
+    border-radius:999px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .upload-pick .upload-btn:hover{background:var(--ink); color:#fff;}
+  .upload-filename{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--text-dim);
+    max-width:220px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  #rebuildBtn{
+    background:var(--ink);
+    border:1px solid var(--ink);
+    color:#fff;
+    font-family:'Barlow Semi Condensed',sans-serif;
+    font-weight:700;
+    font-size:13.5px;
+    padding:9px 18px;
+    border-radius:999px;
+    cursor:pointer;
+  }
+  #rebuildBtn:disabled{
+    background:none;
+    border-color:var(--card-border);
+    color:var(--text-dimmer);
+    cursor:not-allowed;
+  }
+  #rebuildBtn:not(:disabled):hover{background:var(--pretzel); border-color:var(--pretzel);}
+  .upload-status{
+    font-size:12.5px;
+    color:var(--text-dim);
+    max-width:520px;
+    line-height:1.4;
+  }
+  .upload-status.ok{color:var(--lime-text); font-weight:600;}
+  .upload-status.warn{color:#9C5D0A; font-weight:600;}
+  .upload-status.error{color:var(--rose-text); font-weight:600;}
+  .uploader-hint{
+    width:100%;
+    font-size:11.5px;
+    color:var(--text-dim);
+    margin:12px 0 0;
+  }
+
+  .guide-glossary{
+    border-top:1px solid var(--card-border);
+    padding-top:14px;
+  }
+  .guide-glossary summary{
+    cursor:pointer;
+    font-family:'Anton',sans-serif;
+    font-weight:400;
+    font-size:14px;
+    color:var(--text-dim);
+    letter-spacing:.01em;
+  }
+  .guide-glossary summary:hover{color:var(--text);}
+  .guide-glossary dl{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px 24px;
+    margin:14px 0 0;
+  }
+  .guide-glossary dl > div{border-top:1px solid var(--card-border); padding-top:8px;}
+  .guide-glossary dt{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    font-weight:600;
+    color:var(--pretzel-text);
+    margin-bottom:2px;
+  }
+  .guide-glossary dd{
+    margin:0;
+    font-size:12.5px;
+    color:var(--text-dim);
+    line-height:1.4;
+  }
+
+  @media (max-width:720px){
+    .guide-methods{grid-template-columns:1fr;}
+    .guide-glossary dl{grid-template-columns:1fr;}
+  }
+
+
+  /* ---------- body layout (sidebar + canvas) ---------- */
+  .body-row{
+    display:flex;
+    align-items:stretch;
+    flex:1;
+    min-height:0;
+  }
+
+  /* ---------- filter sidebar ---------- */
+  .sidebar{
+    width:264px;
+    flex:none;
+    background:var(--panel);
+    border-right:1px solid var(--card-border);
+    overflow-y:auto;
+    padding:16px 14px 30px;
+  }
+  .sidebar-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:4px;
+  }
+  .sidebar-head h2{
+    font-family:'Anton', sans-serif;
+    font-weight:400;
+    font-size:13.5px;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    margin:0;
+    color:var(--text-dim);
+  }
+  #clearFiltersBtn{
+    background:none;
+    border:none;
+    color:var(--pretzel-text);
+    font-family:'Barlow Semi Condensed',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    cursor:pointer;
+    padding:2px 0;
+    display:none;
+  }
+  #clearFiltersBtn.show{display:inline-block;}
+  .sidebar-hint{
+    font-size:11.5px;
+    color:var(--text-dimmer);
+    line-height:1.4;
+    margin:0 0 16px;
+  }
+
+  .facet{
+    border:1px solid var(--card-border);
+    border-radius:9px;
+    margin-bottom:10px;
+    background:var(--card);
+    overflow:hidden;
+  }
+  .facet.active{border-color:var(--pretzel);}
+  .facet-btn{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    background:none;
+    border:none;
+    color:var(--text);
+    font-family:'Barlow Semi Condensed',sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    padding:10px 12px;
+    cursor:pointer;
+    text-align:left;
+  }
+  .facet-btn .fb-left{display:flex; align-items:center; gap:8px; overflow:hidden;}
+  .facet-count{
+    background:var(--pretzel-text);
+    color:#fff;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    font-weight:600;
+    border-radius:8px;
+    padding:1px 6px;
+    flex:none;
+    display:none;
+  }
+  .facet.active .facet-count{display:inline-block;}
+  .facet-chev{
+    color:var(--text-dimmer);
+    font-size:11px;
+    transition:transform .12s ease;
+    flex:none;
+  }
+  .facet.open .facet-chev{transform:rotate(90deg);}
+  .facet-panel{
+    display:none;
+    padding:0 10px 10px;
+  }
+  .facet.open .facet-panel{display:block;}
+  .facet-search{
+    width:100%;
+    background:var(--bg-soft);
+    border:1px solid var(--card-border);
+    color:var(--text);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    padding:6px 9px;
+    border-radius:6px;
+    margin-bottom:7px;
+  }
+  .facet-search:focus{outline:2px solid var(--focus); outline-offset:1px;}
+  .facet-options{
+    max-height:190px;
+    overflow-y:auto;
+  }
+  .facet-opt{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:5px 4px;
+    border-radius:5px;
+    cursor:pointer;
+    font-size:12.5px;
+  }
+  .facet-opt:hover{background:var(--bg-soft);}
+  .facet-opt input{
+    accent-color:var(--pretzel);
+    flex:none;
+    cursor:pointer;
+  }
+  .facet-opt .fo-label{
+    flex:1;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color:var(--text-dim);
+  }
+  .facet-opt input:checked ~ .fo-label{color:var(--text);}
+  .facet-opt .fo-count{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    color:var(--text-dimmer);
+    flex:none;
+  }
+  .facet-empty{color:var(--text-dimmer); font-size:12px; padding:6px 4px;}
+
+  .filter-summary{
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px solid var(--card-border);
+    font-size:12px;
+    color:var(--text-dim);
+    line-height:1.5;
+  }
+  .filter-summary b{color:var(--lime-text); font-family:'IBM Plex Mono',monospace;}
+
+  /* ---------- canvas ---------- */
+  .stage-wrap{
+    position:relative;
+    flex:1;
+    min-width:0;
+    overflow:auto;
+    background:
+      radial-gradient(circle at 1px 1px, #E5E1D2 1px, transparent 0) 0 0/22px 22px,
+      var(--bg);
+  }
+  .stage{
+    position:relative;
+    display:flex;
+    align-items:flex-start;
+    padding:60px 60px 100px 60px;
+    min-height:100%;
+    width:max-content;
+  }
+  svg.connectors{
+    position:absolute;
+    top:0; left:0;
+    overflow:visible;
+    pointer-events:none;
+  }
+  .col{
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:14px;
+    flex:none;
+    position:relative;
+    z-index:2;
+  }
+  .col + .col{ margin-left:76px; }
+
+  /* ---------- node card ---------- */
+  .node{
+    background:var(--card);
+    border:1px solid var(--card-border);
+    border-radius:14px;
+    width:248px;
+    padding:11px 13px 12px;
+    cursor:pointer;
+    position:relative;
+    box-shadow:0 1px 3px rgba(20,20,10,.05);
+    transition:border-color .12s ease, box-shadow .12s ease, transform .12s ease;
+  }
+  .node:hover{border-color:var(--pretzel); box-shadow:0 6px 18px rgba(40,120,255,.15);}
+  .node:focus-visible{outline:2px solid var(--focus); outline-offset:2px;}
+  .node.expanded{border-color:var(--pretzel); box-shadow:0 0 0 1.5px rgba(40,120,255,.4);}
+  .node.dim{opacity:.28;}
+  .node.hit{border-color:#96A614; box-shadow:0 0 0 1.5px rgba(202,220,48,.7), 0 6px 20px rgba(202,220,48,.25);}
+  .node.apex{
+    width:236px;
+    cursor:default;
+    border-color:var(--pretzel);
+    background:linear-gradient(160deg,rgba(40,120,255,.09),var(--card) 65%);
+  }
+
+  .node-top{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:7px;
+  }
+  .type-chip{
+    width:8px;height:8px;border-radius:2.5px;flex:none;
+  }
+  .type-label{
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:var(--text-dim);
+    flex:1;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .traced-badge{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:9px;
+    color:var(--text-dim);
+    border:1px solid var(--card-border);
+    border-radius:4px;
+    padding:1px 4px;
+    flex:none;
+  }
+  .node-doc{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+    font-weight:600;
+    color:var(--text);
+    margin-bottom:6px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .node-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    font-size:12px;
+    color:var(--text-dim);
+    margin-top:3px;
+    gap:8px;
+  }
+  .node-row .v{
+    font-family:'IBM Plex Mono',monospace;
+    color:var(--text);
+    text-align:right;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .qty-pos{color:var(--lime-text) !important;}
+  .qty-neg{color:var(--rose-text) !important;}
+  .node-item{
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px dashed var(--card-border);
+    font-size:11px;
+    color:var(--text-dimmer);
+    line-height:1.35;
+  }
+  .node-item b{color:var(--text-dim); font-weight:600;}
+
+  .expand-tab{
+    position:absolute;
+    right:-1px;
+    top:50%;
+    transform:translateY(-50%);
+    width:24px;height:24px;
+    border-radius:50%;
+    background:var(--card);
+    border:1px solid var(--card-border);
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;
+    color:var(--text-dim);
+    right:-12px;
+  }
+  .node:hover .expand-tab, .node.expanded .expand-tab{border-color:var(--pretzel); color:var(--pretzel);}
+  .node[data-childcount="0"] .expand-tab{display:none;}
+  .node.apex .expand-tab{right:-12px;}
+
+  .child-count{
+    position:absolute;
+    right:-12px; top:-9px;
+    background:var(--pretzel-text);
+    color:#fff;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    font-weight:600;
+    border-radius:9px;
+    padding:1px 6px;
+    line-height:1.4;
+    min-width:16px;
+    text-align:center;
+    z-index:3;
+    display:none;
+  }
+  .node[data-childcount]:not([data-childcount="0"]) .child-count{display:block;}
+
+  .col-label{
+    position:sticky;
+    left:0;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--text-dimmer);
+    margin-bottom:4px;
+  }
+
+  .empty-msg{
+    color:var(--text-dimmer);
+    font-size:13px;
+    padding:40px;
+  }
+
+  /* scrollbars */
+  .stage-wrap::-webkit-scrollbar{height:12px; width:12px;}
+  .stage-wrap::-webkit-scrollbar-track{background:var(--bg);}
+  .stage-wrap::-webkit-scrollbar-thumb{background:#DDD8C6; border-radius:8px; border:3px solid var(--bg);}
+  .stage-wrap::-webkit-scrollbar-thumb:hover{background:#C9C3AC;}
+
+  @media (max-width:720px){
+    header{flex-wrap:wrap; gap:10px;}
+    .brand{border-right:none; padding-right:0;}
+    .search-wrap{max-width:none; order:3; width:100%;}
+    .header-actions{margin-left:0;}
+    .body-row{flex-direction:column;}
+    .sidebar{width:100%; max-height:220px; border-right:none; border-bottom:1px solid var(--card-border);}
+    .narrative{max-height:34vh;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark">50</div>
+    <div>
+      <h1 id="itemTitle">Item Trace</h1>
+      <p id="itemSub">loading…</p>
+    </div>
+  </div>
+
+  <div class="view-switch">
+    <label for="viewSelect">View</label>
+    <select id="viewSelect">
+      <option value="o2u">Origin → Usage</option>
+      <option value="u2o">Usage → Origin</option>
+    </select>
+  </div>
+
+  <div class="search-wrap">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#6B6B6B" stroke-width="2"/><path d="M21 21L16.65 16.65" stroke="#6B6B6B" stroke-width="2" stroke-linecap="round"/></svg>
+    <input id="searchInput" type="text" placeholder="Find by doc no, entry no, lot, item…" autocomplete="off">
+    <div class="search-results" id="searchResults"></div>
+  </div>
+
+  <div class="header-actions">
+    <button class="btn" id="loadFilesBtn">Load new trace files</button>
+    <button class="btn" id="resetBtn">Reset view</button>
+  </div>
+</header>
+
+<section class="guide" id="guidePanel">
+  <div class="guide-head" id="guideHead">
+    <h2><span class="chev">▾</span> How Item Tracing Works</h2>
+    <button class="btn-mini" id="guideToggleBtn">Hide this</button>
+  </div>
+  <div class="guide-body">
+
+    <p class="guide-intro">Business Central holds every sales, inventory, production, and procurement record we have. An <b>Item Trace</b> follows one lot number through that entire history — everywhere it came from, and everywhere it ended up — so instead of piecing it together by hand, you pull two reports out of Business Central and this tool turns them into a visual, clickable trace with a plain-English summary of what happened at each step.</p>
+
+    <div class="guide-methods">
+      <div class="method-card m-origin">
+        <span class="method-icon">→</span>
+        <h3>Origin → Usage</h3>
+        <p class="method-def">Start from a <b>raw material or packaging lot</b> and trace <b>forward</b> — every production order it fed into, every finished-good lot it became, every customer it shipped to.</p>
+        <p class="method-use">Use it to answer: <i>"If this raw material lot has a problem, what finished products and customers were affected?"</i></p>
+      </div>
+      <div class="method-card m-usage">
+        <span class="method-icon">←</span>
+        <h3>Usage → Origin</h3>
+        <p class="method-def">Start from a <b>finished good, production order, or shipment</b> and trace <b>backward</b> — the vendor lots and raw material receipts that went into it.</p>
+        <p class="method-use">Use it to answer: <i>"Where did the ingredients in this specific batch come from?"</i></p>
+      </div>
+    </div>
+
+    <div class="guide-steps">
+      <h3>Pulling a trace from Business Central</h3>
+      <ol>
+        <li><span class="step-num">1</span><div><b>Log in to Business Central</b> with your EBE O365 credentials at <span class="mono">businesscentral.dynamics.com/WholeAndFree-Prod</span>.</div></li>
+        <li><span class="step-num">2</span><div><b>Open Item Tracing.</b> Click the search (magnifying glass) icon in the top right, type "Item Tracing," and select the Item Tracing task.</div></li>
+        <li><span class="step-num">3</span><div><b>Enter the Lot No.</b> Every trace has to start from a lot number — use a raw material or packing lot for Origin → Usage, or a finished-good lot for Usage → Origin.</div></li>
+        <li><span class="step-num">4</span><div><b>Set the direction and trace.</b> Set Trace Method to "Origin → Usage" or "Usage → Origin," set Show Components to "No," then click Trace.</div></li>
+        <li><span class="step-num">5</span><div><b>Export it.</b> Once results appear, click the export icon (box with an arrow) and choose Open in Excel to download the full trace.</div></li>
+        <li><span class="step-num">6</span><div><b>Do it again for the other direction</b>, then upload both files below — this tool needs both to show the complete picture.</div></li>
+      </ol>
+      <p class="guide-tip">Tip: personalize the Item Tracing columns first so <span class="mono">Entry Type</span>, <span class="mono">Source Type</span>, <span class="mono">Source Name</span>, <span class="mono">Lot No.</span>, and <span class="mono">Posting Date</span> are all showing — that's what this tool reads from the export.</p>
+    </div>
+
+    <div class="guide-upload" id="uploaderPanel">
+      <h3>Upload your two files</h3>
+      <div class="uploader-inner">
+        <div class="upload-slot">
+          <label for="fileO2U">Origin → Usage file</label>
+          <div class="upload-pick">
+            <button type="button" class="upload-btn" id="fileO2UBtn">Choose .xlsx</button>
+            <input type="file" id="fileO2U" accept=".xlsx">
+            <span class="upload-filename" id="fileO2UName">No file chosen</span>
+          </div>
+        </div>
+        <div class="upload-slot">
+          <label for="fileU2O">Usage → Origin file</label>
+          <div class="upload-pick">
+            <button type="button" class="upload-btn" id="fileU2OBtn">Choose .xlsx</button>
+            <input type="file" id="fileU2O" accept=".xlsx">
+            <span class="upload-filename" id="fileU2OName">No file chosen</span>
+          </div>
+        </div>
+        <button id="rebuildBtn" disabled>Rebuild trace</button>
+        <span class="upload-status" id="uploadStatus"></span>
+      </div>
+      <p class="uploader-hint">Works for any item — upload a new pair of files any time to replace the trace shown below.</p>
+    </div>
+
+    <details class="guide-glossary">
+      <summary>Glossary of terms used in Business Central</summary>
+      <dl>
+        <div><dt>Item Ledger Entry</dt><dd>A database entry recording a lot to a document — either a sales order or a released production order.</dd></div>
+        <div><dt>RLPROD######</dt><dd>A Released Production Order number.</dd></div>
+        <div><dt>SO#######</dt><dd>A Sales Order number.</dd></div>
+        <div><dt>PPRCP######</dt><dd>Document number of a Purchase Receipt.</dd></div>
+        <div><dt>PSSHP#####</dt><dd>Posted Sales Shipment / Invoice.</dd></div>
+        <div><dt>GO-LIVE / Take On</dt><dd>Items loaded at the initial inventory start from MRPeasy.</dd></div>
+        <div><dt>Posting Date</dt><dd>The date the transaction was completed in the system.</dd></div>
+        <div><dt>Source Name</dt><dd>Source of record — for sales documents, the customer name; for purchases, the vendor name.</dd></div>
+      </dl>
+    </details>
+
+  </div>
+</section>
+
+<div class="legend" id="legend">
+  <span class="lg-title">Legend</span>
+</div>
+
+<section class="narrative" id="narrativePanel">
+  <div class="narrative-head" id="narrativeHead">
+    <h2><span class="chev">▾</span> Trace Summary</h2>
+    <div class="narrative-controls">
+      <label class="toggle"><input type="checkbox" id="showAllToggle"> Show every reversed / duplicate entry</label>
+      <button class="btn-mini" id="collapseBranchesBtn">Collapse all branches</button>
+    </div>
+  </div>
+  <div class="narrative-body">
+    <p class="narrative-stats" id="narrativeStats"></p>
+    <ul class="narrative-list" id="narrativeList"></ul>
+  </div>
+</section>
+
+<div class="body-row">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <h2>Filter &amp; expand</h2>
+      <button id="clearFiltersBtn">Clear</button>
+    </div>
+    <p class="sidebar-hint" id="sidebarHint">Pick one or more values below — the tree expands to show every matching transaction.</p>
+    <div id="facetContainer"></div>
+    <div class="filter-summary" id="filterSummary" style="display:none;"></div>
+  </aside>
+
+  <div class="stage-wrap" id="stageWrap">
+    <div class="stage" id="stage">
+      <svg class="connectors" id="connectors"></svg>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = {"o2u":{"nodes":[],"roots":[]},"u2o":{"nodes":[],"roots":[]},"item":"","itemDesc":""};
+
+/* precompute "pure noise" map per tree: a node is noise if it (and its whole
+   subtree) is already-traced — i.e. a duplicate loop-closure that adds no
+   new information to the trace. */
+function computeNoiseMap(tree){
+  const memo = {};
+  function rec(id){
+    if (id in memo) return memo[id];
+    memo[id] = false; // guard against cycles, shouldn't occur but stay safe
+    const node = tree.nodes[id];
+    const result = !!node.traced && node.children.every(rec);
+    memo[id] = result;
+    return result;
+  }
+  tree.nodes.forEach(n => rec(n.id));
+  tree.noise = memo;
+}
+computeNoiseMap(DATA.o2u);
+computeNoiseMap(DATA.u2o);
+
+const TYPE_META = {
+  'Purch. Rcpt. Header':               { color:'var(--lime)',    short:'Purchase Receipt' },
+  'Finished Production Order Output':  { color:'var(--teal)',    short:'Production Output' },
+  'Finished Production Order Consumption': { color:'var(--orange)', short:'Production Consumption' },
+  'Transfer Receipt Header':           { color:'var(--sky)',     short:'Transfer Receipt' },
+  'Transfer Shipment Header':          { color:'var(--magenta)', short:'Transfer Shipment' },
+  'Sales Shipment Header':             { color:'var(--rose)',    short:'Sales Shipment' },
+  'Item Ledger Entry':                 { color:'var(--grey)',    short:'Ledger Entry / Adjustment' },
+};
+
+let state = {
+  view: 'o2u',
+  expanded: new Set(),   // node ids expanded — shared by narrative outline & visual tree
+  hitIds: new Set(),     // currently highlighted node ids (search jump or facet matches)
+  hideNoise: true,       // simplify: hide already-traced duplicate/reversal branches
+  narrativeOpen: true,
+  filters: {             // active facet selections, per field
+    source: new Set(),
+    lot: new Set(),
+    entry: new Set(),
+    loc: new Set(),
+  },
+  facetOpen: {source:false, lot:false, entry:false, loc:false},
+  facetSearch: {source:'', lot:'', entry:'', loc:''},
+};
+
+const FACETS = [
+  { key:'source', field:'source', label:'Source Name' },
+  { key:'lot',    field:'lot',    label:'Lot #' },
+  { key:'entry',  field:'entry',  label:'Entry #' },
+  { key:'loc',    field:'loc',    label:'Location' },
+];
+
+const stageWrap = document.getElementById('stageWrap');
+const stage = document.getElementById('stage');
+const svg = document.getElementById('connectors');
+const viewSelect = document.getElementById('viewSelect');
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+const resetBtn = document.getElementById('resetBtn');
+const itemTitle = document.getElementById('itemTitle');
+const itemSub = document.getElementById('itemSub');
+const legend = document.getElementById('legend');
+const facetContainer = document.getElementById('facetContainer');
+const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+const filterSummary = document.getElementById('filterSummary');
+const sidebarHint = document.getElementById('sidebarHint');
+const narrativePanel = document.getElementById('narrativePanel');
+const narrativeHead = document.getElementById('narrativeHead');
+const narrativeStats = document.getElementById('narrativeStats');
+const narrativeList = document.getElementById('narrativeList');
+const showAllToggle = document.getElementById('showAllToggle');
+const collapseBranchesBtn = document.getElementById('collapseBranchesBtn');
+const loadFilesBtn = document.getElementById('loadFilesBtn');
+const guidePanel = document.getElementById('guidePanel');
+const guideHead = document.getElementById('guideHead');
+const guideToggleBtn = document.getElementById('guideToggleBtn');
+const uploaderPanel = document.getElementById('uploaderPanel');
+const fileO2U = document.getElementById('fileO2U');
+const fileU2O = document.getElementById('fileU2O');
+const fileO2UBtn = document.getElementById('fileO2UBtn');
+const fileU2OBtn = document.getElementById('fileU2OBtn');
+const fileO2UName = document.getElementById('fileO2UName');
+const fileU2OName = document.getElementById('fileU2OName');
+const rebuildBtn = document.getElementById('rebuildBtn');
+const uploadStatus = document.getElementById('uploadStatus');
+const brandMark = document.querySelector('.brand .mark');
+
+function safeScrollTo(el, opts){
+  if (el && typeof el.scrollTo === 'function'){
+    try { el.scrollTo(opts); } catch(e){ /* some environments reject smooth behavior */ }
+  }
+}
+
+function currentTree(){ return DATA[state.view]; }
+function fmtQty(q){
+  const n = Number(q);
+  const sign = n > 0 ? '+' : '';
+  return sign + (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined,{maximumFractionDigits:2}));
+}
+function isNoiseNode(id){ return !!currentTree().noise[id]; }
+/* the children (or roots) actually shown, respecting the "simplify" toggle */
+function getChildren(node){
+  if (!state.hideNoise) return node.children;
+  return node.children.filter(id => !isNoiseNode(id));
+}
+function getVisibleRoots(){
+  const tree = currentTree();
+  if (!state.hideNoise) return tree.roots;
+  return tree.roots.filter(id => !isNoiseNode(id));
+}
+function hiddenChildCount(node){
+  return node.children.length - getChildren(node).length;
+}
+
+function buildLegend(){
+  legend.innerHTML = '<span class="lg-title">Legend</span>' +
+    Object.entries(TYPE_META).map(([k,v]) =>
+      `<span class="lg-item"><span class="lg-dot" style="background:${v.color}"></span>${v.short}</span>`
+    ).join('') +
+    `<span class="lg-item"><span class="lg-dot" style="background:var(--pretzel)"></span>Item 50028</span>`;
+}
+
+function nodeById(id){ return currentTree().nodes[id]; }
+
+function renderHeader(){
+  if (!DATA.item){
+    itemTitle.textContent = 'Item Trace';
+    itemSub.textContent = 'No trace loaded — upload your Origin → Usage and Usage → Origin files above to get started.';
+    if (brandMark) brandMark.textContent = '?';
+    return;
+  }
+  itemTitle.textContent = 'Item Trace · ' + DATA.item;
+  const roots = currentTree().roots.length;
+  const viewLabel = state.view === 'o2u' ? 'Origin → Usage' : 'Usage → Origin';
+  itemSub.textContent = `${DATA.itemDesc} — ${viewLabel} — ${roots} root transaction${roots===1?'':'s'}`;
+  if (brandMark) brandMark.textContent = String(DATA.item || '?').slice(0,2);
+}
+
+/* ---------- building the visible column structure ---------- */
+function computeColumns(){
+  const columns = [];
+  // column 0: synthetic apex
+  columns.push([{apex:true, id:'apex'}]);
+  let frontier = getVisibleRoots().slice();
+  while (frontier.length){
+    columns.push(frontier.map(id => ({apex:false, id})));
+    let next = [];
+    for (const id of frontier){
+      if (state.expanded.has(id)){
+        next = next.concat(getChildren(nodeById(id)));
+      }
+    }
+    frontier = next;
+  }
+  return columns;
+}
+
+function typeMeta(node){
+  return TYPE_META[node.type] || { color:'var(--grey)', short:node.type };
+}
+
+function renderNodeCard(entry){
+  const div = document.createElement('div');
+  div.dataset.id = entry.id;
+
+  if (entry.apex){
+    const rootCount = getVisibleRoots().length;
+    div.className = 'node apex';
+    div.dataset.childcount = rootCount;
+    div.innerHTML = `
+      <div class="node-top">
+        <span class="type-chip" style="background:var(--pretzel)"></span>
+        <span class="type-label">Item</span>
+      </div>
+      <div class="node-doc">${DATA.item}</div>
+      <div class="node-row"><span>Description</span></div>
+      <div class="node-item">${DATA.itemDesc}</div>
+      <span class="child-count">${rootCount}</span>
+      <span class="expand-tab">›</span>
+    `;
+    div.addEventListener('click', ()=>{}); // apex always expanded, no-op
+    return div;
+  }
+
+  const node = nodeById(entry.id);
+  const meta = typeMeta(node);
+  const isExpanded = state.expanded.has(node.id);
+  const visibleChildren = getChildren(node);
+  const hiddenCount = hiddenChildCount(node);
+  div.className = 'node' + (isExpanded ? ' expanded':'') + (state.hitIds.has(node.id) ? ' hit':'');
+  div.dataset.childcount = visibleChildren.length;
+  div.tabIndex = 0;
+  div.setAttribute('role','button');
+  div.setAttribute('aria-expanded', isExpanded ? 'true':'false');
+
+  const qtyClass = node.qty > 0 ? 'qty-pos' : (node.qty < 0 ? 'qty-neg' : '');
+  const itemLine = (node.itemNo && node.itemNo !== DATA.item)
+    ? `<div class="node-item"><b>${node.itemNo}</b> — ${node.itemDesc||''}</div>`
+    : '';
+  const hiddenLine = hiddenCount
+    ? `<div class="node-item" style="color:var(--text-dimmer)">+${hiddenCount} reversed/duplicate ${hiddenCount===1?'entry':'entries'} hidden</div>`
+    : '';
+
+  div.innerHTML = `
+    <div class="node-top">
+      <span class="type-chip" style="background:${meta.color}"></span>
+      <span class="type-label" title="${node.type}">${meta.short}</span>
+      ${node.traced ? '<span class="traced-badge" title="Already traced elsewhere — closes this branch">TRACED</span>' : ''}
+    </div>
+    <div class="node-doc" title="${node.doc}">${node.doc || '(no doc)'}</div>
+    <div class="node-row"><span>Qty</span><span class="v ${qtyClass}">${fmtQty(node.qty)}</span></div>
+    <div class="node-row"><span>Date</span><span class="v">${node.date||'—'}</span></div>
+    <div class="node-row"><span>Entry</span><span class="v">#${node.entry}</span></div>
+    ${node.source ? `<div class="node-row"><span>Source</span><span class="v" title="${node.source}">${node.source}</span></div>` : ''}
+    ${node.lot ? `<div class="node-row"><span>Lot</span><span class="v">${node.lot}</span></div>` : ''}
+    ${node.loc ? `<div class="node-row"><span>Loc</span><span class="v">${node.loc}</span></div>` : ''}
+    ${itemLine}
+    ${hiddenLine}
+    <span class="child-count">${visibleChildren.length}</span>
+    <span class="expand-tab">›</span>
+  `;
+
+  div.addEventListener('click', () => toggleNode(node.id));
+  div.addEventListener('keydown', (e)=>{
+    if (e.key==='Enter' || e.key===' '){ e.preventDefault(); toggleNode(node.id); }
+  });
+
+  return div;
+}
+
+function toggleNode(id){
+  if (state.expanded.has(id)) state.expanded.delete(id);
+  else state.expanded.add(id);
+  state.hitIds = new Set();
+  render();
+}
+
+function render(){
+  // clear stage but keep svg
+  stage.querySelectorAll('.col, .empty-msg').forEach(el => el.remove());
+
+  const columns = computeColumns();
+
+  if (columns.length === 1 && columns[0][0].apex && currentTree().roots.length === 0){
+    const msg = document.createElement('div');
+    msg.className = 'empty-msg';
+    msg.textContent = DATA.item
+      ? 'No trace data for this view.'
+      : 'No trace loaded yet — upload your Origin → Usage and Usage → Origin files above to get started.';
+    stage.appendChild(msg);
+    positionConnectors([]);
+    renderNarrative();
+    return;
+  }
+
+  const colEls = [];
+  columns.forEach((colEntries, ci) => {
+    const colDiv = document.createElement('div');
+    colDiv.className = 'col';
+    colDiv.dataset.col = ci;
+    colEntries.forEach(entry => colDiv.appendChild(renderNodeCard(entry)));
+    stage.appendChild(colDiv);
+    colEls.push(colDiv);
+  });
+
+  requestAnimationFrame(() => drawConnectors(columns));
+  renderNarrative();
+}
+
+function drawConnectors(columns){
+  const stageRect = stage.getBoundingClientRect();
+  const paths = [];
+
+  for (let ci = 0; ci < columns.length - 1; ci++){
+    const colEntries = columns[ci];
+    colEntries.forEach(entry => {
+      const isExpandedParent = entry.apex || state.expanded.has(entry.id);
+      if (!isExpandedParent) return;
+      const parentEl = stage.querySelector(`.col[data-col="${ci}"] .node[data-id="${entry.apex ? 'apex' : entry.id}"]`);
+      if (!parentEl) return;
+      const pr = parentEl.getBoundingClientRect();
+      const px = pr.right - stageRect.left;
+      const py = pr.top + pr.height/2 - stageRect.top;
+
+      const childIds = entry.apex ? getVisibleRoots() : getChildren(nodeById(entry.id));
+      childIds.forEach(cid => {
+        const childEl = stage.querySelector(`.col[data-col="${ci+1}"] .node[data-id="${cid}"]`);
+        if (!childEl) return;
+        const cr = childEl.getBoundingClientRect();
+        const cx = cr.left - stageRect.left;
+        const cy = cr.top + cr.height/2 - stageRect.top;
+        const midX = (px + cx) / 2;
+        const strokeColor = entry.apex ? 'rgba(40,120,255,.55)' : 'rgba(26,26,26,.16)';
+        paths.push(`<path d="M ${px} ${py} C ${midX} ${py}, ${midX} ${cy}, ${cx} ${cy}" stroke="${strokeColor}" stroke-width="1.5" fill="none"/>`);
+      });
+    });
+  }
+
+  const w = stage.scrollWidth;
+  const h = stage.scrollHeight;
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.innerHTML = paths.join('');
+}
+
+function positionConnectors(){
+  svg.innerHTML = '';
+}
+
+/* ---------- narrative summary ---------- */
+function esc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function describeNode(node){
+  const qtyAbs = Math.abs(node.qty);
+  const qtyStr = `<b>${qtyAbs.toLocaleString()}</b> unit${qtyAbs===1?'':'s'}`;
+  const doc = `<span class="doc-ref">${esc(node.doc || '#'+node.entry)}</span>`;
+  const date = node.date || 'an unknown date';
+
+  switch(node.type){
+    case 'Purch. Rcpt. Header':
+      return `Received ${qtyStr} from <b>${esc(node.source||'a vendor')}</b> on ${date} — ${doc}`;
+    case 'Finished Production Order Consumption':
+      return `Consumed ${qtyStr} into Production Order ${doc} on ${date}`;
+    case 'Finished Production Order Output':
+      return `Produced ${qtyStr} as output of Production Order ${doc} on ${date}`;
+    case 'Transfer Receipt Header':
+      return `Received ${qtyStr} via transfer into <b>${esc(node.loc||'a location')}</b> on ${date} — ${doc}`;
+    case 'Transfer Shipment Header':
+      return `Shipped ${qtyStr} via transfer out of <b>${esc(node.loc||'a location')}</b> on ${date} — ${doc}`;
+    case 'Sales Shipment Header':
+      return `Shipped ${qtyStr} to <b>${esc(node.source||'a customer')}</b> on ${date} — ${doc}`;
+    case 'Item Ledger Entry':
+      return node.qty < 0
+        ? `Sold / issued ${qtyStr} on ${date} — ${doc}`
+        : `Inventory entry of ${qtyStr} recorded on ${date} — ${doc}`;
+    default:
+      return `${esc(node.type)} — ${qtyStr} on ${date} (${doc})`;
+  }
+}
+
+function narrativeRowHTML(node, hasChildren, hiddenCount){
+  const meta = typeMeta(node);
+  const isExpanded = state.expanded.has(node.id);
+  const caret = hasChildren ? (isExpanded ? '▾' : '▸') : '•';
+  return `
+    <div class="narr-row${isExpanded?' expanded':''}${state.hitIds.has(node.id)?' hit':''}" data-id="${node.id}">
+      <span class="narr-caret${hasChildren?'':' leaf'}">${caret}</span>
+      <span class="narr-dot" style="background:${meta.color}"></span>
+      <span class="narr-text">${describeNode(node)}${node.traced?'<span class="traced-flag">TRACED</span>':''}${hiddenCount?` <span class="narr-badge">(+${hiddenCount} hidden)</span>`:''}</span>
+    </div>`;
+}
+
+function renderNarrativeNodeLI(id){
+  const node = nodeById(id);
+  const children = getChildren(node);
+  const hidden = hiddenChildCount(node);
+  const li = document.createElement('li');
+  li.innerHTML = narrativeRowHTML(node, children.length > 0, hidden);
+  const row = li.querySelector('.narr-row');
+  row.addEventListener('click', () => toggleNode(id));
+  if (children.length && state.expanded.has(id)){
+    const ul = document.createElement('ul');
+    children.forEach(cid => ul.appendChild(renderNarrativeNodeLI(cid)));
+    li.appendChild(ul);
+  }
+  return li;
+}
+
+function buildNarrativeStats(){
+  const tree = currentTree();
+  const visible = tree.nodes.filter(n => !tree.noise[n.id]);
+  const roots = getVisibleRoots().map(id => tree.nodes[id]);
+  const dates = visible.map(n => n.date).filter(Boolean).sort();
+  const minDate = dates[0], maxDate = dates[dates.length-1];
+  const chip = v => `<span class="stat-chip">${esc(v)}</span>`;
+
+  if (state.view === 'o2u'){
+    const totalIn = roots.filter(n => n.qty > 0).reduce((s,n) => s+n.qty, 0);
+    const shipments = visible.filter(n => n.type === 'Sales Shipment Header');
+    const customers = new Set(shipments.map(n => n.source || 'Unknown customer'));
+    return `<b>${DATA.item}</b> · ${esc(DATA.itemDesc)}. Starting from ${chip(roots.length + ' originating transaction'+(roots.length===1?'':'s'))} totaling ${chip(totalIn.toLocaleString()+' units')} `
+      + `between ${chip(minDate||'—')} and ${chip(maxDate||'—')}, this lot moved through production and transfers and reached `
+      + `${chip(customers.size + ' customer'+(customers.size===1?'':'s'))} across ${chip(shipments.length + ' shipment'+(shipments.length===1?'':'s'))}.`;
+  } else {
+    const totalOut = roots.reduce((s,n) => s+Math.abs(n.qty), 0);
+    const receipts = visible.filter(n => n.type === 'Purch. Rcpt. Header');
+    const vendors = new Set(receipts.map(n => n.source || 'Unknown vendor'));
+    return `<b>${DATA.item}</b> · ${esc(DATA.itemDesc)}. Tracing backward from ${chip(roots.length + ' usage transaction'+(roots.length===1?'':'s'))} `
+      + `totaling ${chip(totalOut.toLocaleString()+' units')} between ${chip(minDate||'—')} and ${chip(maxDate||'—')}, `
+      + `this trail runs back through production and transfers to ${chip(vendors.size + ' vendor'+(vendors.size===1?'':'s'))} `
+      + `across ${chip(receipts.length + ' purchase receipt'+(receipts.length===1?'':'s'))}.`;
+  }
+}
+
+function renderNarrative(){
+  if (!DATA.item){
+    narrativeStats.innerHTML = 'No trace loaded yet. Upload your Origin → Usage and Usage → Origin exports above and click <b>Rebuild trace</b> to see the story here.';
+    narrativeList.innerHTML = '';
+    return;
+  }
+  narrativeStats.innerHTML = buildNarrativeStats();
+  narrativeList.innerHTML = '';
+  const roots = getVisibleRoots();
+  if (!roots.length){
+    narrativeList.innerHTML = `<div class="narrative-empty">No trace data for this view.</div>`;
+    return;
+  }
+  roots.forEach(id => narrativeList.appendChild(renderNarrativeNodeLI(id)));
+}
+
+/* ---------- filter sidebar (facets) ---------- */
+function facetValue(node, field){
+  if (field === 'entry') return node.entry != null ? String(node.entry) : '';
+  return node[field] || '';
+}
+
+function buildFacetOptions(field){
+  const tree = currentTree();
+  const counts = new Map();
+  tree.nodes.forEach(n => {
+    const v = facetValue(n, field);
+    if (!v) return;
+    counts.set(v, (counts.get(v)||0) + 1);
+  });
+  const entries = Array.from(counts.entries());
+  // entry # sorts numerically, everything else alphabetically
+  if (field === 'entry') entries.sort((a,b) => Number(a[0]) - Number(b[0]));
+  else entries.sort((a,b) => a[0].localeCompare(b[0]));
+  return entries; // [ [value, count], ... ]
+}
+
+function facetMatchesFilters(node){
+  for (const f of FACETS){
+    const sel = state.filters[f.key];
+    if (sel.size === 0) continue;
+    const v = facetValue(node, f.field);
+    if (!sel.has(v)) return false;
+  }
+  return true;
+}
+
+function anyFilterActive(){
+  return FACETS.some(f => state.filters[f.key].size > 0);
+}
+
+function renderFacets(){
+  facetContainer.innerHTML = '';
+  if (sidebarHint){
+    sidebarHint.textContent = DATA.item
+      ? 'Pick one or more values below — the tree expands to show every matching transaction.'
+      : 'Filters will appear here once you upload trace files above.';
+  }
+  if (!DATA.item){
+    clearFiltersBtn.classList.remove('show');
+    return;
+  }
+  FACETS.forEach(f => {
+    const options = buildFacetOptions(f.field);
+    const sel = state.filters[f.key];
+    const isOpen = state.facetOpen[f.key];
+    const q = (state.facetSearch[f.key]||'').toLowerCase();
+    const filteredOptions = q ? options.filter(([v]) => v.toLowerCase().includes(q)) : options;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'facet' + (sel.size ? ' active':'') + (isOpen ? ' open':'');
+
+    const btn = document.createElement('button');
+    btn.className = 'facet-btn';
+    btn.innerHTML = `<span class="fb-left">${f.label}${sel.size ? `<span class="facet-count">${sel.size}</span>` : ''}</span><span class="facet-chev">›</span>`;
+    btn.addEventListener('click', () => {
+      state.facetOpen[f.key] = !state.facetOpen[f.key];
+      renderFacets();
+    });
+    wrap.appendChild(btn);
+
+    const panel = document.createElement('div');
+    panel.className = 'facet-panel';
+
+    if (options.length > 8){
+      const search = document.createElement('input');
+      search.className = 'facet-search';
+      search.type = 'text';
+      search.placeholder = `Search ${f.label.toLowerCase()}…`;
+      search.value = state.facetSearch[f.key] || '';
+      search.addEventListener('click', e => e.stopPropagation());
+      search.addEventListener('input', () => {
+        state.facetSearch[f.key] = search.value;
+        renderFacets();
+        // restore focus after re-render
+        const again = facetContainer.querySelector(`.facet:nth-child(${FACETS.indexOf(f)+1}) .facet-search`);
+        if (again){ again.focus(); again.selectionStart = again.selectionEnd = again.value.length; }
+      });
+      panel.appendChild(search);
+    }
+
+    const optsWrap = document.createElement('div');
+    optsWrap.className = 'facet-options';
+    if (!filteredOptions.length){
+      optsWrap.innerHTML = `<div class="facet-empty">No matches.</div>`;
+    } else {
+      filteredOptions.forEach(([value, count]) => {
+        const opt = document.createElement('label');
+        opt.className = 'facet-opt';
+        opt.innerHTML = `<input type="checkbox" ${sel.has(value)?'checked':''}> <span class="fo-label" title="${value}">${value}</span><span class="fo-count">${count}</span>`;
+        const cb = opt.querySelector('input');
+        cb.addEventListener('change', () => {
+          if (cb.checked) sel.add(value); else sel.delete(value);
+          applyFilters();
+        });
+        optsWrap.appendChild(opt);
+      });
+    }
+    panel.appendChild(optsWrap);
+    wrap.appendChild(panel);
+    facetContainer.appendChild(wrap);
+  });
+
+  clearFiltersBtn.classList.toggle('show', anyFilterActive());
+}
+
+function revealIfNoise(ids){
+  // if any target sits inside a pruned/hidden branch, drop back to full detail
+  // so the jump/filter doesn't silently point at something invisible.
+  if (state.hideNoise && ids.some(id => isNoiseNode(id))){
+    state.hideNoise = false;
+    showAllToggle.checked = true;
+  }
+}
+
+function applyFilters(){
+  renderFacets();
+  if (!anyFilterActive()){
+    filterSummary.style.display = 'none';
+    render();
+    return;
+  }
+  const tree = currentTree();
+  const matches = tree.nodes.filter(facetMatchesFilters).map(n => n.id);
+  revealIfNoise(matches);
+
+  // expand ancestor path for every match so it's visible in the tree
+  matches.forEach(id => {
+    const path = findPathToRoot(id);
+    path.forEach(pid => { if (pid !== id) state.expanded.add(pid); });
+  });
+  state.hitIds = new Set(matches);
+
+  filterSummary.style.display = 'block';
+  filterSummary.innerHTML = matches.length
+    ? `<b>${matches.length}</b> matching transaction${matches.length===1?'':'s'} expanded below.`
+    : `No transactions match this combination.`;
+
+  render();
+  if (matches.length){
+    requestAnimationFrame(() => {
+      const el = stage.querySelector(`.node.hit`);
+      if (el && typeof el.scrollIntoView === 'function'){
+        el.scrollIntoView({behavior:'smooth', inline:'center', block:'center'});
+      }
+    });
+  }
+}
+
+function clearFilters(){
+  FACETS.forEach(f => state.filters[f.key] = new Set());
+  state.facetSearch = {source:'', lot:'', entry:'', loc:''};
+  state.hitIds = new Set();
+  filterSummary.style.display = 'none';
+  renderFacets();
+  render();
+}
+clearFiltersBtn.addEventListener('click', clearFilters);
+
+/* ---------- search ---------- */
+function searchNodes(q){
+  q = q.trim().toLowerCase();
+  if (!q) return [];
+  const tree = currentTree();
+  const results = [];
+  for (const node of tree.nodes){
+    if (
+      (node.doc && node.doc.toLowerCase().includes(q)) ||
+      String(node.entry).includes(q) ||
+      (node.lot && String(node.lot).toLowerCase().includes(q)) ||
+      (node.itemNo && String(node.itemNo).toLowerCase().includes(q)) ||
+      (node.source && node.source.toLowerCase().includes(q)) ||
+      (node.type && node.type.toLowerCase().includes(q))
+    ){
+      results.push(node);
+      if (results.length >= 40) break;
+    }
+  }
+  return results;
+}
+
+function findPathToRoot(id){
+  // returns array of ancestor ids from root..id (exclusive of apex)
+  const tree = currentTree();
+  const parentMap = tree.parentMap || (tree.parentMap = buildParentMap(tree));
+  const path = [];
+  let cur = id;
+  while (cur !== undefined && cur !== null){
+    path.unshift(cur);
+    cur = parentMap[cur];
+  }
+  return path;
+}
+function buildParentMap(tree){
+  const map = {};
+  tree.nodes.forEach(n => { n.children.forEach(c => { map[c] = n.id; }); });
+  return map;
+}
+
+function goToNode(id){
+  const path = findPathToRoot(id);
+  revealIfNoise(path);
+  path.forEach(pid => { if (pid !== id) state.expanded.add(pid); });
+  state.hitIds = new Set([id]);
+  render();
+  requestAnimationFrame(() => {
+    const el = stage.querySelector(`.node[data-id="${id}"]`);
+    if (el && typeof el.scrollIntoView === 'function'){
+      el.scrollIntoView({behavior:'smooth', inline:'center', block:'center'});
+    }
+  });
+  searchResults.classList.remove('open');
+  searchInput.value = '';
+}
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value;
+  const results = searchNodes(q);
+  if (!q.trim()){
+    searchResults.classList.remove('open');
+    return;
+  }
+  if (!results.length){
+    searchResults.innerHTML = `<div class="sr-empty">No matches in this view.</div>`;
+  } else {
+    searchResults.innerHTML = results.map(n => {
+      const meta = typeMeta(n);
+      return `<div class="sr-item" data-id="${n.id}">
+        <span class="sr-doc">${n.doc || '#'+n.entry}</span>
+        <div class="sr-meta">${meta.short} · ${n.itemNo} · ${n.date||'—'} · qty ${fmtQty(n.qty)}</div>
+      </div>`;
+    }).join('');
+    searchResults.querySelectorAll('.sr-item').forEach(el => {
+      el.addEventListener('click', () => goToNode(Number(el.dataset.id)));
+    });
+  }
+  searchResults.classList.add('open');
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-wrap')) searchResults.classList.remove('open');
+});
+
+/* ---------- view switch / reset ---------- */
+viewSelect.addEventListener('change', () => {
+  state.view = viewSelect.value;
+  state.expanded = new Set();
+  state.hitIds = new Set();
+  state.hideNoise = true;
+  showAllToggle.checked = false;
+  FACETS.forEach(f => state.filters[f.key] = new Set());
+  state.facetSearch = {source:'', lot:'', entry:'', loc:''};
+  filterSummary.style.display = 'none';
+  renderHeader();
+  renderFacets();
+  render();
+});
+resetBtn.addEventListener('click', () => {
+  state.expanded = new Set();
+  state.hitIds = new Set();
+  state.hideNoise = true;
+  showAllToggle.checked = false;
+  FACETS.forEach(f => state.filters[f.key] = new Set());
+  filterSummary.style.display = 'none';
+  renderFacets();
+  render();
+  safeScrollTo(stageWrap, {left:0, top:0, behavior:'smooth'});
+});
+
+window.addEventListener('resize', () => requestAnimationFrame(() => drawConnectors(computeColumns())));
+
+/* ---------- narrative panel controls ---------- */
+narrativeHead.addEventListener('click', (e) => {
+  if (e.target.closest('.narrative-controls')) return; // don't collapse when using controls
+  state.narrativeOpen = !state.narrativeOpen;
+  narrativePanel.classList.toggle('collapsed', !state.narrativeOpen);
+});
+showAllToggle.addEventListener('click', (e) => e.stopPropagation());
+showAllToggle.addEventListener('change', () => {
+  state.hideNoise = !showAllToggle.checked;
+  render();
+});
+collapseBranchesBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  state.expanded = new Set();
+  state.hitIds = new Set();
+  render();
+});
+
+/* ---------- guide panel controls ---------- */
+let guideOpen = true;
+function setGuideOpen(open){
+  guideOpen = open;
+  guidePanel.classList.toggle('collapsed', !guideOpen);
+  guideToggleBtn.textContent = guideOpen ? 'Hide this' : 'Show this';
+}
+guideHead.addEventListener('click', (e) => {
+  if (e.target.closest('.guide-upload') || e.target === guideToggleBtn) return;
+  setGuideOpen(!guideOpen);
+});
+guideToggleBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setGuideOpen(!guideOpen);
+});
+
+/* ---------- upload & rebuild from Business Central exports ---------- */
+let pendingFiles = { o2u: null, u2o: null };
+
+loadFilesBtn.addEventListener('click', () => {
+  setGuideOpen(true);
+  requestAnimationFrame(() => {
+    if (typeof guidePanel.scrollIntoView === 'function') guidePanel.scrollIntoView({behavior:'smooth', block:'start'});
+    if (typeof uploaderPanel.scrollIntoView === 'function') uploaderPanel.scrollIntoView({behavior:'smooth', block:'center'});
+  });
+});
+fileO2UBtn.addEventListener('click', () => fileO2U.click());
+fileU2OBtn.addEventListener('click', () => fileU2O.click());
+fileO2U.addEventListener('change', () => {
+  pendingFiles.o2u = fileO2U.files[0] || null;
+  fileO2UName.textContent = pendingFiles.o2u ? pendingFiles.o2u.name : 'No file chosen';
+  updateRebuildEnabled();
+});
+fileU2O.addEventListener('change', () => {
+  pendingFiles.u2o = fileU2O.files[0] || null;
+  fileU2OName.textContent = pendingFiles.u2o ? pendingFiles.u2o.name : 'No file chosen';
+  updateRebuildEnabled();
+});
+function updateRebuildEnabled(){
+  rebuildBtn.disabled = !(pendingFiles.o2u && pendingFiles.u2o);
+}
+
+function readFileAsWorkbook(file){
+  return new Promise((resolve, reject) => {
+    if (typeof XLSX === 'undefined'){
+      reject(new Error('The Excel reader library failed to load — check your internet connection and reload the page.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try { resolve(XLSX.read(new Uint8Array(e.target.result), {type:'array'})); }
+      catch (err){ reject(err); }
+    };
+    reader.onerror = () => reject(reader.error || new Error('Could not read the file.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function toBool(v){
+  if (typeof v === 'boolean') return v;
+  if (v == null) return false;
+  const s = String(v).trim().toLowerCase();
+  return s === 'true' || s === '1' || s === 'yes';
+}
+function formatExcelDate(v){
+  if (v == null || v === '') return '';
+  if (typeof v === 'number') return XLSX.SSF.format('yyyy-mm-dd', v);
+  if (v instanceof Date) return v.toISOString().slice(0,10);
+  const d = new Date(v);
+  if (!isNaN(d)) return d.toISOString().slice(0,10);
+  return String(v);
+}
+
+const REQUIRED_COLS = ['Description','Item No.','Item Description','Quantity','Already Traced','Posting Date','Item Ledger Entry No.','Document No.','Parent Item Ledger Entry No.'];
+
+function parseTraceWorkbook(wb){
+  const sheetName = wb.SheetNames.includes('Item Tracing') ? 'Item Tracing' : wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+  if (!rows.length) throw new Error('That sheet is empty.');
+
+  const header = rows[0].map(h => h == null ? '' : String(h).trim());
+  const idx = {};
+  header.forEach((h,i) => { if (h) idx[h] = i; });
+  const missing = REQUIRED_COLS.filter(c => !(c in idx));
+  if (missing.length){
+    throw new Error('Missing expected column(s): ' + missing.join(', ') + '. Make sure this is a Business Central Item Tracing export.');
+  }
+
+  const traceMethodIdx = idx['Trace Method'];
+  let traceMethod = null;
+  const out = [];
+  for (let r = 1; r < rows.length; r++){
+    const row = rows[r];
+    if (!row || row[idx['Item Ledger Entry No.']] == null) continue;
+    if (traceMethod === null && traceMethodIdx != null && row[traceMethodIdx]) traceMethod = String(row[traceMethodIdx]).trim();
+    out.push({
+      description: row[idx['Description']] ?? '',
+      itemNo: row[idx['Item No.']] != null ? String(row[idx['Item No.']]) : '',
+      itemDesc: row[idx['Item Description']] ?? '',
+      source: idx['Source Name'] != null ? (row[idx['Source Name']] || '') : '',
+      loc: idx['Location Code'] != null ? (row[idx['Location Code']] || '') : '',
+      lot: idx['Lot No.'] != null ? (row[idx['Lot No.']] || '') : '',
+      lp: idx['License Plate No.'] != null ? (row[idx['License Plate No.']] || '') : '',
+      qty: Number(row[idx['Quantity']]) || 0,
+      remQty: Number(row[idx['Remaining Quantity']]) || 0,
+      traced: toBool(row[idx['Already Traced']]),
+      date: formatExcelDate(row[idx['Posting Date']]),
+      entry: row[idx['Item Ledger Entry No.']],
+      doc: row[idx['Document No.']] != null ? String(row[idx['Document No.']]) : '',
+      parentEntry: row[idx['Parent Item Ledger Entry No.']],
+    });
+  }
+  if (!out.length) throw new Error('No data rows found in this file.');
+  return { rows: out, traceMethod };
+}
+
+function deriveType(desc, doc){
+  desc = desc || ''; doc = doc || '';
+  if (doc && desc.endsWith(doc)) return desc.slice(0, desc.length - doc.length).trim();
+  return desc;
+}
+
+function buildTreeFromRows(rows){
+  const n = rows.length;
+  const lastSeen = {};
+  const parentOf = new Array(n);
+  for (let i = 0; i < n; i++){
+    const entry = rows[i].entry;
+    const parentEntry = rows[i].parentEntry;
+    if (parentEntry === 0 || parentEntry == null || parentEntry === '') parentOf[i] = -1;
+    else parentOf[i] = (parentEntry in lastSeen) ? lastSeen[parentEntry] : -1;
+    lastSeen[entry] = i;
+  }
+  const nodes = rows.map((r,i) => ({
+    id:i, type:deriveType(r.description, r.doc), itemNo:r.itemNo, itemDesc:r.itemDesc,
+    source:r.source, loc:r.loc, lot:r.lot, lp:r.lp, qty:r.qty, remQty:r.remQty,
+    traced:r.traced, date:r.date, entry:r.entry, doc:r.doc, children:[]
+  }));
+  const roots = [];
+  parentOf.forEach((p,i) => { if (p === -1) roots.push(i); else nodes[p].children.push(i); });
+  return { nodes, roots };
+}
+
+rebuildBtn.addEventListener('click', async () => {
+  uploadStatus.className = 'upload-status';
+  uploadStatus.textContent = 'Reading files…';
+  rebuildBtn.disabled = true;
+  try {
+    const [wbO2U, wbU2O] = await Promise.all([
+      readFileAsWorkbook(pendingFiles.o2u),
+      readFileAsWorkbook(pendingFiles.u2o),
+    ]);
+    const parsedO2U = parseTraceWorkbook(wbO2U);
+    const parsedU2O = parseTraceWorkbook(wbU2O);
+
+    let warning = '';
+    if (parsedO2U.traceMethod && parsedO2U.traceMethod.toLowerCase().indexOf('usage->origin') === 0){
+      warning = ' Heads up: the file in the "Origin → Usage" slot looks like a Usage→Origin export — double-check the two files aren\'t swapped.';
+    } else if (parsedU2O.traceMethod && parsedU2O.traceMethod.toLowerCase().indexOf('origin->usage') === 0){
+      warning = ' Heads up: the file in the "Usage → Origin" slot looks like an Origin→Usage export — double-check the two files aren\'t swapped.';
+    }
+
+    const treeO2U = buildTreeFromRows(parsedO2U.rows);
+    const treeU2O = buildTreeFromRows(parsedU2O.rows);
+    computeNoiseMap(treeO2U);
+    computeNoiseMap(treeU2O);
+
+    DATA.o2u = treeO2U;
+    DATA.u2o = treeU2O;
+    const firstNode = treeO2U.nodes[0] || treeU2O.nodes[0];
+    DATA.item = firstNode ? firstNode.itemNo : DATA.item;
+    DATA.itemDesc = firstNode ? firstNode.itemDesc : DATA.itemDesc;
+
+    // full reset so nothing from the old trace lingers
+    state.view = 'o2u';
+    viewSelect.value = 'o2u';
+    state.expanded = new Set();
+    state.hitIds = new Set();
+    state.hideNoise = true;
+    showAllToggle.checked = false;
+    FACETS.forEach(f => state.filters[f.key] = new Set());
+    state.facetSearch = {source:'', lot:'', entry:'', loc:''};
+    state.facetOpen = {source:false, lot:false, entry:false, loc:false};
+    filterSummary.style.display = 'none';
+
+    renderHeader();
+    renderFacets();
+    render();
+    safeScrollTo(stageWrap, {left:0, top:0});
+
+    uploadStatus.textContent = `Loaded item ${DATA.item} — ${treeO2U.nodes.length.toLocaleString()} Origin→Usage rows, ${treeU2O.nodes.length.toLocaleString()} Usage→Origin rows.` + warning;
+    uploadStatus.className = 'upload-status ' + (warning ? 'warn' : 'ok');
+  } catch (err){
+    uploadStatus.textContent = 'Could not load files: ' + err.message;
+    uploadStatus.className = 'upload-status error';
+  } finally {
+    updateRebuildEnabled();
+  }
+});
+
+/* ---------- init ---------- */
+buildLegend();
+renderHeader();
+renderFacets();
+render();
+</script>
+</body>
+</html>
