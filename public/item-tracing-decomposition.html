@@ -422,18 +422,25 @@
   }
   .guide-intro b{color:var(--text); font-weight:600;}
 
-  .guide-methods{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:14px;
-    margin-bottom:24px;
-  }
-  .method-card{
+  .guide-hero{
     background:var(--card);
     border:1px solid var(--card-border);
     border-radius:14px;
-    padding:16px 18px;
+    padding:18px 20px;
+    margin-bottom:24px;
     box-shadow:0 1px 3px rgba(20,20,10,.05);
+  }
+  .guide-methods{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:0;
+    margin-bottom:18px;
+  }
+  .method-card{
+    padding:0 20px;
+  }
+  .method-card + .method-card{
+    border-left:1px solid var(--card-border);
   }
   .method-icon{
     display:flex;
@@ -511,11 +518,8 @@
   }
 
   .guide-upload{
-    background:rgba(202,220,48,.16);
-    border:1px solid rgba(150,166,20,.3);
-    border-radius:14px;
-    padding:16px 18px;
-    margin-bottom:20px;
+    border-top:1px solid var(--card-border);
+    padding-top:16px;
   }
   .uploader-inner{
     display:flex;
@@ -638,7 +642,8 @@
   }
 
   @media (max-width:720px){
-    .guide-methods{grid-template-columns:1fr;}
+    .guide-methods{grid-template-columns:1fr; gap:16px;}
+    .method-card + .method-card{border-left:none; border-top:1px solid var(--card-border); padding-top:16px;}
     .guide-glossary dl{grid-template-columns:1fr;}
   }
 
@@ -1041,18 +1046,45 @@
 
     <p class="guide-intro">Business Central holds every sales, inventory, production, and procurement record we have. An <b>Item Trace</b> follows one lot number through that entire history — everywhere it came from, and everywhere it ended up — so instead of piecing it together by hand, you pull two reports out of Business Central and this tool turns them into a visual, clickable trace with a plain-English summary of what happened at each step.</p>
 
-    <div class="guide-methods">
-      <div class="method-card m-origin">
-        <span class="method-icon">→</span>
-        <h3>Origin → Usage</h3>
-        <p class="method-def">Start from a <b>raw material or packaging lot</b> and trace <b>forward</b> — every production order it fed into, every finished-good lot it became, every customer it shipped to.</p>
-        <p class="method-use">Use it to answer: <i>"If this raw material lot has a problem, what finished products and customers were affected?"</i></p>
+    <div class="guide-hero">
+      <div class="guide-methods">
+        <div class="method-card m-origin">
+          <span class="method-icon">→</span>
+          <h3>Origin → Usage</h3>
+          <p class="method-def">Start from a <b>raw material or packaging lot</b> and trace <b>forward</b> — every production order it fed into, every finished-good lot it became, every customer it shipped to.</p>
+          <p class="method-use">Use it to answer: <i>"If this raw material lot has a problem, what finished products and customers were affected?"</i></p>
+        </div>
+        <div class="method-card m-usage">
+          <span class="method-icon">←</span>
+          <h3>Usage → Origin</h3>
+          <p class="method-def">Start from a <b>finished good, production order, or shipment</b> and trace <b>backward</b> — the vendor lots and raw material receipts that went into it.</p>
+          <p class="method-use">Use it to answer: <i>"Where did the ingredients in this specific batch come from?"</i></p>
+        </div>
       </div>
-      <div class="method-card m-usage">
-        <span class="method-icon">←</span>
-        <h3>Usage → Origin</h3>
-        <p class="method-def">Start from a <b>finished good, production order, or shipment</b> and trace <b>backward</b> — the vendor lots and raw material receipts that went into it.</p>
-        <p class="method-use">Use it to answer: <i>"Where did the ingredients in this specific batch come from?"</i></p>
+
+      <div class="guide-upload" id="uploaderPanel">
+        <h3>Upload your two files</h3>
+        <div class="uploader-inner">
+          <div class="upload-slot">
+            <label for="fileO2U">Origin → Usage file</label>
+            <div class="upload-pick">
+              <button type="button" class="upload-btn" id="fileO2UBtn">Choose .xlsx</button>
+              <input type="file" id="fileO2U" accept=".xlsx">
+              <span class="upload-filename" id="fileO2UName">No file chosen</span>
+            </div>
+          </div>
+          <div class="upload-slot">
+            <label for="fileU2O">Usage → Origin file</label>
+            <div class="upload-pick">
+              <button type="button" class="upload-btn" id="fileU2OBtn">Choose .xlsx</button>
+              <input type="file" id="fileU2O" accept=".xlsx">
+              <span class="upload-filename" id="fileU2OName">No file chosen</span>
+            </div>
+          </div>
+          <button id="rebuildBtn" disabled>Rebuild trace</button>
+          <span class="upload-status" id="uploadStatus"></span>
+        </div>
+        <p class="uploader-hint">Works for any item — upload a new pair of files any time to replace the trace shown below.</p>
       </div>
     </div>
 
@@ -1064,34 +1096,9 @@
         <li><span class="step-num">3</span><div><b>Enter the Lot No.</b> Every trace has to start from a lot number — use a raw material or packing lot for Origin → Usage, or a finished-good lot for Usage → Origin.</div></li>
         <li><span class="step-num">4</span><div><b>Set the direction and trace.</b> Set Trace Method to "Origin → Usage" or "Usage → Origin," set Show Components to "No," then click Trace.</div></li>
         <li><span class="step-num">5</span><div><b>Export it.</b> Once results appear, click the export icon (box with an arrow) and choose Open in Excel to download the full trace.</div></li>
-        <li><span class="step-num">6</span><div><b>Do it again for the other direction</b>, then upload both files below — this tool needs both to show the complete picture.</div></li>
+        <li><span class="step-num">6</span><div><b>Do it again for the other direction</b>, then upload both files above — this tool needs both to show the complete picture.</div></li>
       </ol>
       <p class="guide-tip">Tip: personalize the Item Tracing columns first so <span class="mono">Entry Type</span>, <span class="mono">Source Type</span>, <span class="mono">Source Name</span>, <span class="mono">Lot No.</span>, and <span class="mono">Posting Date</span> are all showing — that's what this tool reads from the export.</p>
-    </div>
-
-    <div class="guide-upload" id="uploaderPanel">
-      <h3>Upload your two files</h3>
-      <div class="uploader-inner">
-        <div class="upload-slot">
-          <label for="fileO2U">Origin → Usage file</label>
-          <div class="upload-pick">
-            <button type="button" class="upload-btn" id="fileO2UBtn">Choose .xlsx</button>
-            <input type="file" id="fileO2U" accept=".xlsx">
-            <span class="upload-filename" id="fileO2UName">No file chosen</span>
-          </div>
-        </div>
-        <div class="upload-slot">
-          <label for="fileU2O">Usage → Origin file</label>
-          <div class="upload-pick">
-            <button type="button" class="upload-btn" id="fileU2OBtn">Choose .xlsx</button>
-            <input type="file" id="fileU2O" accept=".xlsx">
-            <span class="upload-filename" id="fileU2OName">No file chosen</span>
-          </div>
-        </div>
-        <button id="rebuildBtn" disabled>Rebuild trace</button>
-        <span class="upload-status" id="uploadStatus"></span>
-      </div>
-      <p class="uploader-hint">Works for any item — upload a new pair of files any time to replace the trace shown below.</p>
     </div>
 
     <details class="guide-glossary">
@@ -1268,8 +1275,7 @@ function buildLegend(){
   legend.innerHTML = '<span class="lg-title">Legend</span>' +
     Object.entries(TYPE_META).map(([k,v]) =>
       `<span class="lg-item"><span class="lg-dot" style="background:${v.color}"></span>${v.short}</span>`
-    ).join('') +
-    `<span class="lg-item"><span class="lg-dot" style="background:var(--pretzel)"></span>Item 50028</span>`;
+    ).join('');
 }
 
 function nodeById(id){ return currentTree().nodes[id]; }
@@ -2048,6 +2054,7 @@ rebuildBtn.addEventListener('click', async () => {
 
     uploadStatus.textContent = `Loaded item ${DATA.item} — ${treeO2U.nodes.length.toLocaleString()} Origin→Usage rows, ${treeU2O.nodes.length.toLocaleString()} Usage→Origin rows.` + warning;
     uploadStatus.className = 'upload-status ' + (warning ? 'warn' : 'ok');
+    setGuideOpen(false);
   } catch (err){
     uploadStatus.textContent = 'Could not load files: ' + err.message;
     uploadStatus.className = 'upload-status error';
