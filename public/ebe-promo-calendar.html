@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Every Body Eat — Promotional Calendar</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FFFFFF;
+  --bg-soft: #F7F5EE;
+  --card: #FFFFFF;
+  --card-border: #E8E4D6;
+  --text: #1A1A1A;
+  --text-dim: #6B6B64;
+  --text-dimmer: #78766E;
+  --ink: #1A1A1A;
+  --pretzel: #2878FF;
+  --pretzel-text: #1E5FDB;
+  --lime: #CADC30;
+  --lime-text: #5C6B0A;
+  --orange: #F99420;
+  --teal: #0099F3;
+  --sky: #87CCF4;
+  --magenta: #CC1F97;
+  --rose: #ED1C24;
+  --rose-text: #B0181D;
+  --grey: #878787;
+  --pos: #00bf63;
+  --neg: #ff3131;
+  --neu: #78766E;
+  --pos-bg: rgba(0,191,99,0.15);
+  --pos-light: rgba(0,191,99,0.07);
+  --neg-bg: rgba(255,49,49,0.12);
+  --neg-light: rgba(255,49,49,0.06);
+  --neu-bg: rgba(120,118,110,0.12);
+  --brand-light: rgba(40,120,255,0.08);
+  --focus: #2878FF;
+  --border: #E8E4D6;
+  --brand: #2878FF;
+  --brand-dark: #1A1A1A;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: 'Barlow Semi Condensed', sans-serif; color: var(--text);
+  background: var(--bg);
+}
+h1, h2, h3 { font-family: 'Anton', sans-serif; font-weight: 400; margin: 0 0 8px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+a { color: var(--pretzel-text); }
+
+/* Sidebar */
+.sidenav {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+  background: var(--bg-soft); border-right: 1px solid var(--card-border);
+  overflow-y: auto; z-index: 100; padding: 0 0 40px; transition: transform .2s;
+}
+.sidenav.collapsed { transform: translateX(-220px); }
+.sidenav-logo { padding: 20px 16px 12px; border-bottom: 1px solid var(--card-border); }
+.sidenav-logo h1 { color: var(--ink); font-size: 16px; letter-spacing: 0.04em; }
+.sidenav-logo p { color: var(--text-dim); font-size: 11px; margin: 4px 0 0; }
+.nav-section { padding: 14px 8px 4px 16px; color: var(--text-dimmer); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.sidenav a { display: block; padding: 8px 16px; color: var(--ink); text-decoration: none; font-size: 14px; border-radius: 4px; margin: 1px 8px; transition: background .15s; cursor: pointer; border-left: 3px solid transparent; }
+.sidenav a:hover, .sidenav a.active { background: rgba(0,0,0,0.07); }
+.sidenav a.add-link { background: var(--ink); color: #fff; font-weight: 700; margin: 10px 8px 4px; }
+.sidenav a.add-link:hover { background: #333; }
+.navtoggle {
+  position: fixed; top: 16px; left: 176px; z-index: 200;
+  width: 32px; height: 32px; border-radius: 999px; border: none; background: var(--ink);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px;
+  transition: left .2s;
+}
+.navtoggle.collapsed-state { left: 16px; }
+.navtoggle span { width: 16px; height: 2px; background: #fff; display: block; }
+.main { margin-left: 220px; padding: 32px 36px 80px; min-height: 100vh; transition: margin .2s; }
+.main.expanded { margin-left: 0; }
+
+/* Header */
+.pagehead { background: var(--bg); border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 28px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+.pagehead h1 { font-size: 30px; }
+.pagehead .sub { color: var(--text-dim); font-size: 14px; margin-top: 4px; }
+.savestate { font-size: 12px; color: var(--text-dimmer); font-family: 'IBM Plex Mono', monospace; }
+
+.section { display: none; }
+.section.active { display: block; }
+
+/* Cards */
+.card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; box-shadow: 0 1px 3px rgba(20,20,10,.05); padding: 20px; margin-bottom: 20px; }
+.card h2 { font-size: 20px; margin-bottom: 4px; }
+.card .desc { color: var(--text-dim); font-size: 13px; margin-bottom: 16px; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border: 2px solid var(--ink); background: transparent; color: var(--ink); padding: 8px 18px; font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 600; font-size: 14px; cursor: pointer; transition: all .15s; }
+.btn:hover { background: rgba(0,0,0,0.05); }
+.btn-primary { background: var(--ink); color: #fff; }
+.btn-primary:hover { background: #333; }
+.btn-mini { border-radius: 999px; border: 1px solid var(--card-border); background: #fff; color: var(--text-dim); padding: 4px 12px; font-size: 12px; cursor: pointer; }
+.btn-mini:hover { border-color: var(--ink); color: var(--ink); }
+.btn-danger { border-color: var(--rose-text); color: var(--rose-text); }
+.btn-danger:hover { background: var(--neg-light); }
+.btn[disabled] { background: transparent; border-color: var(--card-border); color: var(--text-dimmer); cursor: not-allowed; }
+
+/* Form */
+.formgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 14px; }
+.formgrid .full { grid-column: 1 / -1; }
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; font-weight: 600; }
+input, select, textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--card-border); border-radius: 8px; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 14px; color: var(--text); background: #fff; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--brand-light); }
+.err { color: var(--rose-text); font-size: 13px; margin-top: 10px; display: none; background: var(--neg-light); border: 1px solid var(--neg-bg); border-radius: 8px; padding: 10px 14px; }
+.ok { color: #007a3d; font-size: 13px; margin-top: 10px; display: none; background: var(--pos-light); border: 1px solid var(--pos-bg); border-radius: 8px; padding: 10px 14px; }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dimmer); border-bottom: 2px solid var(--ink); padding: 8px 10px; white-space: nowrap; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--card-border); vertical-align: middle; }
+tr:hover td { background: var(--bg-soft); }
+.chip { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 11px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+.chip-active { background: var(--pos-bg); color: #007a3d; }
+.chip-upcoming { background: rgba(249,148,32,0.18); color: #a35a00; }
+.chip-completed { background: var(--neu-bg); color: var(--text-dimmer); }
+.retailer-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; flex: none; }
+.numcell { font-family: 'IBM Plex Mono', monospace; text-align: right; }
+.editable-input { width: 90px; padding: 5px 7px; font-size: 12px; }
+.editable-input.wide { width: 110px; }
+
+/* Gantt */
+.gantt-scroll { overflow-x: auto; border: 1px solid var(--card-border); border-radius: 10px; }
+.gantt-grid { display: grid; }
+.gantt-rowlabel { position: sticky; left: 0; background: var(--bg-soft); z-index: 5; padding: 6px 12px; font-weight: 700; font-size: 13px; display: flex; align-items: center; border-right: 1px solid var(--card-border); }
+.gantt-head { background: var(--ink); color: #fff; font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-align: center; padding: 4px 0; display: flex; align-items: center; justify-content: center; }
+.gantt-head.year { font-family: 'Anton', sans-serif; font-size: 13px; letter-spacing: .04em; }
+.gantt-cell { border-right: 1px solid #F0EEE4; min-height: 30px; }
+.gantt-bar { border-radius: 6px; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-align: center; padding: 2px 4px; line-height: 1.15; overflow: hidden; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.15); transition: transform .1s, box-shadow .1s; }
+.gantt-bar:hover { transform: scale(1.03); box-shadow: 0 3px 8px rgba(0,0,0,.3); z-index: 3; position: relative; }
+.legend-row { display: flex; gap: 18px; margin-top: 14px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-dim); }
+.legend-swatch { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+
+/* Analysis */
+.metric-good { color: #007a3d; font-weight: 700; }
+.metric-bad { color: var(--rose-text); font-weight: 700; }
+.metric-neutral { color: var(--text-dimmer); }
+
+/* Empty state */
+.empty { text-align: center; padding: 40px 20px; color: var(--text-dim); }
+.empty h3 { color: var(--text-dim); font-size: 16px; }
+
+/* Steps */
+.step { display: flex; gap: 12px; margin-bottom: 16px; }
+.step-num { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: #fff; font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.step-body h3 { font-size: 15px; margin-bottom: 4px; }
+.step-body p { margin: 0; font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+
+.formula-box { background: var(--bg-soft); border: 1px solid var(--card-border); border-radius: 10px; padding: 14px 16px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--text); margin: 6px 0; }
+
+/* Channel section coloring */
+.channel-head { display: flex; align-items: center; gap: 10px; }
+.channel-swatch { width: 16px; height: 16px; border-radius: 5px; flex: none; }
+
+/* Modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(20,18,10,0.45); z-index: 300; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.open { display: flex; }
+.modal-card { background: #fff; border-radius: 16px; max-width: 460px; width: 100%; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,.3); max-height: 86vh; overflow-y: auto; }
+.modal-card h2 { font-size: 20px; margin-bottom: 2px; }
+.modal-card .modal-sub { color: var(--text-dim); font-size: 13px; margin-bottom: 16px; }
+.modal-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--card-border); font-size: 14px; }
+.modal-row span:first-child { color: var(--text-dim); }
+.modal-row span:last-child { font-weight: 600; text-align: right; }
+.modal-close { position: absolute; top: 16px; right: 20px; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-dim); }
+.modal-inner { position: relative; }
+.modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+
+/* Campaigns */
+.chip-channel { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; margin: 2px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.chip-channel .dot { width: 7px; height: 7px; }
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.checkbox-pill { display: flex; align-items: center; gap: 6px; border: 1.5px solid var(--card-border); border-radius: 999px; padding: 6px 14px 6px 10px; font-size: 13px; cursor: pointer; user-select: none; transition: all .12s; }
+.checkbox-pill input { width: auto; margin: 0; }
+.checkbox-pill.checked { border-color: var(--ink); background: var(--bg-soft); font-weight: 600; }
+.status-select { max-width: 220px; }
+.chip-status-Identified { background: var(--neu-bg); color: var(--text-dimmer); }
+.chip-status-Planning { background: rgba(135,204,244,.3); color: #00629C; }
+.chip-status-Approved { background: rgba(40,120,255,.15); color: var(--pretzel-text); }
+.chip-status-Live { background: var(--pos-bg); color: #007a3d; }
+.chip-status-Completed { background: rgba(120,118,110,0.22); color: var(--text-dimmer); }
+.chip-status-OnHold { background: rgba(249,148,32,.18); color: #a35a00; }
+.chip-status-Cancelled { background: var(--neg-bg); color: var(--rose-text); }
+
+.needed-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.needed-row input[type=text] { flex: 1; }
+.needed-drop { flex: 0 0 240px; border: 1.5px dashed var(--card-border); border-radius: 8px; padding: 7px 12px; font-size: 12px; color: var(--text-dim); cursor: pointer; text-align: center; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 34px; }
+.needed-drop:hover, .needed-drop.dragover { border-color: var(--pretzel); background: var(--brand-light); color: var(--pretzel-text); }
+.needed-drop.filled { border-style: solid; border-color: var(--pos-bg); background: var(--pos-light); color: #007a3d; justify-content: space-between; cursor: default; }
+.needed-drop.filled span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.needed-status { flex: 0 0 76px; text-align: center; font-size: 11px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; padding: 4px 0; border-radius: 999px; }
+.needed-status.pending { background: rgba(249,148,32,.18); color: #a35a00; }
+.needed-status.done { background: var(--pos-bg); color: #007a3d; }
+
+.dropzone { border: 2px dashed var(--card-border); border-radius: 12px; padding: 22px; text-align: center; color: var(--text-dim); font-size: 13px; cursor: pointer; transition: all .15s; }
+.dropzone:hover, .dropzone.dragover { border-color: var(--pretzel); background: var(--brand-light); color: var(--pretzel-text); }
+.dropzone input[type=file] { display: none; }
+.asset-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.asset-row { display: flex; align-items: center; gap: 10px; background: var(--bg-soft); border: 1px solid var(--card-border); border-radius: 10px; padding: 8px 12px; font-size: 13px; }
+.asset-icon { width: 30px; height: 30px; border-radius: 7px; background: var(--ink); color: #fff; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; font-weight: 700; flex: none; }
+.asset-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asset-size { color: var(--text-dimmer); font-family: 'IBM Plex Mono', monospace; font-size: 11px; flex: none; }
+.asset-size-warn { color: var(--rose-text); font-size: 12px; margin-top: 8px; }
+.campaign-link { cursor: pointer; color: var(--pretzel-text); font-weight: 600; }
+.campaign-link:hover { text-decoration: underline; }
+
+@media (max-width: 780px) {
+  .formgrid { grid-template-columns: 1fr; }
+  .main, .main.expanded { margin-left: 0; }
+  .sidenav { box-shadow: 4px 0 16px rgba(0,0,0,.15); }
+}
+</style>
+</head>
+<body>
+
+<button class="navtoggle" id="navtoggle" onclick="toggleNav()"><span></span><span></span><span></span></button>
+
+<nav class="sidenav" id="sidenav">
+  <div class="sidenav-logo">
+    <h1>EVERY BODY EAT</h1>
+    <p>Promotional Calendar</p>
+  </div>
+  <a onclick="showSection('add')" data-section="add" class="add-link">+ Add a Promotion</a>
+  <a onclick="showSection('campaigns')" data-section="campaigns">Campaigns</a>
+  <a onclick="showSection('master')" data-section="master">Master Gantt Chart</a>
+  <div class="nav-section">Channels</div>
+  <div id="channelNavHost"></div>
+  <div class="nav-section">Reference</div>
+  <a onclick="showSection('howto')" data-section="howto">How It Works</a>
+</nav>
+
+<div class="main" id="main">
+  <div class="pagehead">
+    <div>
+      <h1 id="pageTitle">Add a Promotion</h1>
+      <div class="sub" id="pageSub">Fill in every field, then save. New promotions appear instantly across all views.</div>
+    </div>
+    <div class="savestate" id="savestate">Loading…</div>
+  </div>
+
+  <!-- ADD -->
+  <section class="section active" id="section-add">
+    <div class="card">
+      <input type="hidden" id="editingId" value="">
+      <div class="formgrid">
+        <div class="full">
+          <label>Product Description</label>
+          <input list="productList" id="f-product" placeholder="e.g. All Products">
+          <datalist id="productList">
+            <option value="All Products">
+            <option value="6ct Cases">
+            <option value="20ct 1.1oz & 6ct Cases">
+            <option value="Cookie Bites & Crispbread Crackers">
+          </datalist>
+        </div>
+        <div class="full">
+          <label>Campaign (optional)</label>
+          <select id="f-campaign"><option value="">— No Campaign —</option></select>
+        </div>
+        <div class="full">
+          <label>Promotion Description</label>
+          <input id="f-desc" placeholder="e.g. Spring Refresh">
+        </div>
+        <div>
+          <label>Channel</label>
+          <select id="f-channel"></select>
+        </div>
+        <div>
+          <label>Retailer / Site (optional)</label>
+          <input id="f-retailer" placeholder="Defaults to channel name">
+        </div>
+        <div>
+          <label>Start Date</label>
+          <input type="date" id="f-start">
+        </div>
+        <div>
+          <label>End Date</label>
+          <input type="date" id="f-end">
+        </div>
+        <div>
+          <label>Promotion Type</label>
+          <select id="f-ptype">
+            <option>Coupon</option>
+            <option>Price Discount</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label>Discount Amount (%)</label>
+          <input type="number" id="f-discount" min="0" max="100" step="1" placeholder="e.g. 15">
+        </div>
+      </div>
+      <div class="err" id="addErr"></div>
+      <div class="ok" id="addOk"></div>
+      <div style="display:flex; gap:10px; margin-top:18px;">
+        <button class="btn btn-primary" id="addSubmitBtn" onclick="submitPromotion()">Save Promotion</button>
+        <button class="btn" id="addCancelBtn" onclick="cancelEdit()" style="display:none;">Cancel Edit</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAMPAIGNS -->
+  <section class="section" id="section-campaigns">
+    <div class="card">
+      <input type="hidden" id="editingCampaignId" value="">
+      <h2 id="campaignFormTitle">New Campaign</h2>
+      <div class="desc">An omni-channel campaign that promotions across any channel can link back to — plus a shared spot for briefs, creative, and other assets.</div>
+      <div class="formgrid">
+        <div class="full">
+          <label>Campaign Name</label>
+          <input id="c-name" placeholder="e.g. Fall Into Savings">
+        </div>
+        <div class="full">
+          <label>Participating Channels</label>
+          <div class="checkbox-group" id="c-channels"></div>
+        </div>
+        <div>
+          <label>Start Date</label>
+          <input type="date" id="c-start">
+        </div>
+        <div>
+          <label>End Date</label>
+          <input type="date" id="c-end">
+        </div>
+        <div>
+          <label>Status</label>
+          <select id="c-status" class="status-select">
+            <option>Identified</option>
+            <option>Planning</option>
+            <option>Approved</option>
+            <option>Live</option>
+            <option>Completed</option>
+            <option>On Hold</option>
+            <option>Cancelled</option>
+          </select>
+        </div>
+        <div>
+          <label>Owner</label>
+          <input id="c-owner" placeholder="e.g. Jamie Chen">
+        </div>
+        <div class="full">
+          <label>Campaign Brief</label>
+          <textarea id="c-brief" rows="4" placeholder="Goals, target audience, key message — whatever the team needs to build against."></textarea>
+        </div>
+        <div class="full">
+          <label>Assets Needed</label>
+          <div class="desc" style="margin-bottom:8px;">List what's needed line by line. Drop the file onto a line once it's ready — that's how the team can tell what's still outstanding.</div>
+          <div id="c-needed-list"></div>
+          <div class="asset-size-warn" id="assetSizeWarn" style="display:none;"></div>
+        </div>
+      </div>
+      <div class="err" id="campaignErr"></div>
+      <div class="ok" id="campaignOk"></div>
+      <div style="display:flex; gap:10px; margin-top:18px;">
+        <button class="btn btn-primary" id="campaignSubmitBtn" onclick="submitCampaign()">Save Campaign</button>
+        <button class="btn" id="campaignCancelBtn" onclick="cancelCampaignEdit()" style="display:none;">Cancel Edit</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Campaign Gantt Calendar</h2>
+      <div class="desc">Every campaign's window, at a glance. Click a bar for full details.</div>
+      <div id="campaignGanttHost"></div>
+      <div class="legend-row" id="campaignGanttLegend"></div>
+    </div>
+
+    <div class="card">
+      <h2>All Campaigns</h2>
+      <div class="desc">Every omni-channel campaign, with linked promotions across channels and shared assets.</div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>ID</th><th>Campaign</th><th>Owner</th><th>Channels</th><th>Dates</th><th>Status</th><th>Assets Needed</th><th>Linked Promos</th><th></th></tr></thead>
+          <tbody id="campaignsTableBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="campaignsEmpty" style="display:none;">
+        <h3>No campaigns yet</h3>
+        <p>Create one above to start tying promotions together across channels.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- MASTER GANTT CHART -->
+  <section class="section" id="section-master">
+    <div class="card">
+      <h2>Master Gantt Chart</h2>
+      <div class="desc">Every campaign and every promotion, across every channel, in one view. Campaign rows sit on top; channel rows below. Click any bar for full details.</div>
+      <div id="masterGanttHost"></div>
+      <div class="legend-row" id="masterGanttLegend"></div>
+    </div>
+  </section>
+
+  <!-- CHANNEL SECTIONS injected here by JS -->
+  <div id="channelSectionsHost"></div>
+
+  <!-- HOW TO -->
+  <section class="section" id="section-howto">
+    <div class="card">
+      <h2>How This Tool Works</h2>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Source of Truth</h3>
+          <p>Everything lives in one place — this tool. Every channel tab reads from the same underlying data, so there's nothing to keep in sync manually.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Adding a Promotion</h3>
+          <p>Click "+ Add a Promotion" at the top of the sidebar, fill in the fields — including which Channel it belongs to — and save. It appears immediately in that channel's tab.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Channel Tabs</h3>
+          <p>Amazon, Walmart, TikTok, DTC, Retail, Distributor, and Other each get their own tab with a Gantt Calendar, a Promotions Table, and an Analysis section — scoped to just that channel's promotions.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>Editing or Removing a Promotion</h3>
+          <p>In any channel's Table, click "Edit" on a row to change its details, or "Delete" to remove it.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>Running the Analysis</h3>
+          <p>In a channel's Analysis section, type Baseline $, Promo $, Post Promo $, and True Cost directly into the table cells — Lift %, Incremental Revenue, and ROI calculate live.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <h3>Gantt Calendar</h3>
+          <p>Rows are retailer/site within that channel. Columns are Year / Month / Week. Click any bar to see that promotion's full details. Overlapping promotions on the same row stack into separate lanes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Promo detail modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this) closeDetail()">
+  <div class="modal-card">
+    <div class="modal-inner">
+      <button class="modal-close" onclick="closeDetail()">✕</button>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- State ---------- */
+const MAX_ASSET_BYTES = 5 * 1024 * 1024; // matches the server's per-file cap
+let promos = [];
+let campaigns = [];
+let editingId = null;
+let editingCampaignId = null;
+let draftCampaignId = null;
+let draftAssetsNeeded = [];
+
+const CHANNELS = [
+  { key: 'Amazon',      color: '#F99420' },
+  { key: 'Walmart',     color: '#0099F3' },
+  { key: 'TikTok',      color: '#CADC30' },
+  { key: 'DTC',         color: '#2878FF' },
+  { key: 'Retail',      color: '#CC1F97' },
+  { key: 'Distributor', color: '#87CCF4' },
+  { key: 'Other',       color: '#878787' },
+];
+const CHANNEL_COLOR = Object.fromEntries(CHANNELS.map(c => [c.key, c.color]));
+
+const SEED = [{"id": "P01", "product": "All Products", "desc": "New Year New You", "channel": "Amazon", "retailer": "Amazon", "start": "2026-01-01", "end": "2026-01-31", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P02", "product": "6ct Cases", "desc": "February 6ct Push", "channel": "Amazon", "retailer": "Amazon", "start": "2026-02-02", "end": "2026-02-28", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P03", "product": "All Products", "desc": "Allergy Awareness Month", "channel": "Amazon", "retailer": "Amazon", "start": "2026-05-01", "end": "2026-05-15", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P04", "product": "All Products", "desc": "Allergy Awareness Month", "channel": "Amazon", "retailer": "Amazon", "start": "2026-05-17", "end": "2026-05-31", "ptype": "Coupon", "discount": 0.1, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P05", "product": "All Products", "desc": "Prime Day Lead In", "channel": "Amazon", "retailer": "Amazon", "start": "2026-06-08", "end": "2026-06-22", "ptype": "Coupon", "discount": 0.1, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P06", "product": "All Products", "desc": "Prime Day", "channel": "Amazon", "retailer": "Amazon", "start": "2026-06-23", "end": "2026-06-26", "ptype": "Price Discount", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P07", "product": "All Products", "desc": "Prime Day", "channel": "Amazon", "retailer": "Amazon", "start": "2026-06-23", "end": "2026-06-26", "ptype": "Coupon", "discount": 0.1, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P08", "product": "20ct 1.1oz & 6ct Cases", "desc": "Back To School", "channel": "Amazon", "retailer": "Amazon", "start": "2026-08-15", "end": "2026-09-15", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P14", "product": "All Products", "desc": "Back To School", "channel": "TikTok", "retailer": "TikTok Shop", "start": "2026-08-15", "end": "2026-09-15", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P17", "product": "20ct 1.1oz & 6ct Cases", "desc": "Back To School", "channel": "Walmart", "retailer": "Walmart", "start": "2026-08-15", "end": "2026-09-15", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P09", "product": "All Products", "desc": "Fall Prime Day Lead In", "channel": "Amazon", "retailer": "Amazon", "start": "2026-09-29", "end": "2026-10-05", "ptype": "Coupon", "discount": 0.1, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P18", "product": "All Products", "desc": "Fall Prime Day Lead In", "channel": "Walmart", "retailer": "Walmart", "start": "2026-09-29", "end": "2026-10-05", "ptype": "Coupon", "discount": 0.1, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P10", "product": "All Products", "desc": "Fall Prime Day", "channel": "Amazon", "retailer": "Amazon", "start": "2026-10-06", "end": "2026-10-07", "ptype": "Price Discount", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P19", "product": "All Products", "desc": "Fall Prime Day", "channel": "Walmart", "retailer": "Walmart", "start": "2026-10-06", "end": "2026-10-07", "ptype": "Price Discount", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P11", "product": "All Products", "desc": "Fall Prime Day Out", "channel": "Amazon", "retailer": "Amazon", "start": "2026-10-08", "end": "2026-10-13", "ptype": "Coupon", "discount": 0.1, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P20", "product": "All Products", "desc": "Fall Prime Day Out", "channel": "Walmart", "retailer": "Walmart", "start": "2026-10-08", "end": "2026-10-13", "ptype": "Coupon", "discount": 0.1, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P12", "product": "All Products", "desc": "Black Friday & Cyber Monday", "channel": "Amazon", "retailer": "Amazon", "start": "2026-11-20", "end": "2026-11-30", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P15", "product": "All Products", "desc": "Black Friday & Cyber Monday", "channel": "TikTok", "retailer": "TikTok Shop", "start": "2026-11-20", "end": "2026-11-30", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P21", "product": "All Products", "desc": "Black Friday & Cyber Monday", "channel": "Walmart", "retailer": "Walmart", "start": "2026-11-20", "end": "2026-11-30", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P13", "product": "Cookie Bites & Crispbread Crackers", "desc": "Holiday", "channel": "Amazon", "retailer": "Amazon", "start": "2026-12-01", "end": "2026-12-31", "ptype": "Coupon", "discount": 0.1, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P16", "product": "All Products", "desc": "Holiday", "channel": "TikTok", "retailer": "TikTok Shop", "start": "2026-12-01", "end": "2026-12-31", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P22", "product": "Cookie Bites & Crispbread Crackers", "desc": "Holiday", "channel": "Walmart", "retailer": "Walmart", "start": "2026-12-01", "end": "2026-12-31", "ptype": "Coupon", "discount": 0.1, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P23", "product": "All Products", "desc": "2027 New Year New You", "channel": "Amazon", "retailer": "Amazon", "start": "2027-01-01", "end": "2027-01-31", "ptype": "Coupon", "discount": 0.2, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}, {"id": "P24", "product": "All Products", "desc": "Allergy Awareness Month", "channel": "Amazon", "retailer": "Amazon", "start": "2027-05-01", "end": "2027-05-31", "ptype": "Coupon", "discount": 0.1, "baseline": null, "promoRev": null, "postRev": null, "trueCost": null, "notes": ""}];
+
+/* ---------- Nav ---------- */
+function setNavCollapsed(collapsed) {
+  document.getElementById('sidenav').classList.toggle('collapsed', collapsed);
+  document.getElementById('main').classList.toggle('expanded', collapsed);
+  document.getElementById('navtoggle').classList.toggle('collapsed-state', collapsed);
+}
+function toggleNav() {
+  const isCollapsed = document.getElementById('sidenav').classList.contains('collapsed');
+  setNavCollapsed(!isCollapsed);
+}
+if (window.innerWidth < 780) setNavCollapsed(true);
+
+function buildNav() {
+  const host = document.getElementById('channelNavHost');
+  host.innerHTML = CHANNELS.map(c =>
+    `<a onclick="showSection('ch-${c.key}')" data-section="ch-${c.key}" style="border-left:3px solid ${c.color}; padding-left:13px;">${c.key}</a>`
+  ).join('');
+}
+
+const PAGE_TITLES = { add: ['Add a Promotion', 'Fill in every field, then save. New promotions appear instantly across all views.'], campaigns: ['Campaigns', 'Tie promotions together across channels, with shared briefs and assets.'], master: ['Master Gantt Chart', 'Every campaign and every promotion, across every channel, in one place.'], howto: ['How It Works', 'A quick reference for using this tool.'] };
+CHANNELS.forEach(c => { PAGE_TITLES['ch-' + c.key] = [c.key, 'Gantt Calendar, Promotions Table, and Analysis for ' + c.key + '.']; });
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.querySelectorAll('.sidenav a').forEach(a => a.classList.remove('active'));
+  const link = document.querySelector('.sidenav a[data-section="' + name + '"]');
+  if (link) link.classList.add('active');
+  const [title, sub] = PAGE_TITLES[name] || [name, ''];
+  document.getElementById('pageTitle').textContent = title;
+  document.getElementById('pageSub').textContent = sub;
+  if (name.startsWith('ch-')) renderChannel(name.slice(3));
+  if (name === 'campaigns') { renderCampaignsTable(); renderCampaignsGantt(); }
+  if (name === 'master') renderMasterGantt();
+  if (window.innerWidth < 780) setNavCollapsed(true);
+}
+
+/* ---------- Build channel sections ---------- */
+function buildChannelSections() {
+  const host = document.getElementById('channelSectionsHost');
+  host.innerHTML = CHANNELS.map(c => `
+    <section class="section" id="section-ch-${c.key}">
+      <div class="card" style="border-left:4px solid ${c.color};">
+        <div class="channel-head"><span class="channel-swatch" style="background:${c.color};"></span><h2 style="color:${darken(c.color)};">${c.key} — Gantt Calendar</h2></div>
+        <div class="desc">Click any bar for full promotion details.</div>
+        <div id="gantt-${c.key}"></div>
+        <div class="legend-row" id="legend-${c.key}"></div>
+      </div>
+      <div class="card">
+        <h2>${c.key} — Promotions Table</h2>
+        <div class="desc">Every ${c.key} promotion. Edit or delete from here.</div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>ID</th><th>Product</th><th>Campaign</th><th>Promotion</th><th>Retailer/Site</th><th>Dates</th><th>Offer</th><th>Status</th><th></th></tr></thead>
+            <tbody id="table-${c.key}"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="empty-${c.key}" style="display:none;">
+          <h3>No ${c.key} promotions yet</h3>
+          <p>Use "+ Add a Promotion" in the sidebar and set Channel to ${c.key}.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h2>${c.key} — Analysis</h2>
+        <div class="desc">Drop in performance numbers once a promotion runs.</div>
+        <div class="formula-box">
+          Promo Lift % = (Promo $ − Baseline $) / Baseline $<br>
+          Incremental Revenue = (Promo $ − Baseline $) − MAX(0, Baseline $ − Post Promo $)<br>
+          ROI = Incremental Revenue / True Cost
+        </div>
+        <div style="overflow-x:auto; margin-top:14px;">
+          <table>
+            <thead><tr><th>Promotion</th><th>Baseline $</th><th>Promo $</th><th>Post $</th><th>True Cost</th><th>Lift %</th><th>Incr. Rev</th><th>ROI</th></tr></thead>
+            <tbody id="analysis-${c.key}"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  `).join('');
+}
+function darken(hex) {
+  // simple darken for text-on-white contrast
+  const map = { '#F99420':'#A35A00', '#0099F3':'#00629C', '#CADC30':'#5C6B0A', '#2878FF':'#1E5FDB', '#CC1F97':'#9A1874', '#87CCF4':'#00629C', '#878787':'#5A5A5A' };
+  return map[hex] || hex;
+}
+
+/* ---------- Storage ---------- */
+async function loadPromos() {
+  const el = document.getElementById('savestate');
+  try {
+    const res = await fetch('/api/marketing/promotions');
+    if (!res.ok) throw new Error('load failed');
+    const body = await res.json();
+    promos = body.promotions;
+  } catch (e) {
+    promos = SEED;
+    el.textContent = 'Offline — showing seed data, changes will not be saved';
+    renderAllVisible();
+    return;
+  }
+  el.textContent = 'Synced · ' + promos.length + ' promotions';
+  renderAllVisible();
+}
+async function savePromos() {
+  const el = document.getElementById('savestate');
+  try {
+    el.textContent = 'Saving…';
+    const res = await fetch('/api/marketing/promotions', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(promos),
+    });
+    if (!res.ok) throw new Error('save failed');
+    el.textContent = 'Synced · ' + promos.length + ' promotions';
+  } catch (e) {
+    el.textContent = 'Save failed — changes are local only until retried';
+  }
+}
+
+/* ---------- Helpers ---------- */
+function statusOf(p) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const s = new Date(p.start + 'T00:00:00');
+  const e = new Date(p.end + 'T00:00:00');
+  if (today > e) return 'Completed';
+  if (today < s) return 'Upcoming';
+  return 'Active';
+}
+function chipClass(status) {
+  if (status === 'Active') return 'chip-active';
+  if (status === 'Upcoming') return 'chip-upcoming';
+  return 'chip-completed';
+}
+function fmtDate(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function nextId() {
+  let max = 0;
+  promos.forEach(p => { const n = parseInt(p.id.replace('P','')); if (n > max) max = n; });
+  return 'P' + String(max + 1).padStart(2, '0');
+}
+function channelOf(p) {
+  return CHANNELS.some(c => c.key === p.channel) ? p.channel : 'Other';
+}
+
+/* ---------- Render dispatch ---------- */
+function renderAllVisible() {
+  const activeSection = document.querySelector('.section.active');
+  if (activeSection && activeSection.id.startsWith('section-ch-')) {
+    renderChannel(activeSection.id.replace('section-ch-',''));
+  }
+}
+function renderChannel(key) {
+  renderChannelGantt(key);
+  renderChannelTable(key);
+  renderChannelAnalysis(key);
+}
+
+/* ---------- Table (per channel) ---------- */
+function renderChannelTable(key) {
+  const body = document.getElementById('table-' + key);
+  const empty = document.getElementById('empty-' + key);
+  if (!body) return;
+  body.innerHTML = '';
+  const list = promos.filter(p => channelOf(p) === key).sort((a,b) => a.start.localeCompare(b.start));
+  if (list.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  list.forEach(p => {
+    const status = statusOf(p);
+    const camp = campaigns.find(c => c.id === p.campaignId);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono">${p.id}</td>
+      <td>${p.product}</td>
+      <td>${camp ? `<span class="campaign-link" onclick="openCampaignDetail('${camp.id}')">${camp.name}</span>` : '<span style="color:var(--text-dimmer);">—</span>'}</td>
+      <td><strong style="cursor:pointer;" onclick="openDetail('${p.id}')">${p.desc}</strong></td>
+      <td><span class="retailer-dot" style="background:${CHANNEL_COLOR[key]};"></span>${p.retailer || key}</td>
+      <td class="mono">${fmtDate(p.start)} – ${fmtDate(p.end)}</td>
+      <td>${Math.round(p.discount*100)}% ${p.ptype}</td>
+      <td><span class="chip ${chipClass(status)}">${status}</span></td>
+      <td style="white-space:nowrap;">
+        <button class="btn-mini" onclick="startEdit('${p.id}')">Edit</button>
+        <button class="btn-mini" style="color:#B0181D;" onclick="deletePromo('${p.id}')">Delete</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+}
+
+/* ---------- Gantt (per channel) ---------- */
+function renderChannelGantt(key) {
+  const host = document.getElementById('gantt-' + key);
+  const legendHost = document.getElementById('legend-' + key);
+  if (!host) return;
+  host.innerHTML = '';
+  legendHost.innerHTML = '';
+  const list = promos.filter(p => channelOf(p) === key);
+  if (list.length === 0) {
+    host.innerHTML = '<div class="empty"><h3>No promotions yet</h3><p>Add one to see it on this calendar.</p></div>';
+    return;
+  }
+
+  const dates = list.flatMap(p => [new Date(p.start+'T00:00:00'), new Date(p.end+'T00:00:00')]);
+  let minDate = new Date(Math.min(...dates));
+  let maxDate = new Date(Math.max(...dates));
+  const yearStart = new Date(minDate.getFullYear(), 0, 1);
+  const yearEnd = new Date(maxDate.getFullYear(), 11, 31);
+
+  const weekStarts = [];
+  let cursor = new Date(yearStart);
+  while (cursor <= yearEnd) {
+    weekStarts.push(new Date(cursor));
+    cursor = new Date(cursor.getTime() + 7*86400000);
+  }
+  const nWeeks = weekStarts.length;
+
+  function weekIndex(d) {
+    for (let i = 0; i < nWeeks; i++) {
+      const wEnd = new Date(weekStarts[i].getTime() + 7*86400000);
+      if (d >= weekStarts[i] && d < wEnd) return i;
+    }
+    return d < weekStarts[0] ? 0 : nWeeks - 1;
+  }
+
+  const rowLabels = [...new Set(list.map(p => p.retailer || key))];
+  let laneRows = [];
+  const promoLane = {};
+  rowLabels.forEach(label => {
+    const rPromos = list.filter(p => (p.retailer || key) === label)
+      .map(p => ({...p, sD: new Date(p.start+'T00:00:00'), eD: new Date(p.end+'T00:00:00')}))
+      .sort((a,b) => a.sD - b.sD);
+    const lanes = [];
+    rPromos.forEach(p => {
+      let placed = false;
+      for (let li = 0; li < lanes.length; li++) {
+        if (p.sD > lanes[li]) { lanes[li] = p.eD; promoLane[p.id] = {label, lane: li}; placed = true; break; }
+      }
+      if (!placed) { lanes.push(p.eD); promoLane[p.id] = {label, lane: lanes.length - 1}; }
+    });
+    for (let li = 0; li < lanes.length; li++) laneRows.push({label, lane: li});
+  });
+
+  const colWidth = 26;
+  const labelWidth = 150;
+  const totalRows = laneRows.length;
+  const gridTemplateCols = labelWidth + 'px ' + ('repeat(' + nWeeks + ', ' + colWidth + 'px)');
+  let html = '<div class="gantt-scroll"><div class="gantt-grid" style="grid-template-columns:' + gridTemplateCols + '; grid-template-rows: 22px 22px 28px repeat(' + totalRows + ', 34px);">';
+
+  html += '<div class="gantt-rowlabel" style="grid-column:1; grid-row:1;"></div>';
+  let yi = 0;
+  while (yi < nWeeks) {
+    const y = weekStarts[yi].getFullYear();
+    let span = 0;
+    while (yi + span < nWeeks && weekStarts[yi+span].getFullYear() === y) span++;
+    html += `<div class="gantt-head year" style="grid-column:${yi+2} / span ${span}; grid-row:1;">${y}</div>`;
+    yi += span;
+  }
+  html += '<div class="gantt-rowlabel" style="grid-column:1; grid-row:2;"></div>';
+  let mi = 0;
+  while (mi < nWeeks) {
+    const m = weekStarts[mi].getMonth(), y = weekStarts[mi].getFullYear();
+    let span = 0;
+    while (mi + span < nWeeks && weekStarts[mi+span].getMonth() === m && weekStarts[mi+span].getFullYear() === y) span++;
+    const label = weekStarts[mi].toLocaleDateString('en-US', {month:'short'});
+    html += `<div class="gantt-head" style="grid-column:${mi+2} / span ${span}; grid-row:2; font-weight:600;">${label}</div>`;
+    mi += span;
+  }
+  html += '<div class="gantt-rowlabel" style="grid-column:1; grid-row:3;">Retailer / Site</div>';
+  for (let i = 0; i < nWeeks; i++) {
+    html += `<div class="gantt-head" style="grid-column:${i+2}; grid-row:3; font-size:8px; color:#ccc;">${weekStarts[i].getDate()}</div>`;
+  }
+
+  let rowCursor = 4;
+  rowLabels.forEach(label => {
+    const rLanes = laneRows.filter(r => r.label === label).length;
+    html += `<div class="gantt-rowlabel" style="grid-column:1; grid-row:${rowCursor} / span ${rLanes};">${label}</div>`;
+    for (let li = 0; li < rLanes; li++) {
+      for (let ci = 0; ci < nWeeks; ci++) {
+        html += `<div class="gantt-cell" style="grid-column:${ci+2}; grid-row:${rowCursor+li};"></div>`;
+      }
+    }
+    rowCursor += rLanes;
+  });
+
+  list.forEach(p => {
+    const loc = promoLane[p.id];
+    if (!loc) return;
+    const rowStart = 4 + laneRows.findIndex(r => r.label === loc.label);
+    const row = rowStart + loc.lane;
+    const sD = new Date(p.start+'T00:00:00'), eD = new Date(p.end+'T00:00:00');
+    const c1 = weekIndex(sD) + 2, c2 = weekIndex(eD) + 2;
+    const color = CHANNEL_COLOR[key];
+    const label = p.desc + ' (' + Math.round(p.discount*100) + '% ' + p.ptype + ')';
+    html += `<div class="gantt-bar" onclick="openDetail('${p.id}')" title="Click for details" style="grid-column:${c1} / ${c2+1}; grid-row:${row}; background:${color}; margin:3px 1px;">${label}</div>`;
+  });
+
+  html += '</div></div>';
+  host.innerHTML = html;
+  legendHost.innerHTML = `<div class="legend-item"><span class="legend-swatch" style="background:${CHANNEL_COLOR[key]};"></span>${key}</div>`;
+}
+
+/* ---------- Generic gantt builder (used by Campaign Gantt + Master Calendar) ---------- */
+function buildGanttHTML(items, opts) {
+  // opts: { rowKeyFn, colorFn, barLabelFn, onClickFn, rowLabelHeader, rowLabelWidth }
+  const dates = items.flatMap(it => [new Date(it.start+'T00:00:00'), new Date(it.end+'T00:00:00')]);
+  const minDate = new Date(Math.min(...dates));
+  const maxDate = new Date(Math.max(...dates));
+  const yearStart = new Date(minDate.getFullYear(), 0, 1);
+  const yearEnd = new Date(maxDate.getFullYear(), 11, 31);
+  const weekStarts = [];
+  let cursor = new Date(yearStart);
+  while (cursor <= yearEnd) { weekStarts.push(new Date(cursor)); cursor = new Date(cursor.getTime() + 7*86400000); }
+  const nWeeks = weekStarts.length;
+  function weekIndex(d) {
+    for (let i = 0; i < nWeeks; i++) {
+      const wEnd = new Date(weekStarts[i].getTime() + 7*86400000);
+      if (d >= weekStarts[i] && d < wEnd) return i;
+    }
+    return d < weekStarts[0] ? 0 : nWeeks - 1;
+  }
+  const rowLabels = [...new Set(items.map(opts.rowKeyFn))];
+  let laneRows = [];
+  const itemLane = {};
+  rowLabels.forEach(label => {
+    const rItems = items.filter(it => opts.rowKeyFn(it) === label)
+      .map(it => ({ id: it.id, sD: new Date(it.start+'T00:00:00'), eD: new Date(it.end+'T00:00:00') }))
+      .sort((a,b) => a.sD - b.sD);
+    const lanes = [];
+    rItems.forEach(it => {
+      let placed = false;
+      for (let li = 0; li < lanes.length; li++) {
+        if (it.sD > lanes[li]) { lanes[li] = it.eD; itemLane[it.id] = {label, lane: li}; placed = true; break; }
+      }
+      if (!placed) { lanes.push(it.eD); itemLane[it.id] = {label, lane: lanes.length - 1}; }
+    });
+    for (let li = 0; li < lanes.length; li++) laneRows.push({label, lane: li});
+  });
+
+  const colWidth = 26;
+  const labelWidth = opts.rowLabelWidth || 150;
+  const totalRows = laneRows.length;
+  const gridTemplateCols = labelWidth + 'px ' + ('repeat(' + nWeeks + ', ' + colWidth + 'px)');
+  let html = '<div class="gantt-scroll"><div class="gantt-grid" style="grid-template-columns:' + gridTemplateCols + '; grid-template-rows: 22px 22px 28px repeat(' + totalRows + ', 34px);">';
+
+  html += '<div class="gantt-rowlabel" style="grid-column:1; grid-row:1;"></div>';
+  let yi = 0;
+  while (yi < nWeeks) {
+    const y = weekStarts[yi].getFullYear();
+    let span = 0;
+    while (yi + span < nWeeks && weekStarts[yi+span].getFullYear() === y) span++;
+    html += `<div class="gantt-head year" style="grid-column:${yi+2} / span ${span}; grid-row:1;">${y}</div>`;
+    yi += span;
+  }
+  html += '<div class="gantt-rowlabel" style="grid-column:1; grid-row:2;"></div>';
+  let mi = 0;
+  while (mi < nWeeks) {
+    const m = weekStarts[mi].getMonth(), y = weekStarts[mi].getFullYear();
+    let span = 0;
+    while (mi + span < nWeeks && weekStarts[mi+span].getMonth() === m && weekStarts[mi+span].getFullYear() === y) span++;
+    const label = weekStarts[mi].toLocaleDateString('en-US', {month:'short'});
+    html += `<div class="gantt-head" style="grid-column:${mi+2} / span ${span}; grid-row:2; font-weight:600;">${label}</div>`;
+    mi += span;
+  }
+  html += `<div class="gantt-rowlabel" style="grid-column:1; grid-row:3;">${opts.rowLabelHeader || ''}</div>`;
+  for (let i = 0; i < nWeeks; i++) {
+    html += `<div class="gantt-head" style="grid-column:${i+2}; grid-row:3; font-size:8px; color:#ccc;">${weekStarts[i].getDate()}</div>`;
+  }
+
+  let rowCursor = 4;
+  rowLabels.forEach(label => {
+    const rLanes = laneRows.filter(r => r.label === label).length;
+    html += `<div class="gantt-rowlabel" style="grid-column:1; grid-row:${rowCursor} / span ${rLanes};">${label}</div>`;
+    for (let li = 0; li < rLanes; li++) {
+      for (let ci = 0; ci < nWeeks; ci++) {
+        html += `<div class="gantt-cell" style="grid-column:${ci+2}; grid-row:${rowCursor+li};"></div>`;
+      }
+    }
+    rowCursor += rLanes;
+  });
+
+  items.forEach(it => {
+    const loc = itemLane[it.id];
+    if (!loc) return;
+    const rowStart = 4 + laneRows.findIndex(r => r.label === loc.label);
+    const row = rowStart + loc.lane;
+    const sD = new Date(it.start+'T00:00:00'), eD = new Date(it.end+'T00:00:00');
+    const c1 = weekIndex(sD) + 2, c2 = weekIndex(eD) + 2;
+    const color = opts.colorFn(it);
+    const label = opts.barLabelFn(it);
+    html += `<div class="gantt-bar" onclick="${opts.onClickFn(it)}" title="Click for details" style="grid-column:${c1} / ${c2+1}; grid-row:${row}; background:${color}; margin:3px 1px;">${label}</div>`;
+  });
+
+  html += '</div></div>';
+  return html;
+}
+
+/* ---------- Campaign Gantt ---------- */
+function renderCampaignsGantt() {
+  const host = document.getElementById('campaignGanttHost');
+  const legendHost = document.getElementById('campaignGanttLegend');
+  if (!host) return;
+  host.innerHTML = '';
+  legendHost.innerHTML = '';
+  if (campaigns.length === 0) {
+    host.innerHTML = '<div class="empty"><h3>No campaigns yet</h3><p>Create one above to see it here.</p></div>';
+    return;
+  }
+  host.innerHTML = buildGanttHTML(campaigns, {
+    rowKeyFn: c => c.name,
+    colorFn: c => (c.channels && c.channels[0]) ? CHANNEL_COLOR[c.channels[0]] : '#1A1A1A',
+    barLabelFn: c => c.name + ' (' + c.status + ')',
+    onClickFn: c => `openCampaignDetail('${c.id}')`,
+    rowLabelHeader: 'Campaign',
+    rowLabelWidth: 170,
+  });
+  legendHost.innerHTML = CHANNELS.map(c => `<div class="legend-item"><span class="legend-swatch" style="background:${c.color};"></span>${c.key}</div>`).join('');
+}
+
+/* ---------- Master Gantt Chart (campaigns + promotions combined) ---------- */
+function renderMasterGantt() {
+  const host = document.getElementById('masterGanttHost');
+  const legend = document.getElementById('masterGanttLegend');
+  if (!host) return;
+  host.innerHTML = ''; legend.innerHTML = '';
+
+  const combined = [...campaigns, ...promos];
+  if (combined.length === 0) {
+    host.innerHTML = '<div class="empty"><h3>Nothing here yet</h3><p>Add a promotion or a campaign to see it on this calendar.</p></div>';
+    return;
+  }
+
+  host.innerHTML = buildGanttHTML(combined, {
+    rowKeyFn: it => it.channels ? ('★ ' + it.name) : channelOf(it),
+    colorFn: it => it.channels ? ((it.channels[0] && CHANNEL_COLOR[it.channels[0]]) || '#1A1A1A') : CHANNEL_COLOR[channelOf(it)],
+    barLabelFn: it => it.channels ? (it.name + ' (' + it.status + ')') : (it.desc + ' (' + (it.retailer || channelOf(it)) + ')'),
+    onClickFn: it => it.channels ? `openCampaignDetail('${it.id}')` : `openDetail('${it.id}')`,
+    rowLabelHeader: 'Campaign / Channel',
+    rowLabelWidth: 180,
+  });
+  legend.innerHTML = '<div class="legend-item"><span class="legend-swatch" style="background:#1A1A1A;"></span>★ Campaign rows</div>'
+    + CHANNELS.map(c => `<div class="legend-item"><span class="legend-swatch" style="background:${c.color};"></span>${c.key}</div>`).join('');
+}
+
+/* ---------- Analysis (per channel) ---------- */
+function renderChannelAnalysis(key) {
+  const body = document.getElementById('analysis-' + key);
+  if (!body) return;
+  body.innerHTML = '';
+  const list = promos.filter(p => channelOf(p) === key).sort((a,b) => a.start.localeCompare(b.start));
+  list.forEach(p => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${p.desc}</strong><br><span style="color:var(--text-dimmer); font-size:11px;">${p.product}</span></td>
+      <td><input type="number" class="editable-input wide" value="${p.baseline ?? ''}" onchange="updateAnalysisField('${p.id}', 'baseline', this.value)"></td>
+      <td><input type="number" class="editable-input wide" value="${p.promoRev ?? ''}" onchange="updateAnalysisField('${p.id}', 'promoRev', this.value)"></td>
+      <td><input type="number" class="editable-input wide" value="${p.postRev ?? ''}" onchange="updateAnalysisField('${p.id}', 'postRev', this.value)"></td>
+      <td><input type="number" class="editable-input wide" value="${p.trueCost ?? ''}" onchange="updateAnalysisField('${p.id}', 'trueCost', this.value)"></td>
+      <td class="numcell" id="lift-${p.id}"></td>
+      <td class="numcell" id="incr-${p.id}"></td>
+      <td class="numcell" id="roi-${p.id}"></td>
+    `;
+    body.appendChild(tr);
+    updateMetricCells(p);
+  });
+}
+function updateMetricCells(p) {
+  const lift = calcLift(p), incr = calcIncr(p), roi = calcRoi(p);
+  const liftEl = document.getElementById('lift-' + p.id);
+  const incrEl = document.getElementById('incr-' + p.id);
+  const roiEl = document.getElementById('roi-' + p.id);
+  if (!liftEl) return;
+  liftEl.textContent = lift === null ? '—' : (lift*100).toFixed(1) + '%';
+  liftEl.className = 'numcell ' + (lift === null ? 'metric-neutral' : (lift >= 0 ? 'metric-good' : 'metric-bad'));
+  incrEl.textContent = incr === null ? '—' : '$' + incr.toLocaleString(undefined,{maximumFractionDigits:0});
+  incrEl.className = 'numcell ' + (incr === null ? 'metric-neutral' : (incr >= 0 ? 'metric-good' : 'metric-bad'));
+  roiEl.textContent = roi === null ? '—' : roi.toFixed(2) + 'x';
+  roiEl.className = 'numcell ' + (roi === null ? 'metric-neutral' : (roi >= 0 ? 'metric-good' : 'metric-bad'));
+}
+function calcLift(p) {
+  if (p.baseline == null || p.promoRev == null || p.baseline === 0) return null;
+  return (p.promoRev - p.baseline) / p.baseline;
+}
+function calcIncr(p) {
+  if (p.baseline == null || p.promoRev == null) return null;
+  const dip = (p.postRev != null) ? Math.max(0, p.baseline - p.postRev) : 0;
+  return (p.promoRev - p.baseline) - dip;
+}
+function calcRoi(p) {
+  const incr = calcIncr(p);
+  if (incr === null || p.trueCost == null || p.trueCost === 0) return null;
+  return incr / p.trueCost;
+}
+async function updateAnalysisField(id, field, value) {
+  const p = promos.find(x => x.id === id);
+  if (!p) return;
+  p[field] = value === '' ? null : parseFloat(value);
+  updateMetricCells(p);
+  await savePromos();
+}
+
+/* ---------- Detail modal ---------- */
+function openDetail(id) {
+  const p = promos.find(x => x.id === id);
+  if (!p) return;
+  const status = statusOf(p);
+  const lift = calcLift(p), incr = calcIncr(p), roi = calcRoi(p);
+  const key = channelOf(p);
+  const camp = campaigns.find(c => c.id === p.campaignId);
+  let analysisRows = '';
+  if (lift !== null || incr !== null || roi !== null) {
+    analysisRows = `
+      <div class="modal-row"><span>Promo Lift</span><span>${lift === null ? '—' : (lift*100).toFixed(1) + '%'}</span></div>
+      <div class="modal-row"><span>Incremental Revenue</span><span>${incr === null ? '—' : '$' + incr.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
+      <div class="modal-row"><span>ROI</span><span>${roi === null ? '—' : roi.toFixed(2) + 'x'}</span></div>`;
+  }
+  document.getElementById('modalBody').innerHTML = `
+    <div class="channel-head"><span class="channel-swatch" style="background:${CHANNEL_COLOR[key]};"></span><h2>${p.desc}</h2></div>
+    <div class="modal-sub">${p.id} · ${key}${p.retailer ? ' · ' + p.retailer : ''}</div>
+    <div class="modal-row"><span>Status</span><span><span class="chip ${chipClass(status)}">${status}</span></span></div>
+    <div class="modal-row"><span>Product</span><span>${p.product}</span></div>
+    <div class="modal-row"><span>Campaign</span><span>${camp ? `<span class="campaign-link" onclick="closeDetail(); openCampaignDetail('${camp.id}');">${camp.name}</span>` : '—'}</span></div>
+    <div class="modal-row"><span>Dates</span><span>${fmtDate(p.start)} – ${fmtDate(p.end)}</span></div>
+    <div class="modal-row"><span>Offer</span><span>${Math.round(p.discount*100)}% ${p.ptype}</span></div>
+    ${analysisRows}
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeDetail(); startEdit('${p.id}');">Edit</button>
+      <button class="btn" onclick="closeDetail();">Close</button>
+    </div>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeDetail() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+/* ---------- Campaigns: storage ---------- */
+async function loadCampaigns() {
+  try {
+    const res = await fetch('/api/marketing/campaigns');
+    if (!res.ok) throw new Error('load failed');
+    const body = await res.json();
+    campaigns = body.campaigns.sort((a,b) => a.id.localeCompare(b.id));
+  } catch (e) {
+    campaigns = [];
+  }
+  populateCampaignSelect();
+  renderCampaignsTable();
+  renderCampaignsGantt();
+  renderAllVisible();
+}
+async function saveCampaign(camp) {
+  try {
+    const res = await fetch('/api/marketing/campaigns', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(camp),
+    });
+    return res.ok;
+  } catch (e) { return false; }
+}
+async function deleteCampaignStorage(id) {
+  try { await fetch('/api/marketing/campaigns/' + encodeURIComponent(id), { method: 'DELETE' }); } catch (e) { /* ignore */ }
+}
+function nextCampaignId() {
+  let max = 0;
+  campaigns.forEach(c => { const n = parseInt(c.id.replace('C','')); if (n > max) max = n; });
+  return 'C' + String(max + 1).padStart(2, '0');
+}
+
+/* ---------- Campaigns: channel checkboxes ---------- */
+function buildChannelCheckboxes() {
+  const host = document.getElementById('c-channels');
+  host.innerHTML = CHANNELS.map(c =>
+    `<label class="checkbox-pill"><input type="checkbox" value="${c.key}" onchange="this.parentElement.classList.toggle('checked', this.checked)"><span class="dot" style="background:${c.color};"></span>${c.key}</label>`
+  ).join('');
+}
+function getSelectedChannels() {
+  return [...document.querySelectorAll('#c-channels input:checked')].map(cb => cb.value);
+}
+function setChannelCheckboxes(selected) {
+  document.querySelectorAll('#c-channels .checkbox-pill').forEach(pill => {
+    const cb = pill.querySelector('input');
+    const on = selected.includes(cb.value);
+    cb.checked = on;
+    pill.classList.toggle('checked', on);
+  });
+}
+
+/* ---------- Campaigns: assets needed (line items) ---------- */
+function extOf(name) { const parts = name.split('.'); return (parts.length > 1 ? parts.pop() : '?').slice(0,4).toUpperCase(); }
+function fmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(0) + ' KB';
+  return (n/1024/1024).toFixed(1) + ' MB';
+}
+function escapeAttr(s) { return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function assetUrl(campaignId, filename) {
+  return '/api/marketing/campaigns/' + encodeURIComponent(campaignId) + '/assets/' + encodeURIComponent(filename);
+}
+// Assets attach to a campaign by id, but a brand-new campaign has no id until first
+// save — so the first file attached on a new campaign mints its id early.
+function draftCampaignAssetId() {
+  if (!draftCampaignId) draftCampaignId = editingCampaignId || nextCampaignId();
+  return draftCampaignId;
+}
+function addNeededRow() { draftAssetsNeeded.push({ name: '', asset: null }); renderNeededList(); }
+function removeNeededRow(i) { draftAssetsNeeded.splice(i, 1); renderNeededList(); }
+function updateNeededName(i, val) { if (draftAssetsNeeded[i]) draftAssetsNeeded[i].name = val; }
+function triggerNeededUpload(i) { document.getElementById('needed-file-' + i).click(); }
+async function removeNeededAsset(i) {
+  const asset = draftAssetsNeeded[i].asset;
+  draftAssetsNeeded[i].asset = null;
+  renderNeededList();
+  if (asset && draftCampaignId) {
+    try { await fetch(assetUrl(draftCampaignId, asset.name), { method: 'DELETE' }); } catch (e) { /* ignore */ }
+  }
+}
+async function handleNeededFile(i, files) {
+  if (!files || !files.length) return;
+  const file = files[0];
+  const warnEl = document.getElementById('assetSizeWarn');
+  if (file.size > MAX_ASSET_BYTES) {
+    warnEl.textContent = 'Skipped "' + file.name + '" — files must be 5MB or smaller. For large files (video, big decks), host it elsewhere and note the link in the item name instead.';
+    warnEl.style.display = 'block';
+    return;
+  }
+  warnEl.style.display = 'none';
+  const campaignId = draftCampaignAssetId();
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch(assetUrl(campaignId, file.name), { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('upload failed');
+    draftAssetsNeeded[i].asset = { name: file.name, type: file.type || 'file', size: file.size };
+  } catch (e) {
+    warnEl.textContent = 'Upload failed for "' + file.name + '" — try again.';
+    warnEl.style.display = 'block';
+  }
+  renderNeededList();
+}
+function renderNeededList() {
+  const host = document.getElementById('c-needed-list');
+  if (!host) return;
+  host.innerHTML = draftAssetsNeeded.map((r, i) => `
+    <div class="needed-row">
+      <input type="text" placeholder="e.g. Hero banner 1200x628" value="${escapeAttr(r.name)}" oninput="updateNeededName(${i}, this.value)">
+      <div class="needed-drop ${r.asset ? 'filled' : ''}"
+           onclick="${r.asset ? '' : `triggerNeededUpload(${i})`}"
+           ondragover="event.preventDefault(); event.stopPropagation(); this.classList.add('dragover');"
+           ondragleave="this.classList.remove('dragover');"
+           ondrop="event.preventDefault(); this.classList.remove('dragover'); handleNeededFile(${i}, event.dataTransfer.files);">
+        ${r.asset
+          ? `<span>${extOf(r.asset.name)} · ${r.asset.name} (${fmtBytes(r.asset.size)})</span><button class="btn-mini" onclick="event.stopPropagation(); removeNeededAsset(${i})">✕</button>`
+          : 'Drop file or click to attach'}
+      </div>
+      <span class="needed-status ${r.asset ? 'done' : 'pending'}">${r.asset ? 'Fulfilled' : 'Needed'}</span>
+      <input type="file" id="needed-file-${i}" style="display:none" onchange="handleNeededFile(${i}, this.files)">
+      <button class="btn-mini" onclick="removeNeededRow(${i})">✕</button>
+    </div>`).join('') + `<button class="btn btn-mini" style="margin-top:2px;" onclick="addNeededRow()">↑ Add Asset Needed</button>`;
+}
+
+
+/* ---------- Campaigns: form ---------- */
+function populateCampaignSelect() {
+  const sel = document.getElementById('f-campaign');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— No Campaign —</option>' + campaigns.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  sel.value = current;
+}
+function startEditCampaign(id) {
+  const c = campaigns.find(x => x.id === id);
+  if (!c) return;
+  editingCampaignId = id;
+  draftCampaignId = id;
+  document.getElementById('c-name').value = c.name;
+  document.getElementById('c-start').value = c.start;
+  document.getElementById('c-end').value = c.end;
+  document.getElementById('c-status').value = c.status;
+  document.getElementById('c-owner').value = c.owner || '';
+  document.getElementById('c-brief').value = c.brief || '';
+  setChannelCheckboxes(c.channels || []);
+  draftAssetsNeeded = JSON.parse(JSON.stringify(c.assetsNeeded || []));
+  renderNeededList();
+  document.getElementById('campaignFormTitle').textContent = 'Edit Campaign — ' + c.id;
+  document.getElementById('campaignCancelBtn').style.display = 'inline-flex';
+  document.getElementById('campaignSubmitBtn').textContent = 'Save Changes';
+  showSection('campaigns');
+}
+function cancelCampaignEdit() {
+  editingCampaignId = null;
+  clearCampaignForm();
+  document.getElementById('campaignFormTitle').textContent = 'New Campaign';
+  document.getElementById('campaignCancelBtn').style.display = 'none';
+  document.getElementById('campaignSubmitBtn').textContent = 'Save Campaign';
+}
+function clearCampaignForm() {
+  draftCampaignId = null;
+  document.getElementById('c-name').value = '';
+  document.getElementById('c-start').value = '';
+  document.getElementById('c-end').value = '';
+  document.getElementById('c-status').value = 'Identified';
+  document.getElementById('c-owner').value = '';
+  document.getElementById('c-brief').value = '';
+  setChannelCheckboxes([]);
+  draftAssetsNeeded = [];
+  renderNeededList();
+  document.getElementById('assetSizeWarn').style.display = 'none';
+}
+async function deleteCampaign(id) {
+  if (!confirm('Delete this campaign? Linked promotions keep their own data but lose the campaign link. This cannot be undone.')) return;
+  campaigns = campaigns.filter(c => c.id !== id);
+  await deleteCampaignStorage(id);
+  let changed = false;
+  promos.forEach(p => { if (p.campaignId === id) { p.campaignId = null; changed = true; } });
+  if (changed) await savePromos();
+  populateCampaignSelect();
+  renderCampaignsTable();
+  renderCampaignsGantt();
+  renderAllVisible();
+}
+async function submitCampaign() {
+  const name = document.getElementById('c-name').value.trim();
+  const start = document.getElementById('c-start').value;
+  const end = document.getElementById('c-end').value;
+  const status = document.getElementById('c-status').value;
+  const owner = document.getElementById('c-owner').value.trim();
+  const brief = document.getElementById('c-brief').value.trim();
+  const channelsSel = getSelectedChannels();
+  const errEl = document.getElementById('campaignErr');
+  const okEl = document.getElementById('campaignOk');
+  okEl.style.display = 'none';
+
+  if (!name || !start || !end || channelsSel.length === 0) {
+    errEl.textContent = 'Fill in the campaign name, dates, and at least one participating channel.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (new Date(end) < new Date(start)) {
+    errEl.textContent = 'End date is before the start date.';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+  const cleanedNeeded = draftAssetsNeeded.filter(r => r.name.trim() !== '' || r.asset);
+
+  let camp;
+  if (editingCampaignId) {
+    camp = campaigns.find(c => c.id === editingCampaignId);
+    Object.assign(camp, { name, start, end, status, owner, brief, channels: channelsSel, assetsNeeded: cleanedNeeded });
+  } else {
+    camp = { id: draftCampaignId || nextCampaignId(), name, start, end, status, owner, brief, channels: channelsSel, assetsNeeded: cleanedNeeded, createdAt: new Date().toISOString() };
+    campaigns.push(camp);
+  }
+  const saved = await saveCampaign(camp);
+  draftCampaignId = null;
+  okEl.textContent = saved ? ('Saved ' + camp.id + ' — ' + camp.name + '.') : 'Saved locally — sync failed, try again.';
+  okEl.style.display = 'block';
+  editingCampaignId = null;
+  document.getElementById('campaignFormTitle').textContent = 'New Campaign';
+  document.getElementById('campaignCancelBtn').style.display = 'none';
+  document.getElementById('campaignSubmitBtn').textContent = 'Save Campaign';
+  clearCampaignForm();
+  populateCampaignSelect();
+  renderCampaignsTable();
+  renderCampaignsGantt();
+  renderAllVisible();
+}
+
+/* ---------- Campaigns: table + detail ---------- */
+function channelChipsHTML(keys) {
+  return (keys || []).map(k => {
+    const col = CHANNEL_COLOR[k] || '#878787';
+    return `<span class="chip-channel" style="background:${col}22; color:${darken(col)};"><span class="dot" style="background:${col};"></span>${k}</span>`;
+  }).join('');
+}
+function renderCampaignsTable() {
+  const body = document.getElementById('campaignsTableBody');
+  const empty = document.getElementById('campaignsEmpty');
+  if (!body) return;
+  body.innerHTML = '';
+  if (campaigns.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  campaigns.forEach(c => {
+    const linked = promos.filter(p => p.campaignId === c.id).length;
+    const statusClass = 'chip-status-' + c.status.replace(/\s+/g,'');
+    const needed = c.assetsNeeded || [];
+    const fulfilled = needed.filter(r => r.asset).length;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono">${c.id}</td>
+      <td><span class="campaign-link" onclick="openCampaignDetail('${c.id}')">${c.name}</span></td>
+      <td>${c.owner || '—'}</td>
+      <td>${channelChipsHTML(c.channels) || '—'}</td>
+      <td class="mono">${fmtDate(c.start)} – ${fmtDate(c.end)}</td>
+      <td><span class="chip ${statusClass}">${c.status}</span></td>
+      <td>${needed.length ? (fulfilled + ' / ' + needed.length) : '—'}</td>
+      <td>${linked}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn-mini" onclick="startEditCampaign('${c.id}')">Edit</button>
+        <button class="btn-mini" style="color:#B0181D;" onclick="deleteCampaign('${c.id}')">Delete</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+}
+function openCampaignDetail(id) {
+  const c = campaigns.find(x => x.id === id);
+  if (!c) return;
+  const linkedPromos = promos.filter(p => p.campaignId === id);
+  const needed = c.assetsNeeded || [];
+  const neededHtml = needed.length ? needed.map(r => `
+    <div class="asset-row">
+      <div class="asset-icon">${r.asset ? extOf(r.asset.name) : '—'}</div>
+      <div class="asset-name">${r.name || '(untitled)'}</div>
+      <span class="needed-status ${r.asset ? 'done' : 'pending'}" style="flex:0 0 auto;">${r.asset ? 'Fulfilled' : 'Needed'}</span>
+      ${r.asset ? `<a class="btn-mini" href="${assetUrl(c.id, r.asset.name)}" download="${r.asset.name}">Download</a>` : ''}
+    </div>`).join('') : '<div style="color:var(--text-dimmer); font-size:13px;">Nothing listed yet.</div>';
+  const promosHtml = linkedPromos.length ? linkedPromos.map(p => `
+    <div class="modal-row"><span>${p.id} · ${channelOf(p)}</span><span class="campaign-link" onclick="closeDetail(); openDetail('${p.id}');">${p.desc}</span></div>`).join('')
+    : '<div style="color:var(--text-dimmer); font-size:13px;">No promotions linked yet.</div>';
+  const briefHtml = c.brief ? `<div style="margin-top:14px; font-weight:700; font-size:12px; color:var(--text-dim); letter-spacing:.04em;">BRIEF</div>
+    <div style="font-size:13px; color:var(--text); line-height:1.5; white-space:pre-wrap;">${c.brief}</div>` : '';
+  document.getElementById('modalBody').innerHTML = `
+    <h2>${c.name}</h2>
+    <div class="modal-sub">${c.id} · <span class="chip chip-status-${c.status.replace(/\s+/g,'')}">${c.status}</span></div>
+    <div class="modal-row"><span>Owner</span><span>${c.owner || '—'}</span></div>
+    <div class="modal-row"><span>Dates</span><span>${fmtDate(c.start)} – ${fmtDate(c.end)}</span></div>
+    <div class="modal-row"><span>Channels</span><span>${channelChipsHTML(c.channels)}</span></div>
+    ${briefHtml}
+    <div style="margin-top:14px; font-weight:700; font-size:12px; color:var(--text-dim); letter-spacing:.04em;">ASSETS NEEDED</div>
+    <div class="asset-list">${neededHtml}</div>
+    <div style="margin-top:14px; font-weight:700; font-size:12px; color:var(--text-dim); letter-spacing:.04em;">LINKED PROMOTIONS (${linkedPromos.length})</div>
+    ${promosHtml}
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeDetail(); startEditCampaign('${c.id}');">Edit</button>
+      <button class="btn" onclick="closeDetail();">Close</button>
+    </div>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+/* ---------- Add / Edit / Delete ---------- */
+function populateChannelSelect() {
+  const sel = document.getElementById('f-channel');
+  sel.innerHTML = CHANNELS.map(c => `<option>${c.key}</option>`).join('');
+}
+function startEdit(id) {
+  const p = promos.find(x => x.id === id);
+  if (!p) return;
+  editingId = id;
+  document.getElementById('f-product').value = p.product;
+  document.getElementById('f-desc').value = p.desc;
+  document.getElementById('f-channel').value = channelOf(p);
+  document.getElementById('f-retailer').value = p.retailer || '';
+  document.getElementById('f-campaign').value = p.campaignId || '';
+  document.getElementById('f-start').value = p.start;
+  document.getElementById('f-end').value = p.end;
+  document.getElementById('f-ptype').value = p.ptype;
+  document.getElementById('f-discount').value = Math.round(p.discount*100);
+  document.getElementById('addCancelBtn').style.display = 'inline-flex';
+  document.getElementById('addSubmitBtn').textContent = 'Save Changes';
+  showSection('add');
+  document.getElementById('pageTitle').textContent = 'Edit Promotion — ' + p.id;
+}
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('addSubmitBtn').textContent = 'Save Promotion';
+  document.getElementById('addCancelBtn').style.display = 'none';
+  clearForm();
+  document.getElementById('pageTitle').textContent = 'Add a Promotion';
+}
+function clearForm() {
+  ['f-product','f-desc','f-start','f-end','f-discount','f-retailer'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-channel').value = 'Amazon';
+  document.getElementById('f-ptype').value = 'Coupon';
+  document.getElementById('f-campaign').value = '';
+}
+async function deletePromo(id) {
+  if (!confirm('Delete this promotion? This cannot be undone.')) return;
+  promos = promos.filter(p => p.id !== id);
+  await savePromos();
+  renderAllVisible();
+}
+async function submitPromotion() {
+  const product = document.getElementById('f-product').value.trim();
+  const desc = document.getElementById('f-desc').value.trim();
+  const channel = document.getElementById('f-channel').value;
+  const campaignId = document.getElementById('f-campaign').value || null;
+  let retailer = document.getElementById('f-retailer').value.trim();
+  if (!retailer) retailer = channel;
+  const start = document.getElementById('f-start').value;
+  const end = document.getElementById('f-end').value;
+  const ptype = document.getElementById('f-ptype').value;
+  const discountRaw = document.getElementById('f-discount').value;
+
+  const errEl = document.getElementById('addErr');
+  const okEl = document.getElementById('addOk');
+  okEl.style.display = 'none';
+
+  if (!product || !desc || !start || !end || discountRaw === '') {
+    errEl.textContent = 'Fill in every field before saving.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (new Date(end) < new Date(start)) {
+    errEl.textContent = 'End date is before the start date.';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  const discount = parseFloat(discountRaw) / 100;
+
+  if (editingId) {
+    const p = promos.find(x => x.id === editingId);
+    Object.assign(p, { product, desc, channel, retailer, campaignId, start, end, ptype, discount });
+    okEl.textContent = 'Saved changes to ' + editingId + '.';
+  } else {
+    const id = nextId();
+    promos.push({ id, product, desc, channel, retailer, campaignId, start, end, ptype, discount, baseline: null, promoRev: null, postRev: null, trueCost: null, notes: '' });
+    okEl.textContent = 'Added ' + id + ' — ' + desc + ' (' + channel + ').';
+  }
+  okEl.style.display = 'block';
+  await savePromos();
+  editingId = null;
+  document.getElementById('addSubmitBtn').textContent = 'Save Promotion';
+  document.getElementById('addCancelBtn').style.display = 'none';
+  document.getElementById('pageTitle').textContent = 'Add a Promotion';
+  clearForm();
+  renderAllVisible();
+}
+
+/* ---------- Init ---------- */
+buildNav();
+buildChannelSections();
+populateChannelSelect();
+buildChannelCheckboxes();
+clearForm();
+clearCampaignForm();
+loadPromos();
+loadCampaigns();
+</script>
+</body>
+</html>

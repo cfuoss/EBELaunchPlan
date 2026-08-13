@@ -96,6 +96,15 @@ secure-cpg-demo
 
 **IMPORTANT:** `<ACCOUNT_ID>` and the gateway name `ebe-marketing-ai` may still be placeholders — verify the real values are filled in before relying on this. Read the real file first; do not overwrite from this snapshot.
 
+## Marketing: Promotional Calendar (D1 + R2)
+
+Added 2026-08-09. Live at `/ebe-promo-calendar.html`, linked as a third card under Dashboards → Marketing Analytics.
+
+- New D1 database `secure-cpg-marketing` (binding `secure_cpg_marketing` in `wrangler.jsonc`, **not** `remote: true` — see caveat below). Schema in `migrations/0001_marketing_init.sql` (`promotions`, `campaigns` tables), seed data in `migrations/0002_marketing_seed.sql` (the tool's original 24 default promotions). Both already applied to the remote database; re-run with `--local` after a fresh `.wrangler/state` wipe if local dev data disappears.
+- Campaign asset files (briefs/images, ≤5MB each) go to the existing `secure-cpg-data` R2 bucket under `marketing/campaigns/{campaignId}/{filename}` — no more base64-in-storage.
+- New routes in `src/index.js`: `GET/PUT /api/marketing/promotions` (whole-list replace, matches the tool's original single-array save model), `GET/PUT /api/marketing/campaigns`, `DELETE /api/marketing/campaigns/:id` (also purges its R2 assets), `POST/GET/DELETE /api/marketing/campaigns/:id/assets/:filename`.
+- **Caveat:** the D1 binding was briefly set to `remote: true` (Wrangler's default suggestion) — this broke `npm run dev` entirely, because a remote-mode binding makes Wrangler open a proxy through the Worker's own Cloudflare Access-gated domain, which fails with no Access Service Token in a non-interactive session. Fixed by using local-mode D1 for dev (matching how `CPG_DATA` R2 already works: local for `dev`, `--remote` only for direct one-off production commands). Don't re-add `remote: true` to `d1_databases` without also setting up an Access Service Token.
+
 ## In-progress: Claude AI integration (current priority)
 
 Goal: connect Claude (via Cloudflare AI Gateway) to analyze review and item-trace data already stored in the hub. Direct Worker + AI Gateway integration was chosen over Cloudflare OS/Gatekeepers for now, since the hub's current needs (analyze existing data, two tools) don't yet require a full agent platform. See "Purpose" section above for the staged path to Cloudflare OS later.

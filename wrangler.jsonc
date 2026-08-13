@@ -1,26 +1,35 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "secure-cpg-demo",
-  "main": "./src/index.js",
-  "compatibility_date": "2026-08-06",
-  "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": true,
-  "preview_urls": false,
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS"
-  },
-  "r2_buckets": [
-    {
-      "binding": "CPG_DATA",
-      "bucket_name": "secure-cpg-data"
-    }
-  ],
-  "vars": {
-    "AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/3f1ba70bb65760f27b93f315a125f388/ebe-marketing-ai/anthropic"
-  },
-  "observability": {
-    "enabled": true
-  },
-  "upload_source_maps": true
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "secure-cpg-demo",
+	"main": "./src/index.js",
+	"compatibility_date": "2026-08-06",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"workers_dev": true,
+	"preview_urls": false,
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS"
+	},
+	"r2_buckets": [
+		{
+			"binding": "CPG_DATA",
+			"bucket_name": "secure-cpg-data"
+		}
+	],
+	"vars": {
+		"AI_GATEWAY_URL": "https://gateway.ai.cloudflare.com/v1/3f1ba70bb65760f27b93f315a125f388/ebe-marketing-ai/anthropic"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true,
+	"d1_databases": [
+		{
+			"binding": "secure_cpg_marketing",
+			"database_name": "secure-cpg-marketing",
+			"database_id": "688432f7-5e21-46b6-bc72-4abe0b8119e1"
+		}
+	]
 }

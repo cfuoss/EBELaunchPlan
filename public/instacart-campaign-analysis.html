@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Every Body Eat — Instacart Campaign Analysis</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#FFFFFF; --bg-soft:#F7F5EE; --card:#FFFFFF; --card-border:#E8E4D6;
+  --text:#1A1A1A; --text-dim:#6B6B64; --text-dimmer:#78766E; --ink:#1A1A1A;
+  --pretzel:#2878FF; --pretzel-text:#1E5FDB;
+  --lime:#CADC30; --lime-text:#5C6B0A;
+  --orange:#F99420; --teal:#0099F3; --sky:#87CCF4; --magenta:#CC1F97;
+  --rose:#ED1C24; --rose-text:#B0181D; --grey:#878787; --focus:#2878FF;
+  --brand:#2878FF; --brand-dark:#1A1A1A; --border:#E8E4D6;
+  --gray:#6B6B64; --pos:#00BF63; --neu:#78766E; --neg:#FF3131;
+  --pos-bg:rgba(0,191,99,0.15); --pos-light:rgba(0,191,99,0.07);
+  --neg-bg:rgba(255,49,49,0.12); --neg-light:rgba(255,49,49,0.06);
+  --neu-bg:rgba(120,118,110,0.12); --brand-light:rgba(40,120,255,0.08);
+  --violet:#6D5CE7;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+/* NAV */
+.sidenav { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #fff; border-right: 1px solid #E8E4D6; overflow-y: auto; z-index: 100; display: flex; flex-direction: column; transition: transform 0.2s ease; }
+.nav-collapsed .sidenav { transform: translateX(-220px); }
+.nav-collapsed .main { margin-left: 0 !important; }
+#nav-toggle { position: fixed; top: 20px; left: 204px; z-index: 200; background: var(--ink); border: none; border-radius: 999px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.18); transition: left 0.2s ease, background 0.2s ease, color 0.2s ease; }
+#nav-toggle svg { width: 16px; height: 16px; transition: transform 0.2s ease; }
+.nav-collapsed #nav-toggle { left: 12px; background: var(--lime); color: #1A1A1A; }
+.nav-collapsed #nav-toggle svg { transform: rotate(180deg); }
+.main { transition: margin-left 0.2s ease; }
+.hub-brand { display: flex; align-items: center; height: 62px; padding: 0 18px; border-bottom: 1px solid #E8E4D6; text-decoration: none; color: inherit; transition: background 0.15s; }
+.hub-brand:hover { background: #f6f6f7; }
+.hub-brand-mark { display: grid; width: 32px; height: 32px; margin-right: 10px; place-items: center; border-radius: 9px; background: #1A1A1A; color: #fff; font-size: 12px; font-weight: 850; letter-spacing: -.04em; }
+.hub-brand-name { font-size: 15px; font-weight: 760; letter-spacing: -.02em; color: #1A1A1A; }
+.nav-section { padding: 12px 8px 4px 16px; color: #78766E; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.sidenav-footer { margin-top: auto; padding: 14px 16px; border-top: 1px solid #E8E4D6; color: #6B6B64; font-size: 11px; }
+.sidenav a { display: block; padding: 9px 16px; color: #62636a; text-decoration: none; font-size: 14px; font-weight: 530; border-radius: 9px; margin: 2px 8px; transition: background 0.15s, color 0.15s; }
+.sidenav a:hover { background: #f6f6f7; color: #1A1A1A; }
+.sidenav a.active { background: #d9d9db; color: #1A1A1A; }
+
+/* MAIN */
+.main { margin-left: 220px; min-height: 100vh; }
+.section { padding: 32px 36px; border-bottom: 1px solid var(--card-border); background: var(--bg); } .section:nth-child(even) { background: var(--bg-soft); }
+.section:last-child { border-bottom: none; }
+h2.page-title { font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin-bottom: 4px; }
+h3.section-title { font-weight: 700; font-size: 16px; color: var(--text); margin: 32px 0 16px; padding-bottom: 8px; border-bottom: 2px solid var(--brand); display: inline-block; }
+h4.sub-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+.subtitle { color: var(--gray); font-size: 13px; margin-bottom: 24px; }
+
+/* CARDS */
+.card-grid { display: grid; gap: 16px; }
+.card-grid-6 { grid-template-columns: repeat(6,1fr); }
+.card-grid-4 { grid-template-columns: repeat(4,1fr); }
+.card-grid-3 { grid-template-columns: repeat(3,1fr); }
+.card-grid-2 { grid-template-columns: repeat(2,1fr); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+.card-kpi { text-align: center; padding: 16px; }
+.kpi-val { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1; }
+.kpi-label { font-size: 11px; color: var(--gray); margin-top: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.kpi-sub { font-size: 11px; color: var(--gray); margin-top: 4px; font-weight: 600; }
+
+/* COMPARISON SELECTOR */
+.comparison-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.comparison-row label { font-size: 12px; color: var(--gray); font-weight: 600; }
+.comparison-row select { padding: 7px 12px; border: 1px solid var(--card-border); border-radius: 999px; font-size: 13px; background: white; color: var(--text); font-family: inherit; outline: none; cursor: pointer; }
+.comparison-row select:focus { border-color: var(--brand); }
+
+/* CHARTS */
+.chart-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 12px; }
+.chart-wrap { height: 220px; position: relative; margin-top: 10px; }
+.chart-wrap-sm { height: 180px; position: relative; }
+.breakdown-grid { display: grid; grid-template-columns: 220px 1fr; gap: 20px; margin-top: 12px; align-items: start; }
+
+/* TABLES */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #f3f4f6; padding: 9px 12px; text-align: left; font-weight: 600; color: var(--text-dim); font-size: 12px; border-bottom: 2px solid var(--border); }
+td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #f9fafb; }
+tfoot td { font-weight: 700; border-top: 2px solid var(--border); background: #f9fafb; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+
+/* BADGES */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.badge-active { background: #e9f9f0; color: #13834c; }
+.badge-active::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #22c56e; }
+.badge-ended { background: #f3f4f6; color: #6B6B64; }
+.badge-paused { background: #fff5df; color: #b66a00; }
+.type-badge { font-size: 11px; padding: 3px 9px; border-radius: 999px; font-weight: 700; }
+.type-acquire { background: rgba(249,148,32,.18); color: #b66a00; }
+.type-maxsales { background: rgba(0,153,243,.18); color: #0a6bb0; }
+
+.mini-bar-wrap { display: inline-block; width: 50px; height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; margin-right: 6px; vertical-align: middle; }
+.mini-bar { height: 100%; }
+.muted-sm { color: var(--text-dim); font-size: 11px; }
+
+/* INSIGHT CARDS */
+.insight-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; margin-top: 12px; }
+.insight-card { }
+.insight-icon { font-size: 18px; margin-bottom: 6px; }
+.insight-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; color: var(--text); }
+.insight-text { font-size: 12.5px; color: var(--text-dim); line-height: 1.55; }
+
+/* PROJECTION BOX */
+.projection-box { background: linear-gradient(135deg, rgba(0,191,99,.07), rgba(0,191,99,.015)); border: 1px solid rgba(0,191,99,.3); margin-top: 20px; }
+.proj-label { font-size: 11px; color: var(--gray); text-transform: uppercase; font-weight: 600; }
+.proj-val { font-size: 19px; font-weight: 800; margin-top: 2px; color: var(--text); }
+.proj-sub { font-size: 11px; margin-top: 2px; font-weight: 600; }
+
+/* SD CARDS */
+.sd-card { padding: 0; margin-bottom: 16px; overflow: hidden; }
+.sd-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.sd-title { font-weight: 700; font-size: 14px; color: var(--text); }
+.sd-meta { font-size: 12px; color: var(--text-dim); display: flex; align-items: center; gap: 8px; }
+.sd-body { display: grid; grid-template-columns: 240px 1fr; }
+.sd-visual { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+.sd-emoji { font-size: 40px; margin-bottom: 10px; }
+.sd-visual-name { font-size: 12px; font-weight: 700; color: #fff; }
+.sd-right { padding: 16px 18px; }
+.kpi-strip { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 14px; }
+.kpi-cell { text-align: center; }
+.kpi-cell .kpi-label { margin-top: 0; }
+.kpi-cell .kpi-val { font-size: 16px; margin-top: 2px; }
+.chart-label { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
+
+/* EMPTY STATE */
+.empty-state { background: var(--bg-soft); border: 1px dashed #d7d7da; border-radius: 10px; padding: 44px 24px; text-align: center; margin-top: 12px; }
+.empty-icon { font-size: 32px; margin-bottom: 10px; }
+.empty-title { font-size: 15px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+.empty-text { font-size: 13px; color: var(--text-dim); max-width: 520px; margin: 0 auto; line-height: 1.6; }
+.empty-text code { background: #eeece2; padding: 1px 6px; border-radius: 4px; }
+
+@media (max-width: 1100px) { .card-grid-6 { grid-template-columns: repeat(3,1fr); } .card-grid-4 { grid-template-columns: repeat(2,1fr); } .chart-row-3 { grid-template-columns: 1fr; } }
+
+/* ── SECTION ACCENT COLORS ─────────────────────────────────────── */
+#sp { border-left: 4px solid #F99420; }
+#sp > h2 { color: #D07A10; }
+.sidenav a[href="#sp"] { border-left: 3px solid #F99420; margin-left: 8px; padding-left: 13px; }
+
+#sd { border-left: 4px solid #87CCF4; }
+#sd > h2 { color: #0099F3; }
+.sidenav a[href="#sd"] { border-left: 3px solid #87CCF4; margin-left: 8px; padding-left: 13px; }
+
+.sidenav a[href="/keyword-insights.html"] { border-left: 3px solid #CC1F97; margin-left: 8px; padding-left: 13px; }
+</style>
+</head>
+<body>
+
+<button id="nav-toggle" onclick="document.body.classList.toggle('nav-collapsed')" title="Toggle sidebar" aria-label="Toggle sidebar">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6" /></svg>
+</button>
+
+<nav class="sidenav">
+  <a class="hub-brand" href="/">
+    <div class="hub-brand-mark">LP</div>
+    <div class="hub-brand-name">LaunchPlan Hub</div>
+  </a>
+  <div class="nav-section">Overview</div>
+  <a href="#exec-summary" onclick="scrollToId('exec-summary')">📊 Executive Summary</a>
+  <div class="nav-section">Campaigns</div>
+  <a href="#sp" onclick="scrollToId('sp')">📦 Sponsored Products</a>
+  <a href="#sd" onclick="scrollToId('sd')">🖼️ Sponsored Display</a>
+  <div class="nav-section">Insights</div>
+  <a href="/keyword-insights.html">🔑 Keyword Insights</a>
+  <div class="sidenav-footer">Data as of August 11, 2026</div>
+</nav>
+
+<div class="main">
+
+<!-- ═══════════════════════════════════════════════
+     EXECUTIVE SUMMARY
+═══════════════════════════════════════════════ -->
+<div class="section" id="exec-summary">
+  <h2 class="page-title">Instacart Campaign Analysis</h2>
+  <p class="subtitle">Every Body Eat · Data as of August 11, 2026 · Sponsored Products + Sponsored Display</p>
+
+  
+<div class="comparison-row">
+  <label for="comparison-select">Compare projections to</label>
+  <select id="comparison-select" onchange="applyComparison(this.value)">
+    <option value="py">Prior Year (Aug 2025)</option>
+    <option value="prevmo">Previous Month, same days elapsed (Jul 2026)</option>
+  </select>
+</div>
+
+  
+<div class="card-grid card-grid-6">
+  <div class="card card-kpi"><div class="kpi-val">$4,102</div><div class="kpi-label">Spend (to-date)</div><div class="kpi-sub">Day 11 of 31</div></div>
+  <div class="card card-kpi"><div class="kpi-val">$11,561</div><div class="kpi-label">Projected Spend</div><div class="kpi-sub" id="cmp-spend-kpi" style="color:#00BF63">▼ 36.9% vs Aug 2025</div></div>
+  <div class="card card-kpi" style="border-color:#bef2d3;background:#f0fdf6"><div class="kpi-val" style="color:#00BF63">$7,439</div><div class="kpi-label" style="color:#00BF63">Sales (to-date)</div></div>
+  <div class="card card-kpi" style="border-color:#bef2d3;background:#f0fdf6"><div class="kpi-val" style="color:#00BF63">$20,963</div><div class="kpi-label" style="color:#00BF63">Projected Sales</div><div class="kpi-sub" id="cmp-sales-kpi" style="color:#FF3131">▼ 52.5% vs Aug 2025</div></div>
+  <div class="card card-kpi"><div class="kpi-val">1.81x</div><div class="kpi-label">Current ROAS</div></div>
+  <div class="card card-kpi" style="border-color:#e3ddfa;background:#f5f2ff"><div class="kpi-val" style="color:#6D5CE7">43.0%</div><div class="kpi-label" style="color:#6D5CE7">Avg NTB%</div></div>
+</div>
+
+  
+<div class="card projection-box">
+  <h4 class="sub-title">📊 End-of-Month Projections (Aug 26)</h4>
+  <div class="card-grid card-grid-4">
+    <div class="proj-item"><div class="proj-label">Spend</div><div class="proj-val">$11,561</div><div class="proj-sub" id="cmp-proj-spend" style="color:#00BF63">▼ 36.9% vs Aug 2025</div></div>
+    <div class="proj-item"><div class="proj-label">Sales</div><div class="proj-val">$20,963</div><div class="proj-sub" id="cmp-proj-sales" style="color:#FF3131">▼ 52.5% vs Aug 2025</div></div>
+    <div class="proj-item"><div class="proj-label">ROAS</div><div class="proj-val">1.81x</div><div class="proj-sub" id="cmp-proj-roas" style="color:#FF3131">▼ 24.8% vs Aug 2025</div></div>
+    <div class="proj-item"><div class="proj-label">NTB Sales</div><div class="proj-val">$9,014</div><div class="proj-sub" id="cmp-proj-ntbsales" style="color:#FF3131">▼ 53.9% vs Aug 2025</div></div>
+  </div>
+</div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SPONSORED PRODUCTS
+═══════════════════════════════════════════════ -->
+<div class="section" id="sp">
+  <h2>📦 Sponsored Products</h2>
+  <p class="subtitle">Auto &amp; manual campaigns — Acquire (maximize NTB%) vs Max Sales (drive ROAS + volume)</p>
+
+  <h3 class="section-title">Current Month Daily Pace</h3>
+  <div class="chart-row-3">
+    <div class="card"><h4 class="sub-title">Daily Spend vs Sales</h4><div class="chart-wrap"><canvas id="dailySpendSales"></canvas></div></div>
+    <div class="card"><h4 class="sub-title">Daily Spend &amp; NTB%</h4><div class="chart-wrap"><canvas id="dailySpendNtb"></canvas></div></div>
+    <div class="card"><h4 class="sub-title">Daily ROAS &amp; NTB%</h4><div class="chart-wrap"><canvas id="dailyRoasNtb"></canvas></div></div>
+  </div>
+
+  <h3 class="section-title">Historical Monthly Performance</h3>
+  <div class="chart-row-3">
+    <div class="card"><h4 class="sub-title">Monthly Spend &amp; Sales</h4><div class="chart-wrap"><canvas id="monthlySpendSales"></canvas></div></div>
+    <div class="card"><h4 class="sub-title">Monthly Spend &amp; NTB%</h4><div class="chart-wrap"><canvas id="monthlySpendNtb"></canvas></div></div>
+    <div class="card"><h4 class="sub-title">Monthly ROAS &amp; NTB%</h4><div class="chart-wrap"><canvas id="monthlyRoasNtb"></canvas></div></div>
+  </div>
+
+  <h3 class="section-title">Current Month Campaign Breakdown</h3>
+  <div class="breakdown-grid">
+    <div class="card"><div class="chart-wrap-sm"><canvas id="campaignDoughnut"></canvas></div></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Campaign</th><th>Type</th><th>Spend</th><th>Sales</th><th>ROAS</th><th>NTB%</th></tr></thead>
+        <tbody><tr>
+      <td>SP - Auto - Acquire - Thins - All Stores</td>
+      <td><span class="type-badge type-acquire">Acquire</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:36%;background:#F99420"></div></div>$1,477 <span class="muted-sm">(36%)</span></td>
+      <td>$2,227</td>
+      <td style="color:#1A1A1A;font-weight:700">1.51x</td>
+      <td style="color:#00BF63;font-weight:700">74.5%</td>
+    </tr>
+<tr>
+      <td>SP - Auto - Max Sales - Thins - All Stores</td>
+      <td><span class="type-badge type-maxsales">Max Sales</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:12%;background:#0099F3"></div></div>$508 <span class="muted-sm">(12%)</span></td>
+      <td>$1,815</td>
+      <td style="color:#00BF63;font-weight:700">3.57x</td>
+      <td style="color:#78766E;font-weight:700">10.6%</td>
+    </tr>
+<tr>
+      <td>SP - Auto - Acquire - Thins - Sprouts</td>
+      <td><span class="type-badge type-acquire">Acquire</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:12%;background:#F99420"></div></div>$503 <span class="muted-sm">(12%)</span></td>
+      <td>$624</td>
+      <td style="color:#FF3131;font-weight:700">1.24x</td>
+      <td style="color:#C97900;font-weight:700">48.4%</td>
+    </tr>
+<tr>
+      <td>SP - Auto - Acquire - Cookies - All Stores</td>
+      <td><span class="type-badge type-acquire">Acquire</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:11%;background:#F99420"></div></div>$470 <span class="muted-sm">(11%)</span></td>
+      <td>$771</td>
+      <td style="color:#1A1A1A;font-weight:700">1.64x</td>
+      <td style="color:#C97900;font-weight:700">58.1%</td>
+    </tr>
+<tr>
+      <td>SP - Auto - Acquire - Thins - Thrive Market</td>
+      <td><span class="type-badge type-acquire">Acquire</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:8%;background:#F99420"></div></div>$312 <span class="muted-sm">(8%)</span></td>
+      <td>$452</td>
+      <td style="color:#FF3131;font-weight:700">1.45x</td>
+      <td style="color:#C97900;font-weight:700">48.1%</td>
+    </tr>
+<tr>
+      <td>SP - Auto - Grow - Thins - Sprouts</td>
+      <td><span class="type-badge type-maxsales">Max Sales</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:6%;background:#0099F3"></div></div>$254 <span class="muted-sm">(6%)</span></td>
+      <td>$502</td>
+      <td style="color:#1A1A1A;font-weight:700">1.98x</td>
+      <td style="color:#C97900;font-weight:700">42.8%</td>
+    </tr>
+<tr>
+      <td>SP - Auto - Acquire - Pretzels - All Stores</td>
+      <td><span class="type-badge type-acquire">Acquire</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:6%;background:#F99420"></div></div>$250 <span class="muted-sm">(6%)</span></td>
+      <td>$391</td>
+      <td style="color:#1A1A1A;font-weight:700">1.56x</td>
+      <td style="color:#00BF63;font-weight:700">66.6%</td>
+    </tr>
+<tr>
+      <td>SP - Auto - Grow - Thins - Thrive Market</td>
+      <td><span class="type-badge type-maxsales">Max Sales</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:3%;background:#0099F3"></div></div>$122 <span class="muted-sm">(3%)</span></td>
+      <td>$477</td>
+      <td style="color:#00BF63;font-weight:700">3.90x</td>
+      <td style="color:#78766E;font-weight:700">14.3%</td>
+    </tr>
+<tr>
+      <td>SP - Manual - Max Sales - Cookies - All Stores</td>
+      <td><span class="type-badge type-maxsales">Max Sales</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:3%;background:#0099F3"></div></div>$107 <span class="muted-sm">(3%)</span></td>
+      <td>$116</td>
+      <td style="color:#FF3131;font-weight:700">1.08x</td>
+      <td style="color:#00BF63;font-weight:700">95.1%</td>
+    </tr>
+<tr>
+      <td>SP - Acquire - Grow - Thins - The Fresh Market</td>
+      <td><span class="type-badge type-acquire">Acquire</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:1%;background:#F99420"></div></div>$44 <span class="muted-sm">(1%)</span></td>
+      <td>$23</td>
+      <td style="color:#FF3131;font-weight:700">0.51x</td>
+      <td style="color:#00BF63;font-weight:700">70.0%</td>
+    </tr>
+<tr>
+      <td>SP - Auto - Grow - Thins - The Fresh Market</td>
+      <td><span class="type-badge type-maxsales">Max Sales</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:1%;background:#0099F3"></div></div>$33 <span class="muted-sm">(1%)</span></td>
+      <td>$41</td>
+      <td style="color:#FF3131;font-weight:700">1.22x</td>
+      <td style="color:#00BF63;font-weight:700">100.0%</td>
+    </tr>
+<tr>
+      <td>SP - Auto - Max Sales - 14oz Cheese-Less - Sam's Club</td>
+      <td><span class="type-badge type-maxsales">Max Sales</span></td>
+      <td><div class="mini-bar-wrap"><div class="mini-bar" style="width:1%;background:#0099F3"></div></div>$22 <span class="muted-sm">(1%)</span></td>
+      <td>$0</td>
+      <td style="color:#FF3131;font-weight:700">0.00x</td>
+      <td style="color:#78766E;font-weight:700">0.0%</td>
+    </tr></tbody>
+        <tfoot><tr><td colspan="2">Total</td><td>$4,102</td><td>$7,439</td><td>1.81x</td><td>47.4%</td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <h3 class="section-title">Spend &amp; NTB% Correlation Analysis</h3>
+  <div class="insight-grid"><div class="card insight-card">
+  <div class="insight-icon">✅</div>
+  <div class="insight-title">Acquire Campaigns Drive NTB%</div>
+  <div class="insight-text">Acquire campaigns account for <b>74%</b> of this month's spend, and the average NTB% across those campaigns is well above the account average. Top performers: <b>SP - Auto - Acquire - Thins - All Stores (74.5%), SP - Acquire - Grow - Thins - The Fresh Market (70.0%), SP - Auto - Acquire - Pretzels - All Stores (66.6%)</b>.</div>
+</div>
+<div class="card insight-card">
+  <div class="insight-icon">💡</div>
+  <div class="insight-title">Max Sales — Low NTB by Design</div>
+  <div class="insight-text">Max Sales campaigns like <b>SP - Auto - Max Sales - 14oz Cheese-Less - Sam's Club (0.0%), SP - Auto - Max Sales - Thins - All Stores (10.6%)</b> intentionally target repeat/high-intent shoppers, so low NTB% here isn't a problem — it's the tradeoff for driving volume and ROAS from existing customers.</div>
+</div>
+<div class="card insight-card">
+  <div class="insight-icon">⚠️</div>
+  <div class="insight-title">Efficiency Tradeoff at Scale</div>
+  <div class="insight-text">Looking at the 3 highest-spend months (avg ROAS 2.36x) vs the 3 lowest-spend months (avg ROAS 3.36x), ROAS tends to compress as monthly spend scales up — a normal diminishing-returns pattern, not an NTB% problem, since NTB% has stayed resilient even in the highest-spend month (2026-01: 49.9% NTB at $24,926 spend).</div>
+</div>
+<div class="card insight-card">
+  <div class="insight-icon">🚀</div>
+  <div class="insight-title">Path to Higher NTB%</div>
+  <div class="insight-text">The highest-NTB Acquire campaigns this month are <b>SP - Auto - Acquire - Thins - All Stores (74.5%), SP - Acquire - Grow - Thins - The Fresh Market (70.0%), SP - Auto - Acquire - Pretzels - All Stores (66.6%)</b>. Shifting incremental budget toward these — rather than spreading evenly across all Acquire campaigns — is the fastest lever to push blended NTB% higher next month.</div>
+</div></div>
+
+  <h3 class="section-title">Key Observations</h3>
+  <div class="insight-grid"><div class="card insight-card">
+  <div class="insight-icon">📈</div>
+  <div class="insight-title">Sales Pace vs Prior Year</div>
+  <div class="insight-text">Projected sales this month are <b style="color:#FF3131">▼ 52.5%</b> vs Aug 2025 — trending clear of last year's pace.</div>
+</div>
+<div class="card insight-card">
+  <div class="insight-icon">🎯</div>
+  <div class="insight-title">NTB% Trend</div>
+  <div class="insight-text">Current NTB% is running at <b>43.0%</b>, below the Aug 2025 rate of 44.3% — a healthy signal that the Acquire-heavy mix (74% of spend) is doing its job of bringing in new-to-brand customers.</div>
+</div>
+<div class="card insight-card">
+  <div class="insight-icon">💰</div>
+  <div class="insight-title">ROAS Trend — Acquire Tradeoff</div>
+  <div class="insight-text">Blended ROAS this month (1.81x) reflects the heavy Acquire skew — Acquire campaigns prioritize NTB% over immediate ROAS, so a lower blended ROAS alongside strong NTB% is the expected, intended tradeoff.</div>
+</div>
+<div class="card insight-card">
+  <div class="insight-icon">🏆</div>
+  <div class="insight-title">Best Historical Benchmark</div>
+  <div class="insight-text"><b>Jan 26</b> is the strongest month on record: $56,981 in sales at 2.29x ROAS and 49.9% NTB% — a useful target for what a well-scaled month can look like.</div>
+</div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SPONSORED DISPLAY
+═══════════════════════════════════════════════ -->
+<div class="section" id="sd">
+  <h2>🖼️ Sponsored Display</h2>
+  <p class="subtitle">Active campaigns first, then ended — 3 active · 10 ended</p>
+
+  
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">SD | Acquire</div>
+        <div class="sd-meta">2026-04-30 – 2026-09-01 <span class="badge badge-active">ACTIVE</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#7A3D00,#F99420)">
+          <div class="sd-emoji">🥨</div>
+          <div class="sd-visual-name">SD | Acquire</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$5,539</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$10,183</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$10,278</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#00BF63">68.2%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#1A1A1A">1.84x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart0"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">SD | Retargeting</div>
+        <div class="sd-meta">2026-05-14 – 2026-09-01 <span class="badge badge-active">ACTIVE</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#0A1D6B,#2878FF)">
+          <div class="sd-emoji">🍪</div>
+          <div class="sd-visual-name">SD | Retargeting</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$68</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$2,166</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$2,175</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#78766E">2.8%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#00BF63">31.70x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart1"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">SD - Retargeting - Sprouts</div>
+        <div class="sd-meta">2026-06-11 – Ongoing <span class="badge badge-active">ACTIVE</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#7A0060,#CC1F97)">
+          <div class="sd-emoji">🧀</div>
+          <div class="sd-visual-name">SD - Retargeting - Sprouts</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$2</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$80</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$80</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#78766E">0.0%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#00BF63">35.34x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart2"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">Engage-ShoppableDisplay-Thins</div>
+        <div class="sd-meta">2025-02-01 – 2025-12-01 <span class="badge badge-ended">ENDED</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#004E82,#0099F3)">
+          <div class="sd-emoji">📦</div>
+          <div class="sd-visual-name">Engage-ShoppableDisplay-Thins</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$9,474</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$6,136</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$6,495</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#00BF63">78.4%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#FF3131">0.65x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart3"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">Engage - Thins & Cookies - Shoppable Display</div>
+        <div class="sd-meta">2025-06-16 – 2025-07-01 <span class="badge badge-ended">ENDED</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#1E5C1E,#00BF63)">
+          <div class="sd-emoji">🛒</div>
+          <div class="sd-visual-name">Engage - Thins & Cookies - Shoppable Display</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$1,067</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$1,087</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$1,118</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#00BF63">87.7%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#FF3131">1.02x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart4"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">Costco Texas</div>
+        <div class="sd-meta">2025-08-11 – 2025-09-13 <span class="badge badge-ended">ENDED</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#5C6B0A,#CADC30)">
+          <div class="sd-emoji">✨</div>
+          <div class="sd-visual-name">Costco Texas</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$1,963</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$1,634</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$1,646</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#00BF63">70.7%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#FF3131">0.83x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart5"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">Costco Texas - Pretzel Thins</div>
+        <div class="sd-meta">2026-01-06 – 2026-04-16 <span class="badge badge-ended">ENDED</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#7A3D00,#F99420)">
+          <div class="sd-emoji">🎯</div>
+          <div class="sd-visual-name">Costco Texas - Pretzel Thins</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$893</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$1,439</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$1,439</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#00BF63">87.7%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#1A1A1A">1.61x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart6"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">SD | Acquire | Sam's Club</div>
+        <div class="sd-meta">2026-05-21 – 2026-06-22 <span class="badge badge-ended">ENDED</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#0A1D6B,#2878FF)">
+          <div class="sd-emoji">🔥</div>
+          <div class="sd-visual-name">SD | Acquire | Sam's Club</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$51</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$34</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$34</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#00BF63">100.0%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#FF3131">0.67x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart7"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">SD - Acquire - CheeseLess - All Stores - High Design</div>
+        <div class="sd-meta">2026-05-30 – 2026-08-01 <span class="badge badge-ended">ENDED</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#7A0060,#CC1F97)">
+          <div class="sd-emoji">🥨</div>
+          <div class="sd-visual-name">SD - Acquire - CheeseLess - All Stores - High Design</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$1,781</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$4,029</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$4,098</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#00BF63">60.6%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#1A1A1A">2.26x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart8"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">SD - Acquire - Fiery Chile Lime - All Stores - High Design</div>
+        <div class="sd-meta">2026-05-30 – 2026-10-01 <span class="badge badge-paused">PAUSED</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#004E82,#0099F3)">
+          <div class="sd-emoji">🍪</div>
+          <div class="sd-visual-name">SD - Acquire - Fiery Chile Lime - All Stores - High Design</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$2,165</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$4,040</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$4,148</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#00BF63">62.5%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#1A1A1A">1.87x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart9"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">SD - Acquire - Chive & Garlic - All Stores - High Design</div>
+        <div class="sd-meta">2026-06-11 – 2026-08-01 <span class="badge badge-ended">ENDED</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#1E5C1E,#00BF63)">
+          <div class="sd-emoji">🧀</div>
+          <div class="sd-visual-name">SD - Acquire - Chive & Garlic - All Stores - High Design</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$925</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$2,695</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$2,736</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#C97900">55.8%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#00BF63">2.91x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart10"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">SD | Acquire | Sam's Club - High Design</div>
+        <div class="sd-meta">2026-06-12 – 2026-08-01 <span class="badge badge-ended">ENDED</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#5C6B0A,#CADC30)">
+          <div class="sd-emoji">📦</div>
+          <div class="sd-visual-name">SD | Acquire | Sam's Club - High Design</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$1</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$0</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$0</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#78766E">0.0%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#FF3131">0.00x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart11"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card sd-card">
+      <div class="sd-header">
+        <div class="sd-title">Cheese-Less High Design Reach Test</div>
+        <div class="sd-meta">2026-06-17 – 2026-08-01 <span class="badge badge-ended">ENDED</span></div>
+      </div>
+      <div class="sd-body">
+        <div class="sd-visual" style="background:linear-gradient(135deg,#7A3D00,#F99420)">
+          <div class="sd-emoji">🛒</div>
+          <div class="sd-visual-name">Cheese-Less High Design Reach Test</div>
+        </div>
+        <div class="sd-right">
+          <div class="kpi-strip">
+            <div class="kpi-cell"><div class="kpi-label">Total Spend</div><div class="kpi-val">$218</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Direct Sales</div><div class="kpi-val" style="color:#00BF63">$924</div></div>
+            <div class="kpi-cell"><div class="kpi-label">Halo Sales</div><div class="kpi-val" style="color:#2878FF">$908</div></div>
+            <div class="kpi-cell"><div class="kpi-label">NTB%</div><div class="kpi-val" style="color:#C97900">49.1%</div></div>
+            <div class="kpi-cell"><div class="kpi-label">ROAS</div><div class="kpi-val" style="color:#00BF63">4.25x</div></div>
+          </div>
+          <div class="chart-label">Weekly Spend vs. Direct Sales — Full Campaign Life</div>
+          <div class="chart-wrap-sm"><canvas id="sdChart12"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+  <h3 class="section-title">Key Observations</h3>
+  <div class="insight-grid"><div class="card insight-card">
+  <div class="insight-icon">🏆</div>
+  <div class="insight-title">Top Performer by ROAS</div>
+  <div class="insight-text"><b>SD - Retargeting - Sprouts</b> leads with 35.34x ROAS on $80 in direct sales from $2 spend.</div>
+</div>
+<div class="card insight-card">
+  <div class="insight-icon">🎯</div>
+  <div class="insight-title">Highest NTB% — Acquire Goal</div>
+  <div class="insight-text"><b>SD | Acquire | Sam's Club</b> drives the highest NTB% at 100.0%, directly supporting the Acquire campaign goal of bringing in new-to-brand customers via Display.</div>
+</div>
+<div class="card insight-card">
+  <div class="insight-icon">⚠️</div>
+  <div class="insight-title">Underperformer Warning</div>
+  <div class="insight-text"><b>Engage-ShoppableDisplay-Thins, Costco Texas, SD | Acquire | Sam's Club</b> are running below 1.0x ROAS and worth a closer look on targeting or creative.</div>
+</div></div>
+</div>
+
+</div>
+
+<script>
+Chart.defaults.color = '#6B6B64';
+Chart.defaults.borderColor = '#E8E4D6';
+Chart.defaults.font.family = "Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
+const spDailyLabels = ["Aug 01", "Aug 02", "Aug 03", "Aug 04", "Aug 05", "Aug 06", "Aug 07", "Aug 08", "Aug 09", "Aug 10", "Aug 11"];
+const spDailySpend = [385.34, 461.17, 375.24, 335.67, 347.77, 333.5, 465.2, 459.24, 495.71, 412.32, 31.06];
+const spDailySales = [754.88, 866.15, 627.21, 695.76, 667.42, 764.13, 840.48, 760.82, 850.27, 611.4, 0.0];
+const spDailyNtb = [49.4, 47.1, 44.5, 49.2, 30.3, 42.5, 47.7, 54.0, 52.1, 56.2, 0.0];
+const spDailyRoas = [1.96, 1.88, 1.67, 2.07, 1.92, 2.29, 1.81, 1.66, 1.72, 1.48, 0.0];
+
+const spMonthlyLabels = ["Jun 25", "Jul 25", "Aug 25", "Sep 25", "Oct 25", "Nov 25", "Dec 25", "Jan 26", "Feb 26", "Mar 26", "Apr 26", "May 26", "Jun 26", "Jul 26", "Aug 26"];
+const spMonthlySpend = [11947.85, 13571.6, 18323.05, 12128.3, 15478.43, 15746.72, 11608.39, 24925.99, 10409.48, 10532.11, 11453.43, 14856.47, 16130.84, 15833.2, 4102.22];
+const spMonthlySales = [45898.27, 43041.09, 44123.02, 45849.84, 54547.64, 51793.6, 32859.17, 56981.46, 40594.27, 46125.41, 35238.85, 36292.71, 38491.66, 35124.07, 7438.52];
+const spMonthlyNtb = [37.7, 37.8, 44.3, 34.9, 38.0, 36.2, 34.2, 49.9, 30.4, 29.1, 41.8, 43.5, 42.0, 43.1, 47.4];
+const spMonthlyRoas = [3.84, 3.17, 2.41, 3.78, 3.52, 3.29, 2.83, 2.29, 3.9, 4.38, 3.08, 2.44, 2.39, 2.22, 1.81];
+
+function moneyFmt(v) { return '$' + v.toLocaleString(); }
+
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.querySelectorAll('.sidenav a').forEach(a => a.classList.remove('active'));
+  const link = document.querySelector('.sidenav a[href="#' + id + '"]');
+  if (link) link.classList.add('active');
+}
+
+// Comparison basis toggle (Prior Year vs Previous Month, same days elapsed)
+const comparisons = {
+  py: {
+    label: "Aug 2025",
+    spend: { text: "\u25bc 36.9%", color: "#00BF63" },
+    sales: { text: "\u25bc 52.5%", color: "#FF3131" },
+    roas: { text: "\u25bc 24.8%", color: "#FF3131" },
+    ntbSales: { text: "\u25bc 53.9%", color: "#FF3131" }
+  },
+  prevmo: {
+    label: "Jul 2026",
+    spend: { text: "\u25bc 26.6%", color: "#00BF63" },
+    sales: { text: "\u25bc 43.2%", color: "#FF3131" },
+    roas: { text: "\u25bc 22.5%", color: "#FF3131" },
+    ntbSales: { text: "\u25bc 40.3%", color: "#FF3131" }
+  }
+};
+
+function applyComparison(mode) {
+  const c = comparisons[mode];
+  const set = (id, metric) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = metric.text + ' vs ' + c.label;
+    el.style.color = metric.color;
+  };
+  set('cmp-spend-kpi', c.spend);
+  set('cmp-sales-kpi', c.sales);
+  set('cmp-proj-spend', c.spend);
+  set('cmp-proj-sales', c.sales);
+  set('cmp-proj-roas', c.roas);
+  set('cmp-proj-ntbsales', c.ntbSales);
+}
+
+// Daily Spend vs Sales
+new Chart(document.getElementById('dailySpendSales'), {
+  data: {
+    labels: spDailyLabels,
+    datasets: [
+      { type:'bar', label:'Spend', data: spDailySpend, backgroundColor:'#F99420' },
+      { type:'line', label:'Sales', data: spDailySales, borderColor:'#00BF63', backgroundColor:'#00BF63', tension:.3 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    scales:{ y:{ ticks:{ callback: moneyFmt } } }, plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } } }
+});
+
+// Daily Spend & NTB dual axis
+new Chart(document.getElementById('dailySpendNtb'), {
+  data: {
+    labels: spDailyLabels,
+    datasets: [
+      { type:'bar', label:'Spend', data: spDailySpend, backgroundColor:'#F99420', yAxisID:'y' },
+      { type:'line', label:'NTB%', data: spDailyNtb, borderColor:'#6D5CE7', backgroundColor:'#6D5CE7', yAxisID:'y1', tension:.3 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    scales: { y:{ position:'left', ticks:{callback:moneyFmt} }, y1:{ position:'right', grid:{drawOnChartArea:false}, ticks:{callback:v=>v+'%'} } },
+    plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } } }
+});
+
+// Daily ROAS & NTB dual axis
+new Chart(document.getElementById('dailyRoasNtb'), {
+  data: {
+    labels: spDailyLabels,
+    datasets: [
+      { type:'line', label:'ROAS', data: spDailyRoas, borderColor:'#F99420', backgroundColor:'#F99420', yAxisID:'y', tension:.3 },
+      { type:'line', label:'NTB%', data: spDailyNtb, borderColor:'#6D5CE7', backgroundColor:'rgba(109,92,231,.2)', fill:true, yAxisID:'y1', tension:.3 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    scales: { y:{ position:'left', ticks:{callback:v=>v+'x'} }, y1:{ position:'right', grid:{drawOnChartArea:false}, ticks:{callback:v=>v+'%'} } },
+    plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } } }
+});
+
+// Monthly Spend & Sales
+new Chart(document.getElementById('monthlySpendSales'), {
+  data: {
+    labels: spMonthlyLabels,
+    datasets: [
+      { type:'bar', label:'Spend', data: spMonthlySpend, backgroundColor:'#F99420' },
+      { type:'line', label:'Sales', data: spMonthlySales, borderColor:'#00BF63', backgroundColor:'#00BF63', tension:.3 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    scales:{ y:{ ticks:{ callback: moneyFmt } } }, plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } } }
+});
+
+// Monthly Spend & NTB
+new Chart(document.getElementById('monthlySpendNtb'), {
+  data: {
+    labels: spMonthlyLabels,
+    datasets: [
+      { type:'bar', label:'Spend', data: spMonthlySpend, backgroundColor:'#F99420', yAxisID:'y' },
+      { type:'line', label:'NTB%', data: spMonthlyNtb, borderColor:'#6D5CE7', backgroundColor:'#6D5CE7', yAxisID:'y1', tension:.3 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    scales: { y:{ position:'left', ticks:{callback:moneyFmt} }, y1:{ position:'right', grid:{drawOnChartArea:false}, ticks:{callback:v=>v+'%'} } },
+    plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } } }
+});
+
+// Monthly ROAS & NTB
+new Chart(document.getElementById('monthlyRoasNtb'), {
+  data: {
+    labels: spMonthlyLabels,
+    datasets: [
+      { type:'line', label:'ROAS', data: spMonthlyRoas, borderColor:'#F99420', backgroundColor:'#F99420', yAxisID:'y', tension:.3 },
+      { type:'line', label:'NTB%', data: spMonthlyNtb, borderColor:'#6D5CE7', backgroundColor:'rgba(109,92,231,.2)', fill:true, yAxisID:'y1', tension:.3 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+    scales: { y:{ position:'left', ticks:{callback:v=>v+'x'} }, y1:{ position:'right', grid:{drawOnChartArea:false}, ticks:{callback:v=>v+'%'} } },
+    plugins:{ legend:{ labels:{ boxWidth:10, font:{size:10} } } } }
+});
+
+// Campaign doughnut
+new Chart(document.getElementById('campaignDoughnut'), {
+  type: 'doughnut',
+  data: {
+    labels: ["SP - Auto - Acquire - Thins - All Stores", "SP - Auto - Max Sales - Thins - All Stores", "SP - Auto - Acquire - Thins - Sprouts", "SP - Auto - Acquire - Cookies - All Stores", "SP - Auto - Acquire - Thins - Thrive Market", "SP - Auto - Grow - Thins - Sprouts", "SP - Auto - Acquire - Pretzels - All Stores", "SP - Auto - Grow - Thins - Thrive Market", "SP - Manual - Max Sales - Cookies - All Stores", "SP - Acquire - Grow - Thins - The Fresh Market", "SP - Auto - Grow - Thins - The Fresh Market", "SP - Auto - Max Sales - 14oz Cheese-Less - Sam's Club"],
+    datasets: [{ data: [1476.64, 508.03, 503.26, 469.6, 312.15, 253.94, 249.74, 122.48, 106.97, 44.38, 33.46, 21.57], backgroundColor: ["#F99420", "#0099F3", "#F99420", "#F99420", "#F99420", "#0099F3", "#F99420", "#0099F3", "#0099F3", "#F99420", "#0099F3", "#0099F3"], borderWidth:2, borderColor:'#FFFFFF' }]
+  },
+  options: { responsive:true, maintainAspectRatio:false,
+    plugins: { legend: { display:false },
+      tooltip: { callbacks: { label: ctx => {
+        const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+        const pct = (ctx.parsed/total*100).toFixed(1);
+        return ctx.label + ': $' + ctx.parsed.toLocaleString() + ' (' + pct + '%)';
+      } } } } }
+});
+
+// SD charts
+
+    new Chart(document.getElementById('sdChart0'), {
+      type: 'bar',
+      data: {
+        labels: ["Apr 27", "May 4", "May 11", "May 18", "May 25", "Jun 1", "Jun 8", "Aug 3", "Aug 10"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [605.87, 1130.93, 954.65, 491.62, 850.85, 835.46, 187.38, 415.06, 66.78], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [1014.35, 2014.54, 1983.42, 1141.35, 1523.83, 1312.04, 307.98, 725.61, 160.36], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart1'), {
+      type: 'bar',
+      data: {
+        labels: ["May 11", "May 18", "May 25", "Jun 8", "Jun 22", "Jul 20", "Jul 27", "Aug 3", "Aug 10"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [1.35, 0.88, 0.34, 0.04, 0.02, 19.55, 19.69, 23.12, 3.35], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [70.68, 80.48, 21.96, 0.0, 0.0, 531.84, 674.06, 696.75, 90.54], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart2'), {
+      type: 'bar',
+      data: {
+        labels: ["Jun 8", "Jun 15", "Jun 22", "Jun 29", "Jul 6", "Jul 13", "Jul 20", "Jul 27", "Aug 3", "Aug 10"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [0.12, 0.1, 0.06, 0.98, 0.56, 0.16, 0.04, 0.16, 0.06, 0.02], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [0.0, 38.94, 0.0, 0.0, 25.96, 4.99, 0.0, 9.98, 0.0, 0.0], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart3'), {
+      type: 'bar',
+      data: {
+        labels: ["Jul 7", "Jul 14", "Jul 21", "Jul 28", "Oct 27", "Nov 3", "Nov 10", "Nov 17", "Nov 24", "Dec 1"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [414.1, 803.4, 802.18, 456.03, 1966.89, 699.54, 1538.82, 1395.96, 1397.16, 0.06], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [316.39, 793.66, 974.47, 580.73, 1001.73, 228.02, 700.17, 684.48, 856.27, 0.0], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart4'), {
+      type: 'bar',
+      data: {
+        labels: ["Jun 16", "Jun 23"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [1002.52, 64.78], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [982.14, 104.93], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart5'), {
+      type: 'bar',
+      data: {
+        labels: ["Aug 11", "Aug 18", "Aug 25", "Sep 1", "Sep 8"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [414.78, 966.44, 380.32, 147.47, 53.81], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [274.32, 822.35, 273.25, 202.69, 61.26], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart6'), {
+      type: 'bar',
+      data: {
+        labels: ["Jan 5", "Jan 12", "Jan 19", "Jan 26", "Feb 2"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [187.04, 239.79, 257.77, 162.02, 45.91], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [199.26, 357.44, 504.63, 310.6, 67.38], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart7'), {
+      type: 'bar',
+      data: {
+        labels: ["Jun 8", "Jun 15"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [37.92, 13.38], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [11.18, 22.96], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart8'), {
+      type: 'bar',
+      data: {
+        labels: ["Jun 1", "Jun 8", "Jun 15", "Jun 22", "Jun 29", "Jul 13", "Jul 20", "Jul 27"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [730.98, 457.0, 170.76, 74.36, 13.96, 195.67, 95.11, 43.1], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [1388.88, 1018.7, 351.33, 379.45, 41.43, 358.63, 337.09, 153.46], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart9'), {
+      type: 'bar',
+      data: {
+        labels: ["Jun 1", "Jun 8", "Jun 15", "Jun 22", "Jun 29", "Jul 13", "Jul 20", "Jul 27", "Aug 3"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [720.4, 471.6, 167.66, 71.3, 11.62, 234.18, 74.22, 231.28, 182.94], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [937.89, 897.07, 401.71, 167.82, 85.38, 406.45, 142.27, 534.71, 466.79], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart10'), {
+      type: 'bar',
+      data: {
+        labels: ["Jun 8", "Jun 15", "Jun 22", "Jun 29", "Jul 13", "Jul 20", "Jul 27"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [230.78, 152.32, 66.26, 11.42, 230.18, 196.64, 37.68], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [521.29, 414.01, 310.55, 67.39, 701.91, 518.14, 161.64], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart11'), {
+      type: 'bar',
+      data: {
+        labels: ["Jul 13", "Jul 20", "Jul 27"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [0.36, 0.5, 0.02], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [0.0, 0.0, 0.0], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+
+    new Chart(document.getElementById('sdChart12'), {
+      type: 'bar',
+      data: {
+        labels: ["Jun 15", "Jun 22", "Jun 29", "Jul 13", "Jul 20", "Jul 27"],
+        datasets: [
+          { type:'bar', label:'Spend', data: [0.1, 0.41, 0.22, 66.59, 86.93, 63.34], backgroundColor:'#F99420', order:1, yAxisID:'y' },
+          { type:'line', label:'Direct Sales', data: [0.0, 14.38, 0.0, 273.87, 241.23, 395.01], borderColor:'#00BF63', backgroundColor:'#00BF63', tension:0.3, order:2, yAxisID:'y' }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        scales: { y: { ticks: { callback: v => '$'+v } } },
+        plugins: { legend: { labels: { boxWidth:10, font:{size:10} } } }
+      }
+    });
+</script>
+</body>
+</html>

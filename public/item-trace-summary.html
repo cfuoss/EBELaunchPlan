@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Item Trace Summary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="/vendor/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#FFFFFF;
+    --bg-soft:#F7F5EE;
+    --card:#FFFFFF;
+    --card-border:#E8E4D6;
+    --text:#1A1A1A;
+    --text-dim:#6B6B64;
+    --text-dimmer:#78766E;
+    --ink:#1A1A1A;
+    --pretzel:#2878FF;
+    --pretzel-text:#1E5FDB;
+    --lime:#CADC30;
+    --lime-text:#5C6B0A;
+    --orange:#F99420;
+    --teal:#0099F3;
+    --sky:#87CCF4;
+    --magenta:#CC1F97;
+    --rose:#ED1C24;
+    --rose-text:#B0181D;
+    --grey:#878787;
+    --focus:#2878FF;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Barlow Semi Condensed', system-ui, sans-serif;
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+  }
+  ::selection{background:var(--lime); color:var(--ink);}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  /* ---------- header ---------- */
+  header{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:14px 22px;
+    background:var(--bg);
+    border-bottom:2px solid var(--ink);
+    flex-wrap:wrap;
+  }
+  .brand{display:flex; align-items:center; gap:12px; padding-right:18px; border-right:1px solid var(--card-border);}
+  .brand .mark{
+    width:38px;height:38px;border-radius:50%;
+    background:var(--lime);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Anton',sans-serif; font-size:14px; color:var(--ink);
+    flex:none; box-shadow:0 0 0 2px var(--ink) inset;
+  }
+  .brand h1{font-family:'Anton',sans-serif; font-weight:400; font-size:20px; margin:0; line-height:1;}
+  .brand p{margin:3px 0 0; font-size:12.5px; color:var(--text-dim);}
+  .header-actions{margin-left:auto; display:flex; gap:8px; align-items:center;}
+  .search-wrap{position:relative; flex:1; max-width:320px;}
+  .search-wrap input{
+    width:100%; background:var(--bg-soft); border:1px solid var(--card-border); color:var(--text);
+    font-family:'IBM Plex Mono',monospace; font-size:13px; padding:9px 14px 9px 34px; border-radius:999px;
+  }
+  .search-wrap input::placeholder{color:var(--text-dimmer); font-family:'Barlow Semi Condensed',sans-serif;}
+  .search-wrap input:focus{outline:2px solid var(--focus); outline-offset:1px;}
+  .search-wrap svg{position:absolute; left:13px; top:50%; transform:translateY(-50%); pointer-events:none;}
+  .btn{
+    background:var(--card); border:1px solid var(--ink); color:var(--ink);
+    font-family:'Barlow Semi Condensed',sans-serif; font-weight:600; font-size:13px;
+    padding:8px 16px; border-radius:999px; cursor:pointer; white-space:nowrap;
+  }
+  .btn:hover{background:var(--ink); color:#fff;}
+  .btn:focus-visible{outline:2px solid var(--focus); outline-offset:1px;}
+  .btn-mini{
+    background:var(--card); border:1px solid var(--card-border); color:var(--text-dim);
+    font-family:'Barlow Semi Condensed',sans-serif; font-weight:600; font-size:12px;
+    padding:5px 10px; border-radius:999px; cursor:pointer;
+  }
+  .btn-mini:hover{color:var(--ink); border-color:var(--pretzel);}
+
+  /* ---------- guide panel ---------- */
+  .guide{
+    flex:none;
+    background:linear-gradient(180deg,#F4F8FF,var(--bg-soft) 70%);
+    border-bottom:1px solid var(--card-border);
+    max-height:70vh;
+    overflow-y:auto;
+  }
+  .guide.collapsed{max-height:none; overflow:visible;}
+  .guide-head{
+    position:sticky; top:0; display:flex; align-items:center; gap:14px;
+    padding:12px 22px; background:#F4F8FFee; backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--card-border); z-index:5; cursor:pointer;
+  }
+  .guide-head h2{
+    font-family:'Anton',sans-serif; font-weight:400; font-size:19px; margin:0; color:var(--text);
+    display:flex; align-items:center; gap:8px;
+  }
+  .guide-head h2 .chev{font-size:13px; color:var(--pretzel); transition:transform .15s ease; display:inline-block;}
+  .guide.collapsed .guide-head h2 .chev{transform:rotate(-90deg);}
+  .guide-head #guideToggleBtn{margin-left:auto;}
+  .guide-body{padding:18px 22px 26px; display:block; max-width:920px;}
+  .guide.collapsed .guide-body{display:none;}
+  .guide-intro{font-size:15px; line-height:1.6; color:var(--text-dim); margin:0 0 18px;}
+  .guide-intro b{color:var(--text); font-weight:600;}
+
+  .report-legend{
+    display:flex; flex-wrap:wrap; gap:10px 18px; margin:0 0 20px;
+    padding:12px 16px; background:var(--card); border:1px solid var(--card-border); border-radius:12px;
+  }
+  .report-legend div{display:flex; align-items:baseline; gap:6px; font-size:12.5px; color:var(--text-dim);}
+  .report-legend b{font-family:'Anton',sans-serif; font-weight:400; font-size:13px; color:var(--text);}
+
+  .guide-steps h3, .guide-upload h3{
+    font-family:'Anton',sans-serif; font-weight:400; font-size:15.5px; margin:0 0 12px; color:var(--text);
+  }
+  .guide-steps ol{list-style:none; margin:0 0 12px; padding:0; display:flex; flex-direction:column; gap:11px;}
+  .guide-steps li{display:flex; align-items:flex-start; gap:12px; font-size:13.5px; line-height:1.5; color:var(--text-dim);}
+  .guide-steps li b{color:var(--text); font-weight:600;}
+  .step-num{
+    flex:none; width:24px; height:24px; border-radius:50%; background:var(--ink); color:#fff;
+    font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:12px;
+    display:flex; align-items:center; justify-content:center; margin-top:1px;
+  }
+  .mono-chip{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--pretzel-text); background:rgba(40,120,255,.08); padding:1px 5px; border-radius:4px;}
+  .guide-tip{
+    font-size:12.5px; color:var(--text-dimmer); line-height:1.5; margin:14px 0 24px;
+    padding:10px 14px; background:var(--bg-soft); border:1px dashed var(--card-border); border-radius:10px;
+  }
+
+  .guide-upload{
+    background:rgba(202,220,48,.16); border:1px solid rgba(150,166,20,.3);
+    border-radius:14px; padding:16px 18px; margin-bottom:8px;
+  }
+  .uploader-inner{display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap;}
+  .upload-slot{display:flex; flex-direction:column; gap:5px;}
+  .upload-slot > label{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dimmer); font-weight:700;}
+  .upload-pick{display:flex; align-items:center; gap:9px;}
+  .upload-pick input[type=file]{max-width:0.1px; max-height:0.1px; opacity:0; overflow:hidden; position:absolute;}
+  .upload-pick .upload-btn{
+    background:var(--card); border:1px solid var(--ink); color:var(--ink);
+    font-family:'Barlow Semi Condensed',sans-serif; font-weight:600; font-size:13px;
+    padding:8px 15px; border-radius:999px; cursor:pointer; white-space:nowrap;
+  }
+  .upload-pick .upload-btn:hover{background:var(--ink); color:#fff;}
+  .upload-filename{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  #rebuildBtn{
+    background:var(--ink); border:1px solid var(--ink); color:#fff;
+    font-family:'Barlow Semi Condensed',sans-serif; font-weight:700; font-size:13.5px;
+    padding:9px 18px; border-radius:999px; cursor:pointer;
+  }
+  #rebuildBtn:disabled{background:none; border-color:var(--card-border); color:var(--text-dimmer); cursor:not-allowed;}
+  #rebuildBtn:not(:disabled):hover{background:var(--pretzel); border-color:var(--pretzel);}
+  .upload-status{font-size:12.5px; color:var(--text-dim); max-width:520px; line-height:1.4;}
+  .upload-status.ok{color:var(--lime-text); font-weight:600;}
+  .upload-status.warn{color:#9C5D0A; font-weight:600;}
+  .upload-status.error{color:var(--rose-text); font-weight:600;}
+  .uploader-hint{width:100%; font-size:11.5px; color:var(--text-dim); margin:12px 0 0;}
+
+  /* ---------- tab bar ---------- */
+  .tabbar{
+    display:flex; gap:4px; padding:0 22px; background:var(--bg-soft);
+    border-bottom:1px solid var(--card-border); overflow-x:auto; flex:none;
+  }
+  .tab-btn{
+    background:none; border:none; cursor:pointer;
+    font-family:'Anton',sans-serif; font-weight:400; font-size:14px; letter-spacing:.01em;
+    color:var(--text-dim); padding:13px 16px 11px; white-space:nowrap;
+    border-bottom:3px solid transparent; margin-bottom:-1px;
+  }
+  .tab-btn:hover{color:var(--text);}
+  .tab-btn.active{color:var(--text); border-bottom-color:var(--pretzel);}
+  .tab-btn .tab-count{
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; color:var(--text-dimmer);
+    margin-left:5px;
+  }
+  .tab-btn.active .tab-count{color:var(--pretzel-text);}
+
+  /* ---------- content ---------- */
+  main{flex:1; padding:20px 22px 60px; background:var(--bg);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+  .panel-head{margin-bottom:14px;}
+  .panel-head h2{font-family:'Anton',sans-serif; font-weight:400; font-size:20px; margin:0 0 4px;}
+  .panel-head p{margin:0; font-size:13px; color:var(--text-dim); max-width:760px; line-height:1.5;}
+
+  .empty-state{
+    color:var(--text-dimmer); font-size:14px; padding:40px 10px; text-align:center;
+    border:1px dashed var(--card-border); border-radius:14px; background:var(--bg-soft);
+  }
+
+  /* ---------- report table ---------- */
+  .rtable{width:100%; border-collapse:collapse; font-size:12.8px;}
+  .rtable thead th{
+    text-align:left; font-family:'Barlow Semi Condensed',sans-serif; font-weight:700; font-size:11px;
+    text-transform:uppercase; letter-spacing:.04em; color:var(--text-dimmer);
+    padding:9px 10px; border-bottom:2px solid var(--ink); white-space:nowrap; position:sticky; top:0; background:var(--bg); z-index:2;
+  }
+  .rtable tbody tr.row-summary{cursor:pointer; border-bottom:1px solid var(--card-border);}
+  .rtable tbody tr.row-summary:hover{background:rgba(40,120,255,.05);}
+  .rtable tbody tr.row-summary.expanded{background:rgba(40,120,255,.06);}
+  .rtable tbody tr.row-summary.static{cursor:default;}
+  .rtable tbody tr.row-summary.static:hover{background:none;}
+  .rtable td{padding:9px 10px; vertical-align:top;}
+  .rtable td.num{font-family:'IBM Plex Mono',monospace; text-align:right;}
+  .rtable td.mono{font-family:'IBM Plex Mono',monospace;}
+  .rtable .caret{
+    display:inline-block; width:14px; color:var(--pretzel); font-size:11px; transition:transform .12s ease;
+  }
+  .rtable tr.row-summary.expanded .caret{transform:rotate(90deg);}
+  .rtable tr.row-summary.static .caret{visibility:hidden;}
+  .row-detail-wrap td{padding:0; background:var(--bg-soft);}
+  .row-detail-wrap{display:none;}
+  .row-detail-wrap.open{display:table-row;}
+  .row-detail-inner{padding:10px 10px 14px 34px;}
+  .rtable-sub{width:100%; border-collapse:collapse; font-size:12px; background:var(--card); border-radius:10px; overflow:hidden; border:1px solid var(--card-border);}
+  .rtable-sub th{
+    text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-dimmer);
+    padding:7px 9px; border-bottom:1px solid var(--card-border); background:var(--bg-soft);
+  }
+  .rtable-sub td{padding:7px 9px; border-bottom:1px solid var(--card-border); font-size:12px;}
+  .rtable-sub tr:last-child td{border-bottom:none;}
+  .rtable-sub td.num{font-family:'IBM Plex Mono',monospace; text-align:right;}
+  .rtable-sub td.mono{font-family:'IBM Plex Mono',monospace;}
+  .type-pill{
+    display:inline-block; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em;
+    padding:2px 8px; border-radius:999px;
+  }
+  .qty-pos{color:var(--lime-text);}
+  .qty-neg{color:var(--rose-text);}
+
+  ::-webkit-scrollbar{height:12px; width:12px;}
+  ::-webkit-scrollbar-track{background:var(--bg);}
+  ::-webkit-scrollbar-thumb{background:#DDD8C6; border-radius:8px; border:3px solid var(--bg);}
+  ::-webkit-scrollbar-thumb:hover{background:#C9C3AC;}
+
+  @media (max-width:720px){
+    header{flex-wrap:wrap;}
+    .brand{border-right:none; padding-right:0;}
+    .search-wrap{max-width:none; width:100%; order:3;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark" id="brandMark">?</div>
+    <div>
+      <h1 id="itemTitle">Item Trace Summary</h1>
+      <p id="itemSub">No trace loaded — upload your Origin → Usage and Usage → Origin files above to get started.</p>
+    </div>
+  </div>
+  <div class="search-wrap">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#6B6B64" stroke-width="2"/><path d="M21 21L16.65 16.65" stroke="#6B6B64" stroke-width="2" stroke-linecap="round"/></svg>
+    <input id="searchInput" type="text" placeholder="Filter this tab…" autocomplete="off">
+  </div>
+  <div class="header-actions">
+    <button class="btn" id="loadFilesBtn">Load new trace files</button>
+  </div>
+</header>
+
+<section class="guide" id="guidePanel">
+  <div class="guide-head" id="guideHead">
+    <h2><span class="chev">▾</span> About This Report</h2>
+    <button class="btn-mini" id="guideToggleBtn">Hide this</button>
+  </div>
+  <div class="guide-body">
+
+    <p class="guide-intro">Upload the same two Business Central exports for a lot — <b>Origin → Usage</b> and <b>Usage → Origin</b> — and this turns them into five report views instead of one flat spreadsheet: where the lot came from, every production order that repacked it, a per-SKU rollup, every sales shipment, and what's still on hand by location.</p>
+
+    <div class="report-legend">
+      <div><b>Origins</b> — the purchase receipt(s) or production order(s) this lot's whole trace traces back to.</div>
+      <div><b>Production Detail</b> — every production order that repacked this lot into something else, grouped by what it became.</div>
+      <div><b>SKU Summary</b> — one row per item touched, with what was produced / transferred / sold / consumed / remains.</div>
+      <div><b>Sales Shipments</b> — every shipment out the door, by customer.</div>
+      <div><b>SKU by Location</b> — current on-hand position, broken out by warehouse/location.</div>
+    </div>
+
+    <div class="guide-steps">
+      <h3>Pulling a trace from Business Central</h3>
+      <ol>
+        <li><span class="step-num">1</span><div><b>Log in to Business Central</b> with your EBE O365 credentials at <span class="mono-chip">businesscentral.dynamics.com/WholeAndFree-Prod</span>.</div></li>
+        <li><span class="step-num">2</span><div><b>Open Item Tracing.</b> Click the search (magnifying glass) icon in the top right, type "Item Tracing," and select the Item Tracing task.</div></li>
+        <li><span class="step-num">3</span><div><b>Enter the Lot No.</b> Every trace has to start from a lot number.</div></li>
+        <li><span class="step-num">4</span><div><b>Set the direction and trace.</b> Set Trace Method to "Origin → Usage" or "Usage → Origin," set Show Components to "No," then click Trace.</div></li>
+        <li><span class="step-num">5</span><div><b>Export it.</b> Click the export icon (box with an arrow) and choose Open in Excel.</div></li>
+        <li><span class="step-num">6</span><div><b>Do it again for the other direction</b>, then upload both files below.</div></li>
+      </ol>
+      <p class="guide-tip">Tip: personalize the Item Tracing columns first so <span class="mono-chip">Entry Type</span>, <span class="mono-chip">Source Type</span>, <span class="mono-chip">Source Name</span>, <span class="mono-chip">Lot No.</span>, and <span class="mono-chip">Posting Date</span> are all showing — that's what this tool reads from the export.</p>
+    </div>
+
+    <div class="guide-upload" id="uploaderPanel">
+      <h3>Upload your two files</h3>
+      <div class="uploader-inner">
+        <div class="upload-slot">
+          <label for="fileO2U">Origin → Usage file</label>
+          <div class="upload-pick">
+            <button type="button" class="upload-btn" id="fileO2UBtn">Choose .xlsx</button>
+            <input type="file" id="fileO2U" accept=".xlsx">
+            <span class="upload-filename" id="fileO2UName">No file chosen</span>
+          </div>
+        </div>
+        <div class="upload-slot">
+          <label for="fileU2O">Usage → Origin file</label>
+          <div class="upload-pick">
+            <button type="button" class="upload-btn" id="fileU2OBtn">Choose .xlsx</button>
+            <input type="file" id="fileU2O" accept=".xlsx">
+            <span class="upload-filename" id="fileU2OName">No file chosen</span>
+          </div>
+        </div>
+        <button id="rebuildBtn" disabled>Build report</button>
+        <span class="upload-status" id="uploadStatus"></span>
+      </div>
+      <p class="uploader-hint">Works for any item — raw material or finished good. Upload a new pair any time to replace the report below.</p>
+    </div>
+  </div>
+</section>
+
+<nav class="tabbar" id="tabbar">
+  <button class="tab-btn active" data-tab="origins">Origins<span class="tab-count" id="cnt-origins"></span></button>
+  <button class="tab-btn" data-tab="production">Production Detail<span class="tab-count" id="cnt-production"></span></button>
+  <button class="tab-btn" data-tab="sku">SKU Summary<span class="tab-count" id="cnt-sku"></span></button>
+  <button class="tab-btn" data-tab="sales">Sales Shipments<span class="tab-count" id="cnt-sales"></span></button>
+  <button class="tab-btn" data-tab="location">SKU by Location<span class="tab-count" id="cnt-location"></span></button>
+</nav>
+
+<main>
+  <section class="tab-panel active" id="panel-origins">
+    <div class="panel-head">
+      <h2>Origins</h2>
+      <p>The purchase receipt(s) or production order(s) this trace ultimately starts from — a raw material comes from a vendor; a finished good may originate from its own production run.</p>
+    </div>
+    <div id="content-origins"></div>
+  </section>
+
+  <section class="tab-panel" id="panel-production">
+    <div class="panel-head">
+      <h2>Production Detail</h2>
+      <p>Every production order that consumed this lot's lineage, grouped by what it was repacked into. Click a row to see the individual orders and lots behind it.</p>
+    </div>
+    <div id="content-production"></div>
+  </section>
+
+  <section class="tab-panel" id="panel-sku">
+    <div class="panel-head">
+      <h2>SKU Summary</h2>
+      <p>Every item touched anywhere in this trace, with what happened to it downstream of the origin. Click a row to see the specific lots still on hand.</p>
+    </div>
+    <div id="content-sku"></div>
+  </section>
+
+  <section class="tab-panel" id="panel-sales">
+    <div class="panel-head">
+      <h2>Sales Shipments</h2>
+      <p>Every sale that shipped, by customer. Click a row to see which lot(s) fulfilled it.</p>
+    </div>
+    <div id="content-sales"></div>
+  </section>
+
+  <section class="tab-panel" id="panel-location">
+    <div class="panel-head">
+      <h2>SKU by Location</h2>
+      <p>Current position by item and location. Click a row to see the specific lots on hand there.</p>
+    </div>
+    <div id="content-location"></div>
+  </section>
+</main>
+
+<script>
+/* ===================== state ===================== */
+let state = {
+  item: '',
+  itemDesc: '',
+  o2uRows: [],
+  u2oRows: [],
+  combined: [],   // deduped by entry across both files
+  origins: [],    // root rows from the O2U trace
+  activeTab: 'origins',
+  expanded: {},   // per-tab set of expanded summary-row keys
+};
+FTABS = ['origins','production','sku','sales','location'];
+FTABS.forEach(t => state.expanded[t] = new Set());
+
+const TYPE_COLORS = {
+  'Purch. Rcpt. Header': 'var(--lime)',
+  'Finished Production Order Output': 'var(--teal)',
+  'Finished Production Order Consumption': 'var(--orange)',
+  'Transfer Receipt Header': 'var(--sky)',
+  'Transfer Shipment Header': 'var(--magenta)',
+  'Sales Shipment Header': 'var(--rose)',
+  'Item Ledger Entry': 'var(--grey)',
+};
+function typeColor(t){ return TYPE_COLORS[t] || 'var(--grey)'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtQty(n){
+  n = Number(n)||0;
+  return (n>0?'+':'') + (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined,{maximumFractionDigits:2}));
+}
+function fmtNum(n){
+  n = Number(n)||0;
+  return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined,{maximumFractionDigits:2});
+}
+
+/* ===================== DOM refs ===================== */
+const itemTitle = document.getElementById('itemTitle');
+const itemSub = document.getElementById('itemSub');
+const brandMark = document.getElementById('brandMark');
+const searchInput = document.getElementById('searchInput');
+const tabbar = document.getElementById('tabbar');
+const guidePanel = document.getElementById('guidePanel');
+const guideHead = document.getElementById('guideHead');
+const guideToggleBtn = document.getElementById('guideToggleBtn');
+const loadFilesBtn = document.getElementById('loadFilesBtn');
+const uploaderPanel = document.getElementById('uploaderPanel');
+const fileO2U = document.getElementById('fileO2U');
+const fileU2O = document.getElementById('fileU2O');
+const fileO2UBtn = document.getElementById('fileO2UBtn');
+const fileU2OBtn = document.getElementById('fileU2OBtn');
+const fileO2UName = document.getElementById('fileO2UName');
+const fileU2OName = document.getElementById('fileU2OName');
+const rebuildBtn = document.getElementById('rebuildBtn');
+const uploadStatus = document.getElementById('uploadStatus');
+
+/* ===================== guide panel ===================== */
+let guideOpen = true;
+function setGuideOpen(open){
+  guideOpen = open;
+  guidePanel.classList.toggle('collapsed', !guideOpen);
+  guideToggleBtn.textContent = guideOpen ? 'Hide this' : 'Show this';
+}
+guideHead.addEventListener('click', (e) => {
+  if (e.target.closest('.guide-upload') || e.target === guideToggleBtn) return;
+  setGuideOpen(!guideOpen);
+});
+guideToggleBtn.addEventListener('click', (e) => { e.stopPropagation(); setGuideOpen(!guideOpen); });
+loadFilesBtn.addEventListener('click', () => {
+  setGuideOpen(true);
+  requestAnimationFrame(() => {
+    if (typeof guidePanel.scrollIntoView === 'function') guidePanel.scrollIntoView({behavior:'smooth', block:'start'});
+    if (typeof uploaderPanel.scrollIntoView === 'function') uploaderPanel.scrollIntoView({behavior:'smooth', block:'center'});
+  });
+});
+
+/* ===================== tabs ===================== */
+tabbar.addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  const tab = btn.dataset.tab;
+  state.activeTab = tab;
+  tabbar.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+  searchInput.value = '';
+  applySearch();
+});
+
+/* ===================== search (filters active tab) ===================== */
+searchInput.addEventListener('input', applySearch);
+function applySearch(){
+  const q = searchInput.value.trim().toLowerCase();
+  const panel = document.getElementById('panel-' + state.activeTab);
+  if (!panel) return;
+  panel.querySelectorAll('tr.row-summary').forEach(row => {
+    const hay = row.dataset.search || '';
+    const match = !q || hay.includes(q);
+    row.style.display = match ? '' : 'none';
+    const detail = row.nextElementSibling;
+    if (detail && detail.classList.contains('row-detail-wrap')){
+      if (!match) detail.classList.remove('open');
+      detail.style.display = match && detail.classList.contains('open') ? 'table-row' : 'none';
+    }
+  });
+}
+
+/* ===================== generic expandable table renderer ===================== */
+/*
+  spec = {
+    tabKey, container, columns: [{label, cls}], rows: [{key, cells:[html...], search, detailHtml, staticRow?}]
+  }
+*/
+function renderExpandableTable(spec){
+  const { tabKey, container, columns, rows } = spec;
+  if (!rows.length){
+    container.innerHTML = `<div class="empty-state">Nothing to show here yet.</div>`;
+    return;
+  }
+  const expandedSet = state.expanded[tabKey];
+  const thead = `<thead><tr>${rows.some(r=>!r.staticRow) ? '<th></th>' : ''}${columns.map(c=>`<th>${esc(c.label)}</th>`).join('')}</tr></thead>`;
+  const bodyRows = rows.map(r => {
+    const isExpandable = !r.staticRow;
+    const isOpen = expandedSet.has(r.key);
+    const caretCell = rows.some(x=>!x.staticRow) ? `<td>${isExpandable ? '<span class="caret">▸</span>' : ''}</td>` : '';
+    const summary = `<tr class="row-summary${isExpandable?'':' static'}${isOpen?' expanded':''}" data-key="${esc(r.key)}" data-search="${esc((r.search||'').toLowerCase())}">${caretCell}${r.cells.join('')}</tr>`;
+    const detail = isExpandable
+      ? `<tr class="row-detail-wrap${isOpen?' open':''}" data-detail-for="${esc(r.key)}"><td colspan="${columns.length + (rows.some(x=>!x.staticRow)?1:0)}"><div class="row-detail-inner">${r.detailHtml||''}</div></td></tr>`
+      : '';
+    return summary + detail;
+  }).join('');
+  container.innerHTML = `<table class="rtable">${thead}<tbody>${bodyRows}</tbody></table>`;
+
+  container.querySelectorAll('tr.row-summary:not(.static)').forEach(row => {
+    row.addEventListener('click', () => {
+      const key = row.dataset.key;
+      const detail = row.nextElementSibling;
+      const nowOpen = !expandedSet.has(key);
+      if (nowOpen) expandedSet.add(key); else expandedSet.delete(key);
+      row.classList.toggle('expanded', nowOpen);
+      if (detail && detail.classList.contains('row-detail-wrap')){
+        detail.classList.toggle('open', nowOpen);
+        detail.style.display = nowOpen ? 'table-row' : 'none';
+      }
+    });
+  });
+  applySearch();
+}
+
+/* ===================== header / counts ===================== */
+function renderHeader(){
+  if (!state.item){
+    itemTitle.textContent = 'Item Trace Summary';
+    itemSub.textContent = 'No trace loaded — upload your Origin → Usage and Usage → Origin files above to get started.';
+    brandMark.textContent = '?';
+    return;
+  }
+  itemTitle.textContent = 'Item Trace Summary · ' + state.item;
+  itemSub.textContent = `${state.itemDesc} — ${state.combined.length.toLocaleString()} ledger entries across both traces`;
+  brandMark.textContent = String(state.item).slice(0,2);
+}
+function setCount(id, n){ document.getElementById(id).textContent = n ? ` (${n})` : ''; }
+
+/* ===================== TAB 1: Origins ===================== */
+function computeOriginRows(rows){
+  const lastSeenIdx = {};
+  const seenEntry = new Set();
+  const origins = [];
+  rows.forEach((row, i) => {
+    const entry = row.entry;
+    const parentEntry = row.parentEntry;
+    const isRoot = (parentEntry === 0 || parentEntry == null || parentEntry === '') || !(parentEntry in lastSeenIdx);
+    if (isRoot && !seenEntry.has(entry)){
+      origins.push(row);
+      seenEntry.add(entry);
+    }
+    lastSeenIdx[entry] = i;
+  });
+  return origins;
+}
+function renderOrigins(){
+  const rows = state.origins.slice().sort((a,b) => (a.date||'').localeCompare(b.date||''));
+  setCount('cnt-origins', rows.length);
+  const columns = [
+    {label:'Type'}, {label:'Item No'}, {label:'Item Desc'}, {label:'Lot No'}, {label:'Location'},
+    {label:'Qty'}, {label:'Date'}, {label:'Document No'}, {label:'Source'}, {label:'Entry #'}
+  ];
+  const dataRows = rows.map(r => ({
+    key: 'o' + r.entry,
+    staticRow: true,
+    search: [r.type, r.itemNo, r.itemDesc, r.lot, r.loc, r.doc, r.source, r.entry].join(' '),
+    cells: [
+      `<td><span class="type-pill" style="background:${typeColor(r.type)}22; color:${typeColor(r.type)==='var(--grey)'?'var(--text-dim)':typeColor(r.type)}">${esc(r.type)}</span></td>`,
+      `<td class="mono">${esc(r.itemNo)}</td>`,
+      `<td>${esc(r.itemDesc)}</td>`,
+      `<td class="mono">${esc(r.lot||'—')}</td>`,
+      `<td>${esc(r.loc||'—')}</td>`,
+      `<td class="num ${r.qty>0?'qty-pos':(r.qty<0?'qty-neg':'')}">${fmtQty(r.qty)}</td>`,
+      `<td>${esc(r.date||'—')}</td>`,
+      `<td class="mono">${esc(r.doc||'—')}</td>`,
+      `<td>${esc(r.source||'—')}</td>`,
+      `<td class="mono">#${esc(r.entry)}</td>`,
+    ]
+  }));
+  renderExpandableTable({ tabKey:'origins', container: document.getElementById('content-origins'), columns, rows: dataRows });
+}
+
+/* ===================== TAB 2: Production Detail ===================== */
+function computeProductionSummary(combined){
+  const ordersByDoc = {};
+  combined.forEach(r => {
+    if (r.type !== 'Finished Production Order Consumption' && r.type !== 'Finished Production Order Output') return;
+    if (!ordersByDoc[r.doc]) ordersByDoc[r.doc] = { doc:r.doc, outputs:[], consumptions:[] };
+    const o = ordersByDoc[r.doc];
+    if (r.type === 'Finished Production Order Output') o.outputs.push(r);
+    else o.consumptions.push(r);
+  });
+  // A single production order number can be reused across many separate
+  // posting batches (BC does not guarantee one output per doc), so every
+  // output posting is kept — nothing is silently dropped or overwritten.
+  const summaryMap = {};
+  Object.values(ordersByDoc).forEach(o => {
+    if (!o.outputs.length) return;
+    o.outputs.forEach(out => {
+      const key = out.itemNo;
+      if (!summaryMap[key]) summaryMap[key] = { itemNo:key, itemDesc:out.itemDesc, inputs:new Set(), docs:new Set(), postings:[], consumptionsByDoc:{}, totalQty:0, minDate:null, maxDate:null };
+      const s = summaryMap[key];
+      s.docs.add(o.doc);
+      s.postings.push({ doc:o.doc, date:out.date, loc:out.loc, lot:out.lot, qty:out.qty });
+      s.consumptionsByDoc[o.doc] = o.consumptions; // same list regardless of which output in this doc we're on
+      o.consumptions.forEach(c => s.inputs.add(c.itemNo));
+      s.totalQty += (out.qty || 0);
+      if (out.date && (!s.minDate || out.date < s.minDate)) s.minDate = out.date;
+      if (out.date && (!s.maxDate || out.date > s.maxDate)) s.maxDate = out.date;
+    });
+  });
+  return Object.values(summaryMap).sort((a,b) => b.totalQty - a.totalQty);
+}
+function renderProduction(){
+  const summary = computeProductionSummary(state.combined);
+  const totalPostings = summary.reduce((s,x)=>s+x.postings.length, 0);
+  setCount('cnt-production', totalPostings);
+  const columns = [
+    {label:'Output Item'}, {label:'Output Desc'}, {label:'Input(s)'}, {label:'# Orders'}, {label:'# Postings'},
+    {label:'Net Qty Produced'}, {label:'First Date'}, {label:'Last Date'}
+  ];
+  const dataRows = summary.map(s => {
+    const postingRows = s.postings.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''))
+      .map(p => `<tr>
+        <td class="mono">${esc(p.doc)}</td><td>${esc(p.date||'—')}</td><td>${esc(p.loc||'—')}</td>
+        <td class="mono">${esc(p.lot||'—')}</td><td class="num ${p.qty>0?'qty-pos':(p.qty<0?'qty-neg':'')}">${fmtQty(p.qty)}</td>
+      </tr>`).join('');
+    const postingsTable = `<table class="rtable-sub"><thead><tr>
+      <th>Production Order No</th><th>Date</th><th>Location</th><th>Output Lot</th><th>Qty</th>
+    </tr></thead><tbody>${postingRows}</tbody></table>`;
+
+    const allConsumptions = [];
+    Object.entries(s.consumptionsByDoc).forEach(([doc, cs]) => cs.forEach(c => allConsumptions.push({...c, doc})));
+    const consumptionRows = allConsumptions.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''))
+      .map(c => `<tr>
+        <td class="mono">${esc(c.doc)}</td><td class="mono">${esc(c.itemNo)}</td><td>${esc(c.itemDesc)}</td>
+        <td class="mono">${esc(c.lot||'—')}</td><td>${esc(c.date||'—')}</td>
+        <td class="num ${c.qty>0?'qty-pos':(c.qty<0?'qty-neg':'')}">${fmtQty(c.qty)}</td>
+      </tr>`).join('');
+    const consumptionsTable = `<table class="rtable-sub" style="margin-top:10px;"><thead><tr>
+      <th>Order No</th><th>Item</th><th>Desc</th><th>Lot</th><th>Date</th><th>Qty</th>
+    </tr></thead><tbody>${consumptionRows}</tbody></table>`;
+
+    const detailHtml = `
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-dimmer); margin-bottom:6px;">Output postings</div>
+      ${postingsTable}
+      <div style="font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-dimmer); margin:12px 0 6px;">Components consumed under these order(s)</div>
+      ${consumptionsTable}
+    `;
+    return {
+      key: 'p' + s.itemNo,
+      search: [s.itemNo, s.itemDesc, ...s.inputs].join(' '),
+      cells: [
+        `<td class="mono">${esc(s.itemNo)}</td>`,
+        `<td>${esc(s.itemDesc)}</td>`,
+        `<td>${esc(Array.from(s.inputs).join(', '))}</td>`,
+        `<td class="num">${s.docs.size}</td>`,
+        `<td class="num">${s.postings.length}</td>`,
+        `<td class="num ${s.totalQty>0?'qty-pos':(s.totalQty<0?'qty-neg':'')}">${fmtQty(s.totalQty)}</td>`,
+        `<td>${esc(s.minDate||'—')}</td>`,
+        `<td>${esc(s.maxDate||'—')}</td>`,
+      ],
+      detailHtml
+    };
+  });
+  renderExpandableTable({ tabKey:'production', container: document.getElementById('content-production'), columns, rows: dataRows });
+}
+
+/* ===================== TAB 3: SKU Summary ===================== */
+function computeSkuSummary(combined){
+  const skuMap = {};
+  const locSet = new Set();
+  combined.forEach(r => {
+    if (!skuMap[r.itemNo]) skuMap[r.itemNo] = { itemNo:r.itemNo, itemDesc:r.itemDesc, produced:0, transferredOut:0, sold:0, consumed:0, otherAdj:0, remaining:0, remainingByLoc:{}, lots:{} };
+    const s = skuMap[r.itemNo];
+    // net signed accumulation throughout — reversal pairs (+X / -X) must be
+    // allowed to cancel out before we take an absolute value for display,
+    // otherwise a posting-and-its-own-correction gets double counted.
+    if (r.type === 'Finished Production Order Output') s.produced += (r.qty||0);
+    else if (r.type === 'Transfer Shipment Header') s.transferredOut += (r.qty||0);
+    else if (r.type === 'Sales Shipment Header') s.sold += (r.qty||0);
+    else if (r.type === 'Finished Production Order Consumption') s.consumed += (r.qty||0);
+    else if (r.type === 'Item Ledger Entry') s.otherAdj += (r.qty||0);
+    if (r.remQty > 0){
+      s.remaining += r.remQty;
+      s.remainingByLoc[r.loc] = (s.remainingByLoc[r.loc]||0) + r.remQty;
+      locSet.add(r.loc);
+      const lotKey = (r.lot||'(no lot)') + '||' + r.loc;
+      s.lots[lotKey] = s.lots[lotKey] || { lot:r.lot||'(no lot)', loc:r.loc, remQty:0 };
+      s.lots[lotKey].remQty += r.remQty;
+    }
+  });
+  return { skus: Object.values(skuMap).sort((a,b)=>a.itemNo.localeCompare(b.itemNo)), locations: Array.from(locSet).sort() };
+}
+function renderSku(){
+  const { skus, locations } = computeSkuSummary(state.combined);
+  setCount('cnt-sku', skus.length);
+  const columns = [
+    {label:'Item No'}, {label:'Item Desc'}, {label:'Produced'}, {label:'Transferred Out'}, {label:'Sold'},
+    {label:'Consumed'}, {label:'Other Adj.'}, {label:'Remaining (Total)'},
+    ...locations.map(l => ({label:'Rem. ' + l}))
+  ];
+  const dataRows = skus.map(s => {
+    const lots = Object.values(s.lots).sort((a,b)=> b.remQty - a.remQty);
+    const detailHtml = lots.length
+      ? `<table class="rtable-sub"><thead><tr><th>Lot No</th><th>Location</th><th>Remaining Qty</th></tr></thead><tbody>${
+          lots.map(l => `<tr><td class="mono">${esc(l.lot)}</td><td>${esc(l.loc)}</td><td class="num">${fmtNum(l.remQty)}</td></tr>`).join('')
+        }</tbody></table>`
+      : `<div style="color:var(--text-dimmer); font-size:12.5px;">No remaining lots on hand.</div>`;
+    return {
+      key: 's' + s.itemNo,
+      search: [s.itemNo, s.itemDesc].join(' '),
+      cells: [
+        `<td class="mono">${esc(s.itemNo)}</td>`,
+        `<td>${esc(s.itemDesc)}</td>`,
+        `<td class="num">${fmtNum(Math.abs(s.produced))}</td>`,
+        `<td class="num">${fmtNum(Math.abs(s.transferredOut))}</td>`,
+        `<td class="num">${fmtNum(Math.abs(s.sold))}</td>`,
+        `<td class="num">${fmtNum(Math.abs(s.consumed))}</td>`,
+        `<td class="num">${fmtNum(s.otherAdj)}</td>`,
+        `<td class="num">${fmtNum(s.remaining)}</td>`,
+        ...locations.map(l => `<td class="num">${fmtNum(s.remainingByLoc[l]||0)}</td>`)
+      ],
+      detailHtml
+    };
+  });
+  renderExpandableTable({ tabKey:'sku', container: document.getElementById('content-sku'), columns, rows: dataRows });
+}
+
+/* ===================== TAB 4: Sales Shipments ===================== */
+function computeSales(combined){
+  const salesMap = {};
+  combined.forEach(r => {
+    if (r.type !== 'Sales Shipment Header') return;
+    const key = r.doc + '||' + r.itemNo;
+    if (!salesMap[key]) salesMap[key] = { doc:r.doc, itemNo:r.itemNo, itemDesc:r.itemDesc, loc:r.loc, date:r.date, customer:r.source, qty:0, lots:[] };
+    const s = salesMap[key];
+    s.qty += (r.qty||0); // net signed — a shipment and its own reversal should cancel, not double-count
+    s.lots.push({ lot:r.lot||'(no lot)', qty:r.qty, entry:r.entry });
+  });
+  return Object.values(salesMap).sort((a,b) => (b.date||'').localeCompare(a.date||''));
+}
+function renderSales(){
+  const sales = computeSales(state.combined);
+  setCount('cnt-sales', sales.length);
+  const columns = [
+    {label:'Shipment No'}, {label:'Item No'}, {label:'Item Desc'}, {label:'Customer'},
+    {label:'Location'}, {label:'Qty Sold'}, {label:'Ship Date'}
+  ];
+  const dataRows = sales.map(s => {
+    const detailHtml = `<table class="rtable-sub"><thead><tr><th>Lot No</th><th>Qty</th><th>Entry #</th></tr></thead><tbody>${
+      s.lots.map(l => `<tr><td class="mono">${esc(l.lot)}</td><td class="num ${l.qty>0?'qty-pos':(l.qty<0?'qty-neg':'')}">${fmtQty(l.qty)}</td><td class="mono">#${esc(l.entry)}</td></tr>`).join('')
+    }</tbody></table>`;
+    return {
+      key: 'sh' + s.doc + '_' + s.itemNo,
+      search: [s.doc, s.itemNo, s.itemDesc, s.customer, s.loc].join(' '),
+      cells: [
+        `<td class="mono">${esc(s.doc)}</td>`,
+        `<td class="mono">${esc(s.itemNo)}</td>`,
+        `<td>${esc(s.itemDesc)}</td>`,
+        `<td>${esc(s.customer||'—')}</td>`,
+        `<td>${esc(s.loc||'—')}</td>`,
+        `<td class="num">${fmtNum(Math.abs(s.qty))}</td>`,
+        `<td>${esc(s.date||'—')}</td>`,
+      ],
+      detailHtml
+    };
+  });
+  renderExpandableTable({ tabKey:'sales', container: document.getElementById('content-sales'), columns, rows: dataRows });
+}
+
+/* ===================== TAB 5: SKU by Location ===================== */
+function computeLocationSummary(combined){
+  const locMap = {};
+  combined.forEach(r => {
+    if (String(r.loc||'').toUpperCase() === 'TRANSIT') return;
+    const key = r.itemNo + '||' + r.loc;
+    if (!locMap[key]) locMap[key] = { itemNo:r.itemNo, itemDesc:r.itemDesc, loc:r.loc, shipments:new Set(), transferredIn:0, unitsSold:0, remaining:0, firstTransfer:null, lastTransfer:null, lastShip:null, lots:{} };
+    const s = locMap[key];
+    if (r.type === 'Sales Shipment Header'){
+      s.shipments.add(r.doc);
+      s.unitsSold += (r.qty||0); // net signed, abs() at display
+      if (r.date && (!s.lastShip || r.date > s.lastShip)) s.lastShip = r.date;
+    }
+    if (r.type === 'Transfer Receipt Header'){
+      s.transferredIn += (r.qty||0); // net signed, abs() at display
+      if (r.date && (!s.firstTransfer || r.date < s.firstTransfer)) s.firstTransfer = r.date;
+      if (r.date && (!s.lastTransfer || r.date > s.lastTransfer)) s.lastTransfer = r.date;
+    }
+    if (r.remQty > 0){
+      s.remaining += r.remQty;
+      const lotKey = r.lot || '(no lot)';
+      s.lots[lotKey] = (s.lots[lotKey]||0) + r.remQty;
+    }
+  });
+  return Object.values(locMap).sort((a,b) => a.itemNo.localeCompare(b.itemNo) || a.loc.localeCompare(b.loc));
+}
+function renderLocation(){
+  const rows = computeLocationSummary(state.combined);
+  setCount('cnt-location', rows.length);
+  const columns = [
+    {label:'Item No'}, {label:'Item Desc'}, {label:'Location'}, {label:'# Shipments'}, {label:'Transferred In'},
+    {label:'Units Sold'}, {label:'Remaining Qty'}, {label:'First Transfer'}, {label:'Last Transfer'}, {label:'Last Ship Date'}
+  ];
+  const dataRows = rows.map(s => {
+    const lots = Object.entries(s.lots).sort((a,b)=>b[1]-a[1]);
+    const detailHtml = lots.length
+      ? `<table class="rtable-sub"><thead><tr><th>Lot No</th><th>Remaining Qty</th></tr></thead><tbody>${
+          lots.map(([lot,qty]) => `<tr><td class="mono">${esc(lot)}</td><td class="num">${fmtNum(qty)}</td></tr>`).join('')
+        }</tbody></table>`
+      : `<div style="color:var(--text-dimmer); font-size:12.5px;">No remaining lots on hand.</div>`;
+    return {
+      key: 'loc' + s.itemNo + '_' + s.loc,
+      search: [s.itemNo, s.itemDesc, s.loc].join(' '),
+      cells: [
+        `<td class="mono">${esc(s.itemNo)}</td>`,
+        `<td>${esc(s.itemDesc)}</td>`,
+        `<td>${esc(s.loc)}</td>`,
+        `<td class="num">${s.shipments.size}</td>`,
+        `<td class="num">${fmtNum(Math.abs(s.transferredIn))}</td>`,
+        `<td class="num">${fmtNum(Math.abs(s.unitsSold))}</td>`,
+        `<td class="num">${fmtNum(s.remaining)}</td>`,
+        `<td>${esc(s.firstTransfer||'—')}</td>`,
+        `<td>${esc(s.lastTransfer||'—')}</td>`,
+        `<td>${esc(s.lastShip||'—')}</td>`,
+      ],
+      detailHtml
+    };
+  });
+  renderExpandableTable({ tabKey:'location', container: document.getElementById('content-location'), columns, rows: dataRows });
+}
+
+function renderAll(){
+  renderHeader();
+  renderOrigins();
+  renderProduction();
+  renderSku();
+  renderSales();
+  renderLocation();
+}
+
+/* ===================== upload & parsing (Business Central exports) ===================== */
+let pendingFiles = { o2u: null, u2o: null };
+fileO2UBtn.addEventListener('click', () => fileO2U.click());
+fileU2OBtn.addEventListener('click', () => fileU2O.click());
+fileO2U.addEventListener('change', () => {
+  pendingFiles.o2u = fileO2U.files[0] || null;
+  fileO2UName.textContent = pendingFiles.o2u ? pendingFiles.o2u.name : 'No file chosen';
+  updateRebuildEnabled();
+});
+fileU2O.addEventListener('change', () => {
+  pendingFiles.u2o = fileU2O.files[0] || null;
+  fileU2OName.textContent = pendingFiles.u2o ? pendingFiles.u2o.name : 'No file chosen';
+  updateRebuildEnabled();
+});
+function updateRebuildEnabled(){ rebuildBtn.disabled = !(pendingFiles.o2u && pendingFiles.u2o); }
+
+function readFileAsWorkbook(file){
+  return new Promise((resolve, reject) => {
+    if (typeof XLSX === 'undefined'){
+      reject(new Error('The Excel reader library failed to load — check your internet connection and reload the page.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => { try { resolve(XLSX.read(new Uint8Array(e.target.result), {type:'array'})); } catch (err){ reject(err); } };
+    reader.onerror = () => reject(reader.error || new Error('Could not read the file.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+function toBool(v){
+  if (typeof v === 'boolean') return v;
+  if (v == null) return false;
+  const s = String(v).trim().toLowerCase();
+  return s === 'true' || s === '1' || s === 'yes';
+}
+function formatExcelDate(v){
+  if (v == null || v === '') return '';
+  if (typeof v === 'number') return XLSX.SSF.format('yyyy-mm-dd', v);
+  if (v instanceof Date) return v.toISOString().slice(0,10);
+  const d = new Date(v);
+  if (!isNaN(d)) return d.toISOString().slice(0,10);
+  return String(v);
+}
+const REQUIRED_COLS = ['Description','Item No.','Item Description','Quantity','Already Traced','Posting Date','Item Ledger Entry No.','Document No.','Parent Item Ledger Entry No.'];
+function deriveType(desc, doc){
+  desc = desc || ''; doc = doc || '';
+  if (doc && desc.endsWith(doc)) return desc.slice(0, desc.length - doc.length).trim();
+  return desc;
+}
+function parseTraceWorkbook(wb){
+  const sheetName = wb.SheetNames.includes('Item Tracing') ? 'Item Tracing' : wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+  if (!rows.length) throw new Error('That sheet is empty.');
+  const header = rows[0].map(h => h == null ? '' : String(h).trim());
+  const idx = {};
+  header.forEach((h,i) => { if (h) idx[h] = i; });
+  const missing = REQUIRED_COLS.filter(c => !(c in idx));
+  if (missing.length) throw new Error('Missing expected column(s): ' + missing.join(', ') + '. Make sure this is a Business Central Item Tracing export.');
+  const traceMethodIdx = idx['Trace Method'];
+  let traceMethod = null;
+  const out = [];
+  for (let r = 1; r < rows.length; r++){
+    const row = rows[r];
+    if (!row || row[idx['Item Ledger Entry No.']] == null) continue;
+    if (traceMethod === null && traceMethodIdx != null && row[traceMethodIdx]) traceMethod = String(row[traceMethodIdx]).trim();
+    out.push({
+      type: deriveType(row[idx['Description']] ?? '', row[idx['Document No.']] != null ? String(row[idx['Document No.']]) : ''),
+      itemNo: row[idx['Item No.']] != null ? String(row[idx['Item No.']]) : '',
+      itemDesc: row[idx['Item Description']] ?? '',
+      source: idx['Source Name'] != null ? (row[idx['Source Name']] || '') : '',
+      loc: idx['Location Code'] != null ? (row[idx['Location Code']] || '') : '',
+      lot: idx['Lot No.'] != null ? (row[idx['Lot No.']] || '') : '',
+      lp: idx['License Plate No.'] != null ? (row[idx['License Plate No.']] || '') : '',
+      qty: Number(row[idx['Quantity']]) || 0,
+      remQty: Number(row[idx['Remaining Quantity']]) || 0,
+      traced: toBool(row[idx['Already Traced']]),
+      date: formatExcelDate(row[idx['Posting Date']]),
+      entry: row[idx['Item Ledger Entry No.']],
+      doc: row[idx['Document No.']] != null ? String(row[idx['Document No.']]) : '',
+      parentEntry: row[idx['Parent Item Ledger Entry No.']],
+    });
+  }
+  if (!out.length) throw new Error('No data rows found in this file.');
+  return { rows: out, traceMethod };
+}
+function dedupeByEntry(arrays){
+  const map = new Map();
+  arrays.forEach(arr => arr.forEach(row => { if (!map.has(row.entry)) map.set(row.entry, row); }));
+  return Array.from(map.values());
+}
+
+rebuildBtn.addEventListener('click', async () => {
+  uploadStatus.className = 'upload-status';
+  uploadStatus.textContent = 'Reading files…';
+  rebuildBtn.disabled = true;
+  try {
+    const [wbO2U, wbU2O] = await Promise.all([
+      readFileAsWorkbook(pendingFiles.o2u),
+      readFileAsWorkbook(pendingFiles.u2o),
+    ]);
+    const parsedO2U = parseTraceWorkbook(wbO2U);
+    const parsedU2O = parseTraceWorkbook(wbU2O);
+
+    let warning = '';
+    if (parsedO2U.traceMethod && parsedO2U.traceMethod.toLowerCase().indexOf('usage->origin') === 0){
+      warning = ' Heads up: the file in the "Origin → Usage" slot looks like a Usage→Origin export — double-check the two files aren\'t swapped.';
+    } else if (parsedU2O.traceMethod && parsedU2O.traceMethod.toLowerCase().indexOf('origin->usage') === 0){
+      warning = ' Heads up: the file in the "Usage → Origin" slot looks like an Origin→Usage export — double-check the two files aren\'t swapped.';
+    }
+
+    state.o2uRows = parsedO2U.rows;
+    state.u2oRows = parsedU2O.rows;
+    state.combined = dedupeByEntry([state.o2uRows, state.u2oRows]);
+    state.origins = computeOriginRows(state.o2uRows);
+    const firstRow = state.o2uRows[0] || state.u2oRows[0];
+    state.item = firstRow ? firstRow.itemNo : '';
+    state.itemDesc = firstRow ? firstRow.itemDesc : '';
+
+    FTABS.forEach(t => state.expanded[t] = new Set());
+    state.activeTab = 'origins';
+    tabbar.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'origins'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-origins'));
+    searchInput.value = '';
+
+    renderAll();
+
+    uploadStatus.textContent = `Built report for item ${state.item} — ${state.combined.length.toLocaleString()} unique ledger entries (${state.o2uRows.length.toLocaleString()} Origin→Usage rows, ${state.u2oRows.length.toLocaleString()} Usage→Origin rows).` + warning;
+    uploadStatus.className = 'upload-status ' + (warning ? 'warn' : 'ok');
+  } catch (err){
+    uploadStatus.textContent = 'Could not load files: ' + err.message;
+    uploadStatus.className = 'upload-status error';
+  } finally {
+    updateRebuildEnabled();
+  }
+});
+
+/* ===================== init ===================== */
+renderAll();
+</script>
+</body>
+</html>

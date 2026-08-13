@@ -444,6 +444,100 @@
         line-height: 1.55;
       }
 
+      .home-top-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      .tv-toggle { flex: 0 0 auto; }
+      .tv-toggle.active { border-color: var(--ink); background: var(--ink); color: white; }
+
+      body.tv-mode .sidebar,
+      body.tv-mode .mobile-bar,
+      body.tv-mode .overlay { display: none !important; }
+      body.tv-mode .main { margin-left: 0; }
+      body.tv-mode .page { width: min(1400px, calc(100% - 64px)); padding: 40px 0 60px; }
+      body.tv-mode h1 { font-size: clamp(40px, 5.4vw, 66px); }
+      body.tv-mode .tv-toggle span { display: none; }
+
+      .resolved-banner {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 42px 0 0;
+        padding: 18px 20px;
+        border: 1px solid #b9e8cd;
+        border-radius: var(--radius);
+        background: var(--green-soft);
+      }
+      .resolved-banner-head { display: flex; align-items: center; gap: 9px; color: #0e7a44; font-size: 12.5px; font-weight: 760; letter-spacing: .02em; text-transform: uppercase; }
+      .resolved-banner-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+      .resolved-banner-item { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 13px; color: #145a34; }
+      .resolved-banner-dept { padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.65); font-size: 10.5px; font-weight: 760; text-transform: uppercase; letter-spacing: .04em; }
+      .resolved-banner-date { margin-left: auto; color: #3d8462; font-size: 11.5px; }
+
+      .stat-card { display: flex; align-items: flex-start; gap: 13px; padding: 17px 18px; }
+      .stat-card .tool-icon { width: 36px; height: 36px; flex: 0 0 auto; }
+      .stat-card-body { min-width: 0; }
+      .stat-card-label { margin: 0; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+      .stat-card-value { margin: 4px 0 0; font-size: 14px; font-weight: 650; line-height: 1.4; }
+      .stat-card-value strong { font-weight: 760; }
+
+      .dept-card { padding: 20px; }
+      .dept-card h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-size: 15px; }
+      .dept-list { display: flex; flex-direction: column; gap: 11px; margin: 0; padding: 0; list-style: none; }
+      .dept-list li {
+        position: relative;
+        padding-left: 16px;
+        color: #46474d;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .dept-list li::before { content: ""; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--active); }
+      .dept-empty { color: var(--subtle); font-size: 13px; font-style: italic; }
+
+      .issue-title { display: block; color: var(--ink); font-size: 13px; font-weight: 650; line-height: 1.45; }
+      .issue-update { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+      .issue-update-label { color: #85878e; font-weight: 650; }
+
+      .marquee-card { padding: 16px 0 16px 20px; overflow: hidden; }
+      .marquee-card + .marquee-card { margin-top: 12px; }
+      .marquee-label { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: #13834c; font-size: 11px; font-weight: 760; letter-spacing: .06em; text-transform: uppercase; }
+      .marquee-label.negative { color: #c0392b; }
+      .marquee-viewport { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, black 24px, black calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, black 24px, black calc(100% - 24px), transparent); }
+      .marquee-track { display: flex; gap: 14px; width: max-content; animation: marquee-scroll linear infinite; }
+      .marquee-track:hover { animation-play-state: paused; }
+      @keyframes marquee-scroll { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+      .review-chip {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 260px;
+        flex: 0 0 auto;
+        padding: 14px 15px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--soft);
+      }
+      .review-chip-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--muted); }
+      .review-chip-title { margin: 0; font-size: 13px; font-weight: 680; line-height: 1.35; }
+      .review-chip-content { margin: 0; color: #55565c; font-size: 12px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+      .shipment-card { padding: 22px; }
+      .shipment-rows { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+      .shipment-row { display: grid; grid-template-columns: 92px 1fr 64px; align-items: center; gap: 12px; }
+      .shipment-week { color: var(--muted); font-size: 12px; font-weight: 650; }
+      .shipment-track { height: 10px; border-radius: 999px; background: var(--soft); overflow: hidden; }
+      .shipment-fill { height: 100%; border-radius: 999px; background: var(--blue); }
+      .shipment-cases { text-align: right; font-size: 12.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+      .shipment-total-row {
+        display: grid;
+        grid-template-columns: 92px 1fr 64px;
+        gap: 12px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        font-size: 13px;
+        font-weight: 760;
+      }
+      .shipment-total-row .shipment-cases { color: var(--ink); }
+
       .overlay { display: none; }
 
       @media (max-width: 980px) {
@@ -478,6 +572,7 @@
 
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+        .marquee-track { animation: none !important; overflow-x: auto; }
       }
     </style>
   </head>
@@ -502,6 +597,9 @@
       <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2A5 5 0 0 0 12 20.1l1.1-1.1"/></symbol>
       <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
       <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+      <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+      <symbol id="i-collapse" viewBox="0 0 24 24"><path d="M9 3v3a2 2 0 0 1-2 2H4M15 3v3a2 2 0 0 0 2 2h3M9 21v-3a2 2 0 0 0-2-2H4M15 21v-3a2 2 0 0 1 2-2h3"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
     </svg>
 
     <div class="overlay" id="overlay"></div>
@@ -538,6 +636,9 @@
         <button class="nav-item" data-page="integrations">
           <svg class="icon"><use href="#i-plug" /></svg><span>Integrations</span>
         </button>
+        <a class="nav-item" href="/sops.html" style="text-decoration:none;">
+          <svg class="icon"><use href="#i-file" /></svg><span>SOPs</span>
+        </a>
       </nav>
 
       <div class="profile">
@@ -553,9 +654,46 @@
       </div>
 
       <section class="page active" id="page-home">
-        <div class="eyebrow"><span class="eyebrow-dot"></span>LaunchPlan Intelligence</div>
+        <div class="home-top-row">
+          <div class="eyebrow"><span class="eyebrow-dot"></span>LaunchPlan Intelligence</div>
+          <button class="button tv-toggle" id="tv-toggle" type="button"><svg class="icon"><use href="#i-expand" /></svg><span>Fullscreen / TV display</span></button>
+        </div>
         <h1 class="home-title"><span id="greeting">Welcome</span>, Chris <span class="accent">▰</span><span style="color:#ffd64f">▪</span><span style="color:#438df4">●</span></h1>
         <p class="lede">Your secure home for CPG analytics, AI workflows, software, and connected data.</p>
+
+        <div class="section-head"><div><h2>Today</h2><p>Computed live from the weekly source files — no manual snapshot to update.</p></div></div>
+        <div class="grid grid-2" id="today-grid">
+          <div class="card stat-card"><div class="tool-icon orange"><svg class="icon"><use href="#i-chart" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Reviews</p><p class="stat-card-value">Loading…</p></div></div>
+          <div class="card stat-card"><div class="tool-icon violet"><svg class="icon"><use href="#i-file" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Latest SOP</p><p class="stat-card-value">Loading…</p></div></div>
+          <div class="card stat-card"><div class="tool-icon green"><svg class="icon"><use href="#i-merge" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Issues data</p><p class="stat-card-value">Loading…</p></div></div>
+          <div class="card stat-card"><div class="tool-icon"><svg class="icon"><use href="#i-box" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Shipment data</p><p class="stat-card-value">Loading…</p></div></div>
+        </div>
+
+        <div id="reviews-carousel-section" style="display:none;">
+          <div class="section-head"><div><h2>Recent Reviews</h2><p>No new reviews this week — here's the latest positive and critical feedback on file.</p></div></div>
+          <article class="card marquee-card">
+            <div class="marquee-label"><svg class="icon"><use href="#i-chart" /></svg>Positive</div>
+            <div class="marquee-viewport"><div class="marquee-track" id="marquee-positive"></div></div>
+          </article>
+          <article class="card marquee-card">
+            <div class="marquee-label negative"><svg class="icon"><use href="#i-chart" /></svg>Critical</div>
+            <div class="marquee-viewport"><div class="marquee-track" id="marquee-negative"></div></div>
+          </article>
+        </div>
+
+        <div id="resolved-banner-wrap"></div>
+
+        <div class="section-head"><div><h2>Open Issues &amp; Opportunities by Department</h2><p>Each item's title and its most recent update from the Issues/Opportunities meeting tab.</p></div><span class="badge" id="issues-badge">Loading…</span></div>
+        <div class="grid grid-3" id="issues-grid">
+          <article class="card dept-card"><h3>Marketing</h3><ul class="dept-list"><li class="dept-empty">Loading…</li></ul></article>
+          <article class="card dept-card"><h3>Procurement</h3><ul class="dept-list"><li class="dept-empty">Loading…</li></ul></article>
+          <article class="card dept-card"><h3>Sales</h3><ul class="dept-list"><li class="dept-empty">Loading…</li></ul></article>
+        </div>
+
+        <div class="section-head"><div><h2>Upcoming Shipments</h2><p>Active-status case volume for the current week plus the next four.</p></div><span class="badge" id="shipments-badge">Loading…</span></div>
+        <article class="card shipment-card" id="shipments-card">
+          <div class="shipment-rows" id="shipments-rows"><p class="dept-empty">Loading…</p></div>
+        </article>
 
         <div class="section-head"><div><h2>Explore your hub</h2><p>Everything your team needs in one protected workspace.</p></div></div>
         <div class="grid grid-3">
@@ -573,16 +711,26 @@
           </a>
         </div>
 
-        <div class="section-head"><div><h2>Available now</h2><p>Your first secure analytics workflow.</p></div><span class="badge live">1 tool live</span></div>
-        <article class="card tool-card">
-          <div class="tool-top"><div class="tool-icon orange"><svg class="icon"><use href="#i-chart" /></svg></div><span class="badge live">Ready</span></div>
-          <h3>Amazon Review Sentiment Report</h3>
-          <p>Explore customer sentiment, product themes, flavor performance, representative quotes, and detailed reviews.</p>
-          <div class="actions">
-            <a class="button primary" href="/amazon-review-sentiment.html"><svg class="icon"><use href="#i-eye" /></svg>Open report</a>
-            <a class="button" href="/upload.html"><svg class="icon"><use href="#i-upload" /></svg>Upload review data</a>
-          </div>
-        </article>
+        <div class="section-head"><div><h2>Available now</h2><p>Your secure analytics workflows.</p></div><span class="badge live">2 tools live</span></div>
+        <div class="grid grid-2">
+          <article class="card tool-card">
+            <div class="tool-top"><div class="tool-icon orange"><svg class="icon"><use href="#i-chart" /></svg></div><span class="badge live">Ready</span></div>
+            <h3>Amazon Review Sentiment Report</h3>
+            <p>Explore customer sentiment, product themes, flavor performance, representative quotes, and detailed reviews.</p>
+            <div class="actions">
+              <a class="button primary" href="/amazon-review-sentiment.html"><svg class="icon"><use href="#i-eye" /></svg>Open report</a>
+              <a class="button" href="/upload.html"><svg class="icon"><use href="#i-upload" /></svg>Upload review data</a>
+            </div>
+          </article>
+          <article class="card tool-card">
+            <div class="tool-top"><div class="tool-icon orange"><svg class="icon"><use href="#i-chart" /></svg></div><span class="badge live">Ready</span></div>
+            <h3>Instacart Campaign Analysis</h3>
+            <p>Sponsored Products and Sponsored Display performance, NTB% and ROAS trends, and campaign-level spend breakdowns.</p>
+            <div class="actions">
+              <a class="button primary" href="/instacart-campaign-analysis.html"><svg class="icon"><use href="#i-eye" /></svg>Open report</a>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section class="page" id="page-software">
@@ -639,10 +787,10 @@
       const dashboardCategories = [
         { name: "Company Analytics", icon: "i-building", tone: "violet", description: "Company-wide KPIs, financial health, and cross-functional performance.", count: 0 },
         { name: "Executive Summaries", icon: "i-file", tone: "orange", description: "Leadership-ready weekly, monthly, and quarterly decision summaries.", count: 0 },
-        { name: "Marketing Analytics", icon: "i-megaphone", tone: "orange", description: "Customer voice, campaigns, content, retail media, and acquisition.", count: 1 },
+        { name: "Marketing Analytics", icon: "i-megaphone", tone: "orange", description: "Customer voice, campaigns, content, retail media, and acquisition.", count: 3 },
         { name: "Sales Analytics", icon: "i-dollar", tone: "green", description: "Retailer, channel, SKU, velocity, and distribution performance.", count: 0 },
         { name: "Marketing/Sales Summaries", icon: "i-merge", tone: "violet", description: "One shared narrative connecting marketing activity to commercial results.", count: 0 },
-        { name: "Operations Analytics", icon: "i-gear", tone: "green", description: "Inventory, demand planning, fulfillment, and supply chain visibility.", count: 1 }
+        { name: "Operations Analytics", icon: "i-gear", tone: "green", description: "Inventory, demand planning, fulfillment, and supply chain visibility.", count: 2 }
       ];
 
       const software = [
@@ -668,6 +816,175 @@
       function setGreeting() {
         const hour = new Date().getHours();
         document.getElementById("greeting").textContent = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+      }
+
+      function formatDate(isoDate) {
+        if (!isoDate) return "no date on file";
+        const d = new Date(`${isoDate}T00:00:00Z`);
+        if (Number.isNaN(d.getTime())) return isoDate;
+        return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+      }
+
+      function formatDateTime(isoString) {
+        if (!isoString) return "unknown";
+        const d = new Date(isoString);
+        if (Number.isNaN(d.getTime())) return isoString;
+        return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      }
+
+      function esc(str) {
+        return String(str ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      }
+
+      function reviewChip(review) {
+        return `
+          <article class="review-chip">
+            <div class="review-chip-head"><span>${review.rating ? "★".repeat(Math.round(review.rating)) : ""}</span><span>${formatDate(review.date)}</span></div>
+            <p class="review-chip-title">${esc(review.title)}</p>
+            <p class="review-chip-content">${esc(review.content)}</p>
+          </article>`;
+      }
+
+      function renderReviewsCarousel(highlights) {
+        const section = document.getElementById("reviews-carousel-section");
+        const positive = highlights?.positive || [];
+        const negative = highlights?.negative || [];
+
+        if (!positive.length && !negative.length) {
+          section.style.display = "none";
+          return;
+        }
+        section.style.display = "";
+
+        const fill = (id, items) => {
+          const track = document.getElementById(id);
+          if (!items.length) {
+            track.style.animation = "none";
+            track.innerHTML = `<p class="dept-empty">No reviews on file.</p>`;
+            return;
+          }
+          const chips = items.map(reviewChip).join("");
+          // duplicated once so the 50%-translate loop is seamless
+          track.innerHTML = chips + chips;
+          const seconds = Math.max(20, items.length * 5);
+          track.style.animationDuration = `${seconds}s`;
+        };
+
+        fill("marquee-positive", positive);
+        fill("marquee-negative", negative);
+      }
+
+      async function loadToday() {
+        const grid = document.getElementById("today-grid");
+        try {
+          const res = await fetch("/api/news-summary");
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const summary = await res.json();
+          const tiles = grid.querySelectorAll(".stat-card-value");
+
+          tiles[0].innerHTML = summary.latestReviews?.newestDate
+            ? `<strong>${summary.latestReviews.addedLast7Days}</strong> new this week &middot; last ${formatDate(summary.latestReviews.newestDate)}`
+            : "No review data on file";
+
+          tiles[1].innerHTML = summary.latestSop
+            ? `<strong>${summary.latestSop.title}</strong> &middot; ${formatDate(summary.latestSop.uploadedDate)}`
+            : "No SOPs on file";
+
+          tiles[2].innerHTML = summary.issuesSourceTab
+            ? `Tab <strong>${summary.issuesSourceTab}</strong>`
+            : "No issues/opportunities file on file";
+
+          tiles[3].innerHTML = summary.shipmentsSourceFileUpdated
+            ? `Updated <strong>${formatDateTime(summary.shipmentsSourceFileUpdated)}</strong>`
+            : "No shipment plan file on file";
+
+          renderReviewsCarousel(summary.reviewHighlights);
+        } catch (err) {
+          grid.querySelectorAll(".stat-card-value").forEach(el => { el.textContent = "Unavailable right now"; });
+          console.error("Failed to load Today summary", err);
+        }
+      }
+
+      function renderResolvedBanner(items) {
+        const wrap = document.getElementById("resolved-banner-wrap");
+        if (!items || !items.length) {
+          wrap.innerHTML = "";
+          return;
+        }
+        wrap.innerHTML = `
+          <div class="resolved-banner">
+            <div class="resolved-banner-head">${icon("i-check")}Resolved this week</div>
+            <ul class="resolved-banner-list">${items.map(i => `
+              <li class="resolved-banner-item">
+                <span class="resolved-banner-dept">${esc(i.dept)}</span>
+                <span>${esc(i.title)}</span>
+                <span class="resolved-banner-date">${formatDate(i.closedDate)}</span>
+              </li>`).join("")}</ul>
+          </div>`;
+      }
+
+      async function loadIssues() {
+        const badge = document.getElementById("issues-badge");
+        const grid = document.getElementById("issues-grid");
+        const depts = ["Marketing", "Procurement", "Sales"];
+        try {
+          const res = await fetch("/api/issues-opportunities");
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          badge.textContent = data.sourceTab ? `As of tab ${data.sourceTab}` : "No data";
+
+          depts.forEach((dept, i) => {
+            const list = grid.children[i].querySelector(".dept-list");
+            const items = data.departments?.[dept] || [];
+            list.innerHTML = items.length
+              ? items.map(issue => `
+                  <li>
+                    <span class="issue-title">${esc(issue.title)}</span>
+                    ${issue.latestUpdate ? `<span class="issue-update">${issue.latestUpdate.label ? `<span class="issue-update-label">${esc(issue.latestUpdate.label)}</span> ` : ""}${esc(issue.latestUpdate.text)}</span>` : `<span class="issue-update">No updates recorded yet.</span>`}
+                  </li>`).join("")
+              : `<li class="dept-empty">No open issues found.</li>`;
+          });
+
+          renderResolvedBanner(data.resolvedThisWeek);
+        } catch (err) {
+          badge.textContent = "Unavailable";
+          depts.forEach((_, i) => {
+            grid.children[i].querySelector(".dept-list").innerHTML = `<li class="dept-empty">Couldn't load right now.</li>`;
+          });
+          console.error("Failed to load issues/opportunities", err);
+        }
+      }
+
+      async function loadShipments() {
+        const badge = document.getElementById("shipments-badge");
+        const rows = document.getElementById("shipments-rows");
+        try {
+          const res = await fetch("/api/shipments/upcoming");
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          badge.textContent = data.sourceFileUpdated ? `Updated ${formatDateTime(data.sourceFileUpdated)}` : "No data";
+
+          if (!data.weeks?.length) {
+            rows.innerHTML = `<p class="dept-empty">No shipment weeks found.</p>`;
+            return;
+          }
+
+          const maxCases = Math.max(...data.weeks.map(w => w.cases), 1);
+          rows.innerHTML = data.weeks.map(w => `
+            <div class="shipment-row">
+              <span class="shipment-week">${formatDate(w.weekStart)}</span>
+              <div class="shipment-track"><div class="shipment-fill" style="width:${Math.round((w.cases / maxCases) * 100)}%"></div></div>
+              <span class="shipment-cases">${w.cases.toLocaleString()}</span>
+            </div>`).join("") + `
+            <div class="shipment-total-row">
+              <span>Total</span><span></span>
+              <span class="shipment-cases">${data.total.toLocaleString()}</span>
+            </div>`;
+        } catch (err) {
+          badge.textContent = "Unavailable";
+          rows.innerHTML = `<p class="dept-empty">Couldn't load right now.</p>`;
+          console.error("Failed to load shipments", err);
+        }
       }
 
       function renderSoftware(filter = "") {
@@ -719,9 +1036,33 @@
               <a class="button primary" href="/amazon-review-sentiment.html">${icon("i-eye")}Open report</a>
               <a class="button" href="/upload.html">${icon("i-upload")}Upload data</a>
             </div>
+          </article>
+          <article class="card tool-card">
+            <div class="tool-top"><div class="tool-icon orange">${icon("i-chart")}</div><span class="badge live">Ready</span></div>
+            <h3>Instacart Campaign Analysis</h3>
+            <p>Sponsored Products and Sponsored Display performance, NTB% and ROAS trends, and campaign-level spend breakdowns.</p>
+            <div class="actions">
+              <a class="button primary" href="/instacart-campaign-analysis.html">${icon("i-eye")}Open report</a>
+            </div>
+          </article>
+          <article class="card tool-card">
+            <div class="tool-top"><div class="tool-icon orange">${icon("i-chart")}</div><span class="badge live">Ready</span></div>
+            <h3>Promotional Calendar</h3>
+            <p>Plan and track promotions and omni-channel campaigns across Amazon, Walmart, TikTok, DTC, Retail, Distributor, and Other, with a shared Gantt and per-channel analysis.</p>
+            <div class="actions">
+              <a class="button primary" href="/ebe-promo-calendar.html">${icon("i-eye")}Open tool</a>
+            </div>
           </article>` : "";
 
         const operationsTool = item.name === "Operations Analytics" ? `
+          <article class="card tool-card">
+            <div class="tool-top"><div class="tool-icon green">${icon("i-gear")}</div><span class="badge live">Ready</span></div>
+            <h3>Item Trace Summary</h3>
+            <p>Five report views built from an item's Origin → Usage and Usage → Origin traces: origins, production detail, SKU summary, sales shipments, and on-hand by location.</p>
+            <div class="actions">
+              <a class="button primary" href="/item-trace-summary.html">${icon("i-eye")}Open tool</a>
+            </div>
+          </article>
           <article class="card tool-card">
             <div class="tool-top"><div class="tool-icon green">${icon("i-gear")}</div><span class="badge live">Ready</span></div>
             <h3>Item Tracing Decomposition</h3>
@@ -786,10 +1127,38 @@
       });
       document.getElementById("overlay").addEventListener("click", closeMobileNav);
 
+      function setTvMode(on) {
+        document.body.classList.toggle("tv-mode", on);
+        const btn = document.getElementById("tv-toggle");
+        btn.classList.toggle("active", on);
+        btn.querySelector("svg use").setAttribute("href", on ? "#i-collapse" : "#i-expand");
+        btn.querySelector("span").textContent = on ? "Exit fullscreen" : "Fullscreen / TV display";
+      }
+
+      document.getElementById("tv-toggle").addEventListener("click", () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen?.().catch(() => {});
+        } else {
+          document.exitFullscreen?.();
+        }
+      });
+      document.addEventListener("fullscreenchange", () => setTvMode(!!document.fullscreenElement));
+
       setGreeting();
       renderSoftware();
       renderIntegrations();
       renderDashboards();
+      loadToday();
+      loadIssues();
+      loadShipments();
+
+      // This page is meant to be left running on a shared screen — refresh the
+      // live sections periodically rather than only on load/manual reload.
+      setInterval(() => {
+        loadToday();
+        loadIssues();
+        loadShipments();
+      }, 5 * 60 * 1000);
 
       const initialPage = location.hash.replace("#", "");
       if (["software", "dashboards", "skills", "integrations"].includes(initialPage)) showPage(initialPage);
