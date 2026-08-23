@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Every Body Eat — Amazon Review Sentiment Report</title>
+<title>Every Body Eat — Review Sentiment Report</title>
 <style>
   :root {
   --bg:#FFFFFF; --bg-soft:#F7F5EE; --card:#FFFFFF; --card-border:#E8E4D6;
@@ -176,6 +176,12 @@
   .pg-Pretzel { background: #fef3c7; color: #92400e; }
   .pg-CrispbreadCrackers { background: #dbeafe; color: #0099F3; }
 
+  .source-pill { border: 1px solid var(--card-border); background: #fff; color: var(--text-dim); border-radius: 999px; padding: 6px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .source-pill.active { background: var(--text); color: #fff; border-color: var(--text); }
+  .source-badge { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 10.5px; font-weight: 700; }
+  .source-badge-amazon { background: #fef3c7; color: #92400e; }
+  .source-badge-okendo { background: #ede9fe; color: #6d28d9; }
+
   /* FLAVOR SUMMARY TABLE — CLICKABLE ROWS */
   .flavor-row-click { cursor: pointer; }
   .flavor-row-click:hover td { background: var(--brand-light); }
@@ -242,7 +248,7 @@
   <div class="nav-section">All Reviews</div>
   <a href="#all-reviews" onclick="scrollToSection('all-reviews')">🔍 Browse &amp; Filter</a>
   <div class="nav-section">Data</div>
-  <a href="/update-reviews.html">📝 Update Amazon Reviews</a>
+  <a href="/update-reviews.html">📝 Update Reviews</a>
   <a href="/platform-metrics-upload.html">📊 Update Platform Metrics</a>
   <div class="sidenav-footer" id="sidenav-footer">Loading live data…</div>
 </nav>
@@ -250,19 +256,24 @@
 <div class="main">
 
 <div id="report-loading" class="section">
-  <h2 class="page-title">Amazon Review Sentiment Report</h2>
+  <h2 class="page-title">Review Sentiment Report</h2>
   <p class="subtitle"><span class="loading-spinner"></span>Loading live review data from the review database…</p>
 </div>
 
 <div id="report-error" class="section" style="display:none">
-  <h2 class="page-title">Amazon Review Sentiment Report</h2>
+  <h2 class="page-title">Review Sentiment Report</h2>
   <p class="subtitle" style="color:var(--neg)" id="report-error-text"></p>
 </div>
 
 <div id="report-content" style="display:none">
 
 <div class="section" id="exec-summary">
-  <h2 class="page-title">Amazon Review Sentiment Report</h2>
+  <h2 class="page-title">Review Sentiment Report</h2>
+  <div class="source-filter-row" style="display:flex;gap:8px;margin-bottom:10px">
+    <button type="button" class="source-pill" data-source="all">All Sources</button>
+    <button type="button" class="source-pill" data-source="amazon">Amazon</button>
+    <button type="button" class="source-pill" data-source="okendo">Okendo</button>
+  </div>
   <p class="subtitle" id="exec-subtitle"></p>
   <div id="exec-summary-body"></div>
 </div>
@@ -423,6 +434,11 @@ function sentPill(s) {
 function pgLabel(pg) {
   const cls = `pg-${pg.replace(/[^a-zA-Z]/g,'')}`;
   return `<span class="pg-label ${cls}">${escHtml(pg)}</span>`;
+}
+
+function sourceBadge(source) {
+  if (source !== 'amazon' && source !== 'okendo') return '';
+  return `<span class="source-badge source-badge-${source}">${source === 'amazon' ? 'Amazon' : 'Okendo'}</span>`;
 }
 
 function escHtml(s) {
@@ -617,11 +633,13 @@ document.getElementById('exec-summary-body').addEventListener('keydown', (e) => 
   openFlavorDetail(row.dataset.group, row.dataset.flavor);
 });
 
+const SOURCE_LABELS = { all: 'All Sources', amazon: 'Amazon', okendo: 'Okendo' };
+
 function renderExecSummary(report, themeIndex) {
   const meta = report.meta || {};
   const os = report.overall_stats || {};
   document.getElementById('exec-subtitle').textContent =
-    `Every Body Eat · Live data · Written reviews analyzed: ${fmtNum(meta.total_written_reviews ?? os.count ?? 0)} · Platform review totals from metric-data`;
+    `Every Body Eat · Live data · ${SOURCE_LABELS[CURRENT_SOURCE]} · Written reviews analyzed: ${fmtNum(meta.total_written_reviews ?? os.count ?? 0)} · Platform review totals from metric-data`;
 
   const groupOrder = report.group_order || [];
   const groupsByCount = groupOrder.slice().sort((a,b) => (report.groups[b].stats.count||0) - (report.groups[a].stats.count||0));
@@ -866,6 +884,11 @@ function populateFilterDropdowns(report) {
   const flavorSel = document.getElementById('f-flavor');
   const groupOrder = report.group_order || [];
 
+  // Rebuilt on every report load (source switch changes which groups/flavors
+  // actually have reviews), so clear back to the "All ..." option first.
+  groupSel.innerHTML = '<option value="">All Product Groups</option>';
+  flavorSel.innerHTML = '<option value="">All Flavors</option>';
+
   groupOrder.forEach(g => {
     const cfg = groupConfig(g);
     const o = document.createElement('option');
@@ -910,6 +933,7 @@ function reviewCardHtml(r) {
             <strong>${escHtml(r.flavor)}</strong> &nbsp;·&nbsp;
             ${r.date} &nbsp;·&nbsp;
             ${sentPill(r.sentiment)} &nbsp;·&nbsp;
+            ${sourceBadge(r.source)} &nbsp;·&nbsp;
             ${r.verified === 'Yes' ? '✅ Verified' : '🔗 Unverified'}
             ${r.helpful > 0 ? ` &nbsp;·&nbsp; 👍 ${r.helpful} found helpful` : ''}
             ${r.pack_size ? ` &nbsp;·&nbsp; <span style="background:#f1f5f9;border-radius:4px;padding:1px 6px;font-size:11px;color:var(--gray)">${escHtml(r.pack_size)}</span>` : ''}
@@ -985,11 +1009,12 @@ function filterReviews() {
 
 // ─── PACK SIZE FILTER INIT ────────────────────────────────────────────────────
 function initPackSizeDropdown() {
-  var psel=document.getElementById('f-packsize');
-  if(psel && psel.options.length > 1) return;
-  const sizes = [...new Set(REVIEWS.map(r => r.pack_size).filter(Boolean))].sort();
   const sel = document.getElementById('f-packsize');
   if (!sel) return;
+  // Rebuilt on every report load (source switch changes which pack sizes
+  // actually appear), so clear back to the "All Pack Sizes" option first.
+  sel.innerHTML = '<option value="">All Pack Sizes</option>';
+  const sizes = [...new Set(REVIEWS.map(r => r.pack_size).filter(Boolean))].sort();
   sizes.forEach(s => {
     const o = document.createElement('option');
     o.value = s; o.textContent = s;
@@ -1251,10 +1276,26 @@ async function loadRecommendations() {
 }
 
 // ═══ LOAD LIVE REPORT FROM THE REVIEW DATABASE ═══
-async function loadReport() {
+let CURRENT_SOURCE = 'all';
+
+async function loadReport(source) {
+  CURRENT_SOURCE = source || CURRENT_SOURCE;
+  document.querySelectorAll('.source-pill').forEach(p => p.classList.toggle('active', p.dataset.source === CURRENT_SOURCE));
+
+  document.getElementById('report-loading').style.display = '';
+  document.getElementById('report-error').style.display = 'none';
+  document.getElementById('report-content').style.display = 'none';
+
   try {
-    const res = await fetch('/api/reviews/report');
+    const res = await fetch(`/api/reviews/report?source=${encodeURIComponent(CURRENT_SOURCE)}`);
     if (!res.ok) {
+      if (res.status === 404) {
+        document.getElementById('report-loading').style.display = 'none';
+        document.getElementById('report-error').style.display = '';
+        document.getElementById('report-error-text').textContent =
+          `No ${SOURCE_LABELS[CURRENT_SOURCE] || CURRENT_SOURCE} reviews yet — import some via Update Reviews.`;
+        return;
+      }
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error || `Request failed (${res.status})`);
     }
@@ -1278,15 +1319,10 @@ async function loadReport() {
     renderReviews(initSorted);
     updateFilterStats(initSorted);
 
-    document.querySelectorAll('.sidenav a').forEach(a => {
-      a.addEventListener('click', function() {
-        document.querySelectorAll('.sidenav a').forEach(x => x.classList.remove('active'));
-        this.classList.add('active');
-      });
-    });
-
     // Non-blocking: report is already fully visible, recommendations backfill
-    // into the action-boxes whenever this resolves.
+    // into the action-boxes whenever this resolves. Recommendations aren't
+    // source-filtered — they're computed across every review regardless of
+    // which source tab is active.
     loadRecommendations();
   } catch (err) {
     document.getElementById('report-loading').style.display = 'none';
@@ -1295,7 +1331,21 @@ async function loadReport() {
   }
 }
 
-loadReport();
+document.querySelectorAll('.source-pill').forEach(pill => {
+  pill.addEventListener('click', () => loadReport(pill.dataset.source));
+});
+
+// Attached once — highlights whichever sidenav link was last clicked. Data
+// (report) reloads happen separately via the source pills above, so this
+// doesn't need to re-run on every loadReport() call.
+document.querySelectorAll('.sidenav a').forEach(a => {
+  a.addEventListener('click', function() {
+    document.querySelectorAll('.sidenav a').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+loadReport(CURRENT_SOURCE);
 </script>
 </body>
 </html>

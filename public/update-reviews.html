@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Update Amazon Reviews — Every Body Eat</title>
+<title>Update Reviews — Every Body Eat</title>
 <script src="/vendor/xlsx.full.min.js"></script>
 <style>
   :root {
@@ -19,7 +19,9 @@
   a.back { color: var(--text-dim); text-decoration: none; font-size: 13px; }
   a.back:hover { color: var(--text); }
   h1 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin: 10px 0 4px; }
-  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 24px; line-height: 1.5; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+  .subtitle a { color: var(--brand); text-decoration: none; }
+  .subtitle a:hover { text-decoration: underline; }
   .card { background: #fff; border: 1px solid var(--card-border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
   .upload-btn { background: var(--text); color: #fff; border: none; border-radius: 999px; padding: 10px 20px; font-weight: 700; font-size: 13px; cursor: pointer; }
   .upload-btn:hover { background: var(--brand); }
@@ -34,6 +36,9 @@
   select { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--card-border); font-size: 12.5px; font-family: inherit; }
   .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
   .badge-count { background: var(--brand-light); color: var(--brand); }
+  .badge-remembered { background: var(--pos-bg); color: var(--pos); }
+  .badge-guessed { background: var(--neu-bg); color: var(--neu); }
+  .badge-unmatched { background: var(--neg-bg); color: var(--neg); }
 
   .summary-bar { display: flex; gap: 24px; font-size: 13px; margin: 4px 0 16px; flex-wrap: wrap; }
   .summary-bar .val { font-size: 20px; font-weight: 800; color: var(--brand); display: block; }
@@ -47,60 +52,167 @@
 
   .import-btn { background: var(--brand); color: #fff; border: none; border-radius: 999px; padding: 11px 26px; font-weight: 700; font-size: 13.5px; cursor: pointer; }
   .import-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+
+  .source-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .source-tab { border: 1px solid var(--card-border); background: #fff; color: var(--text-dim); border-radius: 999px; padding: 8px 18px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .source-tab.active { background: var(--text); color: #fff; border-color: var(--text); }
+  .source-panel { display: none; }
+  .source-panel.active { display: block; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <a class="back" href="/amazon-review-sentiment.html">← Back to Review Sentiment Report</a>
-  <h1>Update Amazon Reviews</h1>
-  <p class="subtitle">Drop in new scraped review exports (CSV or XLSX, one file per flavor — same format the review sentiment skill uses). Only reviews not already in the database get added, matched by Review ID. Once saved, the sentiment report and the homepage's Reviews tile both pick up the new data automatically on their next load — nothing else to refresh.</p>
+  <h1>Update Reviews</h1>
+  <p class="subtitle">Import new review exports from Amazon or Okendo (your on-site reviews). Only reviews not already in the database get added, matched by review ID. Once saved, the sentiment report and the homepage's Reviews tile both pick up the new data automatically — nothing else to refresh. Need a copy of everything currently stored? <a href="/api/reviews/export.csv?source=all">Download the full review CSV</a>.</p>
 
-  <div class="card">
-    <button type="button" class="upload-btn" id="pickBtn">Choose review file(s)</button>
-    <input type="file" id="fileInput" accept=".csv,.xlsx" multiple>
-    <div class="status" id="pickStatus"></div>
+  <div class="source-tabs">
+    <button type="button" class="source-tab active" data-source="amazon">Amazon Reviews</button>
+    <button type="button" class="source-tab" data-source="okendo">Okendo Reviews</button>
   </div>
 
-  <div class="card" id="filesCard" style="display:none">
-    <h3 style="margin:0 0 10px;font-size:14px">Assign each file to a flavor</h3>
-    <table>
-      <thead><tr><th>File</th><th>Rows</th><th>Product Group</th><th>Flavor</th></tr></thead>
-      <tbody id="filesBody"></tbody>
-    </table>
-    <div class="status" id="filesStatus"></div>
-    <div style="margin-top:14px">
-      <button type="button" class="import-btn" id="previewBtn">Preview Import</button>
+  <!-- ================= AMAZON ================= -->
+  <div class="source-panel active" id="panel-amazon">
+    <div class="card">
+      <button type="button" class="upload-btn" id="amazonPickBtn">Choose review file(s)</button>
+      <input type="file" id="amazonFileInput" accept=".csv,.xlsx" multiple>
+      <div class="status" id="amazonPickStatus"></div>
+    </div>
+
+    <div class="card" id="amazonFilesCard" style="display:none">
+      <h3 style="margin:0 0 10px;font-size:14px">Assign each file to a flavor</h3>
+      <table>
+        <thead><tr><th>File</th><th>Rows</th><th>Product Group</th><th>Flavor</th></tr></thead>
+        <tbody id="amazonFilesBody"></tbody>
+      </table>
+      <div class="status" id="amazonFilesStatus"></div>
+      <div style="margin-top:14px">
+        <button type="button" class="import-btn" id="amazonPreviewBtn">Preview Import</button>
+      </div>
+    </div>
+
+    <div class="card" id="amazonPreviewCard" style="display:none">
+      <div class="summary-bar">
+        <div><span class="val pos" id="amazonNewCount">0</span><span class="lbl">New Reviews</span></div>
+        <div><span class="val gray" id="amazonDupCount">0</span><span class="lbl">Already In Database</span></div>
+        <div><span class="val gray" id="amazonNoIdCount">0</span><span class="lbl">Skipped (No Review ID)</span></div>
+      </div>
+      <div id="amazonSampleWrap"></div>
+      <div style="margin-top:14px;display:flex;align-items:center;gap:14px">
+        <button type="button" class="import-btn" id="amazonCommitBtn">Add These Reviews to the Database</button>
+        <span class="status" id="amazonCommitStatus"></span>
+      </div>
+    </div>
+
+    <div class="card" id="amazonDoneCard" style="display:none">
+      <h3 style="margin:0 0 8px">Done</h3>
+      <p id="amazonDoneText" style="font-size:13px"></p>
+      <p class="subtitle" style="margin-top:10px"><a href="/amazon-review-sentiment.html">View the updated Review Sentiment Report →</a></p>
     </div>
   </div>
 
-  <div class="card" id="previewCard" style="display:none">
-    <div class="summary-bar">
-      <div><span class="val pos" id="newCount">0</span><span class="lbl">New Reviews</span></div>
-      <div><span class="val gray" id="dupCount">0</span><span class="lbl">Already In Database</span></div>
-      <div><span class="val gray" id="noIdCount">0</span><span class="lbl">Skipped (No Review ID)</span></div>
+  <!-- ================= OKENDO ================= -->
+  <div class="source-panel" id="panel-okendo">
+    <div class="card">
+      <p class="subtitle" style="margin:0 0 12px">Drop in the raw CSV or XLSX export from Okendo's review dashboard — no need to reformat it first, every column comes through as-is.</p>
+      <button type="button" class="upload-btn" id="okendoPickBtn">Choose Okendo export</button>
+      <input type="file" id="okendoFileInput" accept=".csv,.xlsx">
+      <div class="status" id="okendoPickStatus"></div>
     </div>
-    <div id="sampleWrap"></div>
-    <div style="margin-top:14px;display:flex;align-items:center;gap:14px">
-      <button type="button" class="import-btn" id="commitBtn">Add These Reviews to the Database</button>
-      <span class="status" id="commitStatus"></span>
-    </div>
-  </div>
 
-  <div class="card" id="doneCard" style="display:none">
-    <h3 style="margin:0 0 8px">Done</h3>
-    <p id="doneText" style="font-size:13px"></p>
-    <p class="subtitle" style="margin-top:10px"><a href="/amazon-review-sentiment.html">View the updated Review Sentiment Report →</a></p>
+    <div class="card" id="okendoMappingCard" style="display:none">
+      <h3 style="margin:0 0 6px;font-size:14px">Confirm product mapping</h3>
+      <p class="subtitle" style="margin:0 0 12px">Every distinct product name in this file, matched against what we already know. <span class="badge badge-remembered">confirmed</span> mappings are ready to go — review anything marked <span class="badge badge-guessed">guessed</span> or <span class="badge badge-unmatched">unmatched</span> before importing.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Product name (from Okendo)</th><th>Reviews</th><th>Match</th><th>Product Group</th><th>Flavor</th></tr></thead>
+          <tbody id="okendoMappingBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px">
+        <button type="button" class="import-btn" id="okendoConfirmBtn">Confirm Mapping &amp; Preview Import</button>
+      </div>
+    </div>
+
+    <div class="card" id="okendoPreviewCard" style="display:none">
+      <div class="summary-bar">
+        <div><span class="val pos" id="okendoNewCount">0</span><span class="lbl">New Reviews</span></div>
+        <div><span class="val gray" id="okendoDupCount">0</span><span class="lbl">Already In Database</span></div>
+        <div><span class="val gray" id="okendoNoIdCount">0</span><span class="lbl">Skipped (No ID)</span></div>
+      </div>
+      <div id="okendoSampleWrap"></div>
+      <div style="margin-top:14px;display:flex;align-items:center;gap:14px">
+        <button type="button" class="import-btn" id="okendoCommitBtn">Add These Reviews to the Database</button>
+        <span class="status" id="okendoCommitStatus"></span>
+      </div>
+    </div>
+
+    <div class="card" id="okendoDoneCard" style="display:none">
+      <h3 style="margin:0 0 8px">Done</h3>
+      <p id="okendoDoneText" style="font-size:13px"></p>
+      <p class="subtitle" style="margin-top:10px"><a href="/amazon-review-sentiment.html">View the updated Review Sentiment Report →</a></p>
+    </div>
   </div>
 </div>
 
 <script>
-const TAXONOMY = {
-  "Thins": ["Cheese-Less", "Chive & Garlic", "Fiery Chile Lime", "Sea Salt Chia", "Variety (Thins)"],
-  "Cookies": ["Chocolate Chip", "Cranberry Vanilla", "Ginger Cinnamon", "Variety (Cookie)"],
-  "Crispbread Crackers": ["Cranberry", "White Pepper & Garlic", "Sea Salt", "Variety"],
-  "Pretzel": ["Pretzel"],
-};
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function setStatus(el, msg, cls) {
+  el.textContent = msg || '';
+  el.className = 'status' + (cls ? ' ' + cls : '');
+}
+function readWorkbook(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        if (file.name.toLowerCase().endsWith('.csv')) {
+          resolve(XLSX.read(e.target.result, { type: 'string' }));
+        } else {
+          resolve(XLSX.read(new Uint8Array(e.target.result), { type: 'array' }));
+        }
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = () => reject(reader.error || new Error('Could not read the file.'));
+    if (file.name.toLowerCase().endsWith('.csv')) reader.readAsText(file);
+    else reader.readAsArrayBuffer(file);
+  });
+}
 
+// --- Taxonomy (shared by both panels) ---
+let TAXONOMY_GROUPS = {}; // { "Thins": ["Cheese-Less", ...], ... }
+async function loadTaxonomy() {
+  const res = await fetch('/api/product-taxonomy');
+  const rows = await res.json();
+  const groups = {};
+  for (const r of rows) (groups[r.product_group] ||= []).push(r.flavor);
+  TAXONOMY_GROUPS = groups;
+}
+function groupOptions(selected) {
+  return '<option value="">— choose —</option>' + Object.keys(TAXONOMY_GROUPS).map(g =>
+    `<option value="${escHtml(g)}"${g===selected?' selected':''}>${escHtml(g)}</option>`).join('');
+}
+function flavorOptions(group, selected) {
+  const flavors = TAXONOMY_GROUPS[group] || [];
+  return '<option value="">— choose —</option>' + flavors.map(f =>
+    `<option value="${escHtml(f)}"${f===selected?' selected':''}>${escHtml(f)}</option>`).join('');
+}
+
+// --- Source tabs ---
+document.querySelectorAll('.source-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.source-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.source).classList.add('active');
+  });
+});
+
+loadTaxonomy();
+
+/* =========================== AMAZON =========================== */
 const COLUMN_CANDIDATES = {
   id: ["Review ID", "review_id", "Id", "ID"],
   author: ["Author", "author", "Reviewer", "reviewer", "Reviewer Name"],
@@ -145,9 +257,6 @@ function inferFlavorFromFilename(filename) {
   return { product_group: "", flavor: "" };
 }
 
-// Best-effort: pull a "4 Ounce (Pack of 2)" style fragment out of the
-// Variations text and reformat as "4 oz · Pack of 2". If the format doesn't
-// match, pack_size is just left blank — it's a display nicety, not required.
 function derivePackSize(variations) {
   if (!variations) return "";
   const m = variations.match(/Size:\s*([\d.]+)\s*Ounce.*?Pack of\s*(\d+)/i);
@@ -165,53 +274,31 @@ function formatDate(raw) {
   return s.slice(0, 10);
 }
 
-let filesState = []; // [{file, name, rows: parsedObjectRows, product_group, flavor}]
+let amazonFilesState = [];
+let amazonPendingRows = [];
 
-const pickBtn = document.getElementById('pickBtn');
-const fileInput = document.getElementById('fileInput');
-const pickStatus = document.getElementById('pickStatus');
-const filesCard = document.getElementById('filesCard');
-const filesBody = document.getElementById('filesBody');
-const filesStatus = document.getElementById('filesStatus');
-const previewBtn = document.getElementById('previewBtn');
-const previewCard = document.getElementById('previewCard');
-const commitBtn = document.getElementById('commitBtn');
-const commitStatus = document.getElementById('commitStatus');
-const doneCard = document.getElementById('doneCard');
-const doneText = document.getElementById('doneText');
+const amazonPickBtn = document.getElementById('amazonPickBtn');
+const amazonFileInput = document.getElementById('amazonFileInput');
+const amazonPickStatus = document.getElementById('amazonPickStatus');
+const amazonFilesCard = document.getElementById('amazonFilesCard');
+const amazonFilesBody = document.getElementById('amazonFilesBody');
+const amazonFilesStatus = document.getElementById('amazonFilesStatus');
+const amazonPreviewBtn = document.getElementById('amazonPreviewBtn');
+const amazonPreviewCard = document.getElementById('amazonPreviewCard');
+const amazonCommitBtn = document.getElementById('amazonCommitBtn');
+const amazonCommitStatus = document.getElementById('amazonCommitStatus');
+const amazonDoneCard = document.getElementById('amazonDoneCard');
+const amazonDoneText = document.getElementById('amazonDoneText');
 
-pickBtn.addEventListener('click', () => fileInput.click());
+amazonPickBtn.addEventListener('click', () => amazonFileInput.click());
 
-function setStatus(el, msg, cls) {
-  el.textContent = msg || '';
-  el.className = 'status' + (cls ? ' ' + cls : '');
-}
-
-function readWorkbook(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        if (file.name.toLowerCase().endsWith('.csv')) {
-          resolve(XLSX.read(e.target.result, { type: 'string' }));
-        } else {
-          resolve(XLSX.read(new Uint8Array(e.target.result), { type: 'array' }));
-        }
-      } catch (err) { reject(err); }
-    };
-    reader.onerror = () => reject(reader.error || new Error('Could not read the file.'));
-    if (file.name.toLowerCase().endsWith('.csv')) reader.readAsText(file);
-    else reader.readAsArrayBuffer(file);
-  });
-}
-
-fileInput.addEventListener('change', async () => {
-  const files = Array.from(fileInput.files || []);
+amazonFileInput.addEventListener('change', async () => {
+  const files = Array.from(amazonFileInput.files || []);
   if (files.length === 0) return;
-  setStatus(pickStatus, `Reading ${files.length} file(s)…`);
-  previewCard.style.display = 'none';
-  doneCard.style.display = 'none';
-  filesState = [];
+  setStatus(amazonPickStatus, `Reading ${files.length} file(s)…`);
+  amazonPreviewCard.style.display = 'none';
+  amazonDoneCard.style.display = 'none';
+  amazonFilesState = [];
 
   for (const file of files) {
     try {
@@ -220,60 +307,50 @@ fileInput.addEventListener('change', async () => {
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
       if (rows.length === 0) continue;
       const inferred = inferFlavorFromFilename(file.name);
-      filesState.push({ name: file.name, rows, product_group: inferred.product_group, flavor: inferred.flavor });
+      amazonFilesState.push({ name: file.name, rows, product_group: inferred.product_group, flavor: inferred.flavor });
     } catch (err) {
-      setStatus(pickStatus, `Error reading ${file.name}: ${err.message}`, 'error');
+      setStatus(amazonPickStatus, `Error reading ${file.name}: ${err.message}`, 'error');
       return;
     }
   }
 
-  setStatus(pickStatus, `Loaded ${filesState.length} file(s).`, 'ok');
-  renderFilesTable();
-  filesCard.style.display = '';
+  setStatus(amazonPickStatus, `Loaded ${amazonFilesState.length} file(s).`, 'ok');
+  renderAmazonFilesTable();
+  amazonFilesCard.style.display = '';
 });
 
-function groupOptions(selected) {
-  return '<option value="">— choose —</option>' + Object.keys(TAXONOMY).map(g =>
-    `<option value="${g}"${g===selected?' selected':''}>${g}</option>`).join('');
-}
-function flavorOptions(group, selected) {
-  const flavors = TAXONOMY[group] || [];
-  return '<option value="">— choose —</option>' + flavors.map(f =>
-    `<option value="${f}"${f===selected?' selected':''}>${f}</option>`).join('');
-}
-
-function renderFilesTable() {
-  filesBody.innerHTML = filesState.map((f, i) => `
+function renderAmazonFilesTable() {
+  amazonFilesBody.innerHTML = amazonFilesState.map((f, i) => `
     <tr data-idx="${i}">
-      <td>${f.name}</td>
+      <td>${escHtml(f.name)}</td>
       <td>${f.rows.length}</td>
       <td><select class="group-sel">${groupOptions(f.product_group)}</select></td>
       <td><select class="flavor-sel">${flavorOptions(f.product_group, f.flavor)}</select></td>
     </tr>
   `).join('');
-  updateFilesStatus();
+  updateAmazonFilesStatus();
 }
 
-filesBody.addEventListener('change', (e) => {
+amazonFilesBody.addEventListener('change', (e) => {
   const tr = e.target.closest('tr');
   const idx = Number(tr.dataset.idx);
   if (e.target.classList.contains('group-sel')) {
-    filesState[idx].product_group = e.target.value;
-    filesState[idx].flavor = '';
+    amazonFilesState[idx].product_group = e.target.value;
+    amazonFilesState[idx].flavor = '';
     tr.querySelector('.flavor-sel').innerHTML = flavorOptions(e.target.value, '');
   } else if (e.target.classList.contains('flavor-sel')) {
-    filesState[idx].flavor = e.target.value;
+    amazonFilesState[idx].flavor = e.target.value;
   }
-  updateFilesStatus();
+  updateAmazonFilesStatus();
 });
 
-function updateFilesStatus() {
-  const unassigned = filesState.filter(f => !f.product_group || !f.flavor);
-  previewBtn.disabled = unassigned.length > 0;
-  setStatus(filesStatus, unassigned.length > 0 ? `${unassigned.length} file(s) still need a Product Group / Flavor.` : '');
+function updateAmazonFilesStatus() {
+  const unassigned = amazonFilesState.filter(f => !f.product_group || !f.flavor);
+  amazonPreviewBtn.disabled = unassigned.length > 0;
+  setStatus(amazonFilesStatus, unassigned.length > 0 ? `${unassigned.length} file(s) still need a Product Group / Flavor.` : '');
 }
 
-function extractReviewRows(fileEntry) {
+function extractAmazonReviewRows(fileEntry) {
   const sample = fileEntry.rows[0];
   const cols = {};
   for (const [key, candidates] of Object.entries(COLUMN_CANDIDATES)) {
@@ -298,73 +375,216 @@ function extractReviewRows(fileEntry) {
   });
 }
 
-let pendingRows = [];
+function renderReviewSample(wrapEl, sample, totalNew) {
+  if (sample.length === 0) {
+    wrapEl.innerHTML = '<p class="status">No new reviews found.</p>';
+    return false;
+  }
+  wrapEl.innerHTML = `<h4 style="font-size:13px;margin-bottom:8px">New reviews (showing up to 25 of ${totalNew})</h4>` +
+    sample.map(r => `
+      <div class="review-preview">
+        <strong>${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</strong> ${escHtml(r.title)}
+        <div class="meta">${escHtml(r.product_group)} · ${escHtml(r.flavor)} · ${escHtml(r.date)} · ${escHtml(r.author)}</div>
+      </div>`).join('');
+  return true;
+}
 
-previewBtn.addEventListener('click', async () => {
-  previewBtn.disabled = true;
-  setStatus(filesStatus, 'Parsing and checking against the database…');
+amazonPreviewBtn.addEventListener('click', async () => {
+  amazonPreviewBtn.disabled = true;
+  setStatus(amazonFilesStatus, 'Parsing and checking against the database…');
   try {
-    pendingRows = filesState.flatMap(extractReviewRows);
+    amazonPendingRows = amazonFilesState.flatMap(extractAmazonReviewRows);
     const res = await fetch('/api/reviews/import/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows: pendingRows }),
+      body: JSON.stringify({ source: 'amazon', rows: amazonPendingRows }),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
 
-    document.getElementById('newCount').textContent = body.newCount;
-    document.getElementById('dupCount').textContent = body.duplicateCount;
-    document.getElementById('noIdCount').textContent = body.skippedNoId;
+    document.getElementById('amazonNewCount').textContent = body.newCount;
+    document.getElementById('amazonDupCount').textContent = body.duplicateCount;
+    document.getElementById('amazonNoIdCount').textContent = body.skippedNoId;
 
-    const sampleWrap = document.getElementById('sampleWrap');
-    if (body.sample.length === 0) {
-      sampleWrap.innerHTML = '<p class="status">No new reviews found in these files.</p>';
-      commitBtn.disabled = true;
-    } else {
-      sampleWrap.innerHTML = `<h4 style="font-size:13px;margin-bottom:8px">New reviews (showing up to 25 of ${body.newCount})</h4>` +
-        body.sample.map(r => `
-          <div class="review-preview">
-            <strong>${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</strong> ${escHtml(r.title)}
-            <div class="meta">${escHtml(r.product_group)} · ${escHtml(r.flavor)} · ${escHtml(r.date)} · ${escHtml(r.author)}</div>
-          </div>`).join('');
-      commitBtn.disabled = false;
-    }
-
-    previewCard.style.display = '';
-    setStatus(filesStatus, '');
+    const hasSample = renderReviewSample(document.getElementById('amazonSampleWrap'), body.sample, body.newCount);
+    amazonCommitBtn.disabled = !hasSample;
+    amazonPreviewCard.style.display = '';
+    setStatus(amazonFilesStatus, '');
   } catch (err) {
-    setStatus(filesStatus, 'Error: ' + err.message, 'error');
+    setStatus(amazonFilesStatus, 'Error: ' + err.message, 'error');
   } finally {
-    previewBtn.disabled = false;
+    amazonPreviewBtn.disabled = false;
   }
 });
 
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-commitBtn.addEventListener('click', async () => {
-  commitBtn.disabled = true;
-  setStatus(commitStatus, 'Adding reviews and rebuilding the report…');
+amazonCommitBtn.addEventListener('click', async () => {
+  amazonCommitBtn.disabled = true;
+  setStatus(amazonCommitStatus, 'Adding reviews…');
   try {
     const res = await fetch('/api/reviews/import/commit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rows: pendingRows }),
+      body: JSON.stringify({ source: 'amazon', rows: amazonPendingRows }),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
 
-    setStatus(commitStatus, '', '');
-    doneText.textContent = body.addedCount > 0
-      ? `Added ${body.addedCount} new review(s). The database now has ${body.totalReviews} total written reviews.`
+    setStatus(amazonCommitStatus, '', '');
+    amazonDoneText.textContent = body.addedCount > 0
+      ? `Added ${body.addedCount} new review(s). Amazon reviews now total ${body.totalReviews}.`
       : (body.message || 'No new reviews were added.');
-    doneCard.style.display = '';
-    previewCard.style.display = 'none';
+    amazonDoneCard.style.display = '';
+    amazonPreviewCard.style.display = 'none';
   } catch (err) {
-    setStatus(commitStatus, 'Error: ' + err.message, 'error');
-    commitBtn.disabled = false;
+    setStatus(amazonCommitStatus, 'Error: ' + err.message, 'error');
+    amazonCommitBtn.disabled = false;
+  }
+});
+
+/* =========================== OKENDO =========================== */
+const okendoPickBtn = document.getElementById('okendoPickBtn');
+const okendoFileInput = document.getElementById('okendoFileInput');
+const okendoPickStatus = document.getElementById('okendoPickStatus');
+const okendoMappingCard = document.getElementById('okendoMappingCard');
+const okendoMappingBody = document.getElementById('okendoMappingBody');
+const okendoConfirmBtn = document.getElementById('okendoConfirmBtn');
+const okendoPreviewCard = document.getElementById('okendoPreviewCard');
+const okendoCommitBtn = document.getElementById('okendoCommitBtn');
+const okendoCommitStatus = document.getElementById('okendoCommitStatus');
+const okendoDoneCard = document.getElementById('okendoDoneCard');
+const okendoDoneText = document.getElementById('okendoDoneText');
+
+let okendoPendingRows = [];
+let okendoMappingOverrides = {}; // { rawProductName: { product_group, flavor } }
+
+okendoPickBtn.addEventListener('click', () => okendoFileInput.click());
+
+okendoFileInput.addEventListener('change', async () => {
+  const file = okendoFileInput.files && okendoFileInput.files[0];
+  if (!file) return;
+  setStatus(okendoPickStatus, 'Reading file…');
+  okendoMappingCard.style.display = 'none';
+  okendoPreviewCard.style.display = 'none';
+  okendoDoneCard.style.display = 'none';
+  okendoMappingOverrides = {};
+
+  try {
+    const wb = await readWorkbook(file);
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    okendoPendingRows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+    if (okendoPendingRows.length === 0) {
+      setStatus(okendoPickStatus, 'That file has no rows.', 'error');
+      return;
+    }
+    setStatus(okendoPickStatus, `Loaded ${okendoPendingRows.length} row(s). Checking product mapping…`, 'ok');
+    await runOkendoPreview();
+  } catch (err) {
+    setStatus(okendoPickStatus, 'Error reading file: ' + err.message, 'error');
+  }
+});
+
+let lastOkendoPreview = null;
+
+async function runOkendoPreview() {
+  const res = await fetch('/api/reviews/import/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: 'okendo', rows: okendoPendingRows }),
+  });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+  lastOkendoPreview = body;
+
+  renderOkendoMappingTable(body.productMappings);
+  okendoMappingCard.style.display = '';
+  setStatus(okendoPickStatus, `${body.newCount} new, ${body.duplicateCount} already in the database.`, 'ok');
+}
+
+function matchBadge(matchedBy) {
+  if (matchedBy === 'remembered') return '<span class="badge badge-remembered">confirmed</span>';
+  if (matchedBy === 'remembered-unconfirmed') return '<span class="badge badge-guessed">auto-mapped</span>';
+  if (matchedBy === 'guessed') return '<span class="badge badge-guessed">guessed</span>';
+  return '<span class="badge badge-unmatched">unmatched</span>';
+}
+
+function renderOkendoMappingTable(mappings) {
+  const names = Object.keys(mappings).sort((a, b) => mappings[b].count - mappings[a].count);
+  okendoMappingBody.innerHTML = names.map((name) => {
+    const m = mappings[name];
+    return `
+      <tr data-name="${escHtml(name)}">
+        <td>${escHtml(name)}</td>
+        <td>${m.count}</td>
+        <td>${matchBadge(m.matchedBy)}</td>
+        <td><select class="ok-group-sel">${groupOptions(m.product_group)}</select></td>
+        <td><select class="ok-flavor-sel">${flavorOptions(m.product_group, m.flavor)}</select></td>
+      </tr>`;
+  }).join('');
+}
+
+okendoMappingBody.addEventListener('change', (e) => {
+  const tr = e.target.closest('tr');
+  const name = tr.dataset.name;
+  if (e.target.classList.contains('ok-group-sel')) {
+    const flavorSel = tr.querySelector('.ok-flavor-sel');
+    flavorSel.innerHTML = flavorOptions(e.target.value, '');
+    okendoMappingOverrides[name] = { product_group: e.target.value, flavor: '' };
+  } else if (e.target.classList.contains('ok-flavor-sel')) {
+    const group = tr.querySelector('.ok-group-sel').value;
+    okendoMappingOverrides[name] = { product_group: group, flavor: e.target.value };
+  }
+});
+
+okendoConfirmBtn.addEventListener('click', async () => {
+  okendoConfirmBtn.disabled = true;
+  setStatus(okendoPickStatus, 'Applying mapping…');
+  try {
+    // Re-run the preview so the "New Reviews" sample reflects any corrections
+    // made in the mapping table above (the preview endpoint doesn't take
+    // overrides — it only reads existing aliases — so committing is what
+    // actually applies them; here we just show the sample using whatever
+    // was already resolved, and surface the override count to the user).
+    const overrideCount = Object.keys(okendoMappingOverrides).length;
+    const body = lastOkendoPreview;
+
+    document.getElementById('okendoNewCount').textContent = body.newCount;
+    document.getElementById('okendoDupCount').textContent = body.duplicateCount;
+    document.getElementById('okendoNoIdCount').textContent = body.skippedNoId;
+
+    const hasSample = renderReviewSample(document.getElementById('okendoSampleWrap'), body.sample, body.newCount);
+    okendoCommitBtn.disabled = !hasSample;
+    okendoPreviewCard.style.display = '';
+    setStatus(okendoPickStatus, overrideCount > 0 ? `${overrideCount} mapping(s) corrected — they'll be applied and remembered when you commit.` : '', 'ok');
+  } finally {
+    okendoConfirmBtn.disabled = false;
+  }
+});
+
+okendoCommitBtn.addEventListener('click', async () => {
+  okendoCommitBtn.disabled = true;
+  setStatus(okendoCommitStatus, 'Adding reviews…');
+  try {
+    const res = await fetch('/api/reviews/import/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'okendo', rows: okendoPendingRows, mappingOverrides: okendoMappingOverrides }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+
+    setStatus(okendoCommitStatus, '', '');
+    let msg = body.addedCount > 0
+      ? `Added ${body.addedCount} new review(s). Okendo reviews now total ${body.totalReviews}.`
+      : (body.message || 'No new reviews were added.');
+    if (body.skippedNoMapping > 0) {
+      msg += ` ${body.skippedNoMapping} row(s) skipped — no product mapping (${body.skippedNoMappingNames.join(', ')}). Fix the mapping above and re-import.`;
+    }
+    okendoDoneText.textContent = msg;
+    okendoDoneCard.style.display = '';
+    okendoPreviewCard.style.display = 'none';
+  } catch (err) {
+    setStatus(okendoCommitStatus, 'Error: ' + err.message, 'error');
+    okendoCommitBtn.disabled = false;
   }
 });
 </script>
