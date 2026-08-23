@@ -519,14 +519,64 @@
       .issue-update { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
       .issue-update-label { color: #85878e; font-weight: 650; }
 
-      .month-list-card { display: block; padding: 20px; text-decoration: none; }
-      .month-list-card h3 { margin: 0 0 14px; font-size: 15px; color: var(--ink); }
-      .month-list { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; max-height: 320px; overflow-y: auto; }
-      .month-list li { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-      .month-list li:last-child { border-bottom: none; padding-bottom: 0; }
-      .month-item-title { display: block; color: var(--ink); font-size: 13px; font-weight: 650; line-height: 1.45; }
-      .month-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--muted); }
-      .month-item-chip { padding: 1px 8px; border-radius: 999px; background: var(--soft); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #56585f; }
+      .home-quicknav { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 30px; }
+      .quicknav-item { padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--white); color: var(--muted); font-size: 12.5px; font-weight: 650; cursor: pointer; transition: background .12s, color .12s, border-color .12s; }
+      .quicknav-item:hover { background: var(--soft); color: var(--ink); }
+      .quicknav-item.active { background: var(--ink); border-color: var(--ink); color: var(--white); }
+
+      .calendar-card { padding: 20px; }
+      .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+      .btn-toggle { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--soft); }
+      .btn-toggle-item { padding: 6px 16px; border: none; border-radius: 999px; background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 700; cursor: pointer; }
+      .btn-toggle-item.active { background: var(--white); color: var(--ink); box-shadow: 0 1px 2px rgba(16,17,20,.08); }
+      .calendar-nav { display: flex; align-items: center; gap: 12px; }
+      .calendar-nav-btn { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 50%; background: var(--white); color: var(--ink); font-size: 15px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+      .calendar-nav-btn:hover { background: var(--soft); }
+      .calendar-month-label { min-width: 130px; text-align: center; font-size: 14px; font-weight: 760; letter-spacing: -.01em; }
+
+      .calendar-weekday-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); padding: 0 2px 8px; border-bottom: 1px solid var(--line); }
+      .calendar-weekday-row span { font-size: 10.5px; font-weight: 760; letter-spacing: .05em; text-transform: uppercase; color: var(--subtle); text-align: left; padding-left: 4px; }
+
+      .cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-rows: min-content; border-bottom: 1px solid var(--line); }
+      .cal-week:last-child { border-bottom: none; }
+      .cal-daynum { padding: 8px 6px 4px; font-size: 12px; font-weight: 650; color: var(--ink); }
+      .cal-daynum.outside { color: var(--subtle); font-weight: 550; }
+      .cal-daynum.today { color: var(--blue); }
+
+      .cal-event-bar {
+        margin: 1px 3px; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 650;
+        line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default;
+      }
+      .cal-event-bar.status-active { background: var(--green-soft); color: #0e7a44; }
+      .cal-event-bar.status-scheduled { background: var(--orange-soft); color: #b66a00; }
+      .cal-event-bar.status-completed { background: var(--soft); color: #76787f; }
+      .cal-event-bar.type-campaign { border: 1px dashed currentColor; }
+
+      .cal-more-toggle { grid-column: 1 / -1; margin: 2px 6px 6px; padding: 3px 8px; border: none; border-radius: 6px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; text-align: left; cursor: pointer; }
+      .cal-more-toggle:hover { background: var(--soft); color: var(--ink); }
+
+      .calendar-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .calendar-table th { padding: 9px 10px; text-align: left; font-size: 10.5px; font-weight: 760; letter-spacing: .04em; text-transform: uppercase; color: var(--subtle); border-bottom: 1px solid var(--line); }
+      .calendar-table td { padding: 10px; border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: top; }
+      .calendar-table tr:last-child td { border-bottom: none; }
+      .calendar-status-chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 760; }
+      .calendar-status-chip.status-active { background: var(--green-soft); color: #0e7a44; }
+      .calendar-status-chip.status-scheduled { background: var(--orange-soft); color: #b66a00; }
+      .calendar-status-chip.status-completed { background: var(--soft); color: #76787f; }
+
+      .calendar-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+      .calendar-legend-item { display: flex; align-items: center; gap: 6px; }
+      .calendar-legend-swatch { width: 11px; height: 11px; border-radius: 3px; }
+      .calendar-legend-swatch.status-active { background: var(--green); }
+      .calendar-legend-swatch.status-scheduled { background: var(--orange); }
+      .calendar-legend-swatch.status-completed { background: var(--subtle); }
+      .calendar-legend-link { margin-left: auto; color: var(--blue); text-decoration: none; font-weight: 650; }
+      .calendar-legend-link:hover { text-decoration: underline; }
+
+      @media (max-width: 640px) {
+        .cal-event-bar { font-size: 10px; }
+        .calendar-month-label { min-width: 100px; }
+      }
 
       .marquee-card { display: block; padding: 16px 0 16px 20px; overflow: hidden; text-decoration: none; color: inherit; cursor: pointer; }
       .marquee-card + .marquee-card { margin-top: 12px; }
@@ -766,7 +816,16 @@
         <h1 class="home-title"><span id="greeting">Welcome</span>, <span id="greeting-name">Chris</span> <span class="accent">▰</span><span style="color:#ffd64f">▪</span><span style="color:#438df4">●</span></h1>
         <p class="lede">Your secure home for CPG analytics, AI workflows, software, and connected data.</p>
 
-        <div class="section-head"><div><h2>Today</h2><p>Computed live from the weekly source files — no manual snapshot to update.</p></div></div>
+        <nav class="home-quicknav" aria-label="Jump to section">
+          <button class="quicknav-item" data-target="section-today" type="button">Today</button>
+          <button class="quicknav-item" data-target="section-reviews" type="button">Recent Reviews</button>
+          <button class="quicknav-item" data-target="section-sentiment" type="button">Review Sentiment</button>
+          <button class="quicknav-item" data-target="section-calendar" type="button">Promotions &amp; Campaigns</button>
+          <button class="quicknav-item" data-target="section-issues" type="button">Issues &amp; Opportunities</button>
+          <button class="quicknav-item" data-target="section-shipments" type="button">Upcoming Shipments</button>
+        </nav>
+
+        <div class="section-head" id="section-today"><div><h2>Today</h2><p>Computed live from the weekly source files — no manual snapshot to update.</p></div></div>
         <div class="grid status-grid" id="data-status-grid">
           <div class="card status-card"><span class="status-dot"></span><div class="status-card-body"><p class="status-card-label">Loading…</p><p class="status-card-value">&nbsp;</p></div></div>
         </div>
@@ -778,7 +837,7 @@
         </div>
 
         <div id="reviews-carousel-section" style="display:none;">
-          <div class="section-head"><div><h2>Recent Reviews</h2><p>Positive/critical/neutral breakdown of the last <span id="reviews-sample-size">20</span> reviews. Click a section to see the full list.</p></div></div>
+          <div class="section-head" id="section-reviews"><div><h2>Recent Reviews</h2><p>Positive/critical/neutral breakdown of the last <span id="reviews-sample-size">20</span> reviews. Click a section to see the full list.</p></div></div>
           <a class="card marquee-card" id="marquee-positive-card" target="_blank" rel="noopener">
             <div class="marquee-label"><svg class="icon"><use href="#i-chart" /></svg>Positive (<span id="marquee-positive-count">0</span>)</div>
             <div class="marquee-viewport"><div class="marquee-track" id="marquee-positive"></div></div>
@@ -793,7 +852,7 @@
           </a>
         </div>
 
-        <div class="section-head"><div><h2>Review Sentiment — Last 30 Days</h2><p>AI-generated summary of recent feedback, with anomalies flagged for follow-up.</p></div><span class="badge" id="sentiment-badge">Loading…</span></div>
+        <div class="section-head" id="section-sentiment"><div><h2>Review Sentiment — Last 30 Days</h2><p>AI-generated summary of recent feedback, with anomalies flagged for follow-up.</p></div><span class="badge" id="sentiment-badge">Loading…</span></div>
         <div class="grid grid-2">
           <a class="card sentiment-summary-card positive" id="sentiment-positive-card" target="_blank" rel="noopener">
             <h3><svg class="icon"><use href="#i-chart" /></svg>Positive (<span id="sentiment-positive-count">0</span>)</h3>
@@ -812,16 +871,51 @@
           <div id="sentiment-anomalies-wrap"><p class="dept-empty">Loading…</p></div>
         </details>
 
+        <div class="section-head" id="section-calendar"><div><h2>Promotions &amp; Campaigns</h2><p>Everything running across retail, marketing, and sales channels.</p></div></div>
+        <div class="card calendar-card">
+          <div class="calendar-toolbar">
+            <div class="btn-toggle" role="tablist">
+              <button class="btn-toggle-item active" id="calendar-view-btn" type="button" role="tab" aria-selected="true">Calendar</button>
+              <button class="btn-toggle-item" id="table-view-btn" type="button" role="tab" aria-selected="false">Table</button>
+            </div>
+            <div class="calendar-nav">
+              <button class="calendar-nav-btn" id="calendar-prev" type="button" aria-label="Previous month">‹</button>
+              <span class="calendar-month-label" id="calendar-month-label">Loading…</span>
+              <button class="calendar-nav-btn" id="calendar-next" type="button" aria-label="Next month">›</button>
+            </div>
+          </div>
+
+          <div id="calendar-grid-wrap">
+            <div class="calendar-weekday-row"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div>
+            <div id="calendar-weeks"><p class="dept-empty" style="padding:16px;">Loading…</p></div>
+          </div>
+
+          <div id="calendar-table-wrap" style="display:none;">
+            <table class="calendar-table">
+              <thead><tr><th>Item</th><th>Type</th><th>Channel / Retailer</th><th>Dates</th><th>Status</th></tr></thead>
+              <tbody id="calendar-table-body"><tr><td colspan="5" class="dept-empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+
+          <div class="calendar-legend">
+            <span>Status:</span>
+            <span class="calendar-legend-item"><span class="calendar-legend-swatch status-active"></span>Active</span>
+            <span class="calendar-legend-item"><span class="calendar-legend-swatch status-scheduled"></span>Scheduled</span>
+            <span class="calendar-legend-item"><span class="calendar-legend-swatch status-completed"></span>Completed</span>
+            <a class="calendar-legend-link" href="/ebe-promo-calendar.html" target="_blank" rel="noopener">Open full calendar tool →</a>
+          </div>
+        </div>
+
         <div id="resolved-banner-wrap"></div>
 
-        <div class="section-head"><div><h2>Open Issues &amp; Opportunities by Department</h2><p>Each item's title and its most recent update from the Issues/Opportunities meeting tab.</p></div><span class="badge" id="issues-badge">Loading…</span></div>
+        <div class="section-head" id="section-issues"><div><h2>Open Issues &amp; Opportunities by Department</h2><p>Each item's title and its most recent update from the Issues/Opportunities meeting tab.</p></div><span class="badge" id="issues-badge">Loading…</span></div>
         <div class="grid grid-3" id="issues-grid">
           <article class="card dept-card"><h3>Marketing</h3><ul class="dept-list"><li class="dept-empty">Loading…</li></ul></article>
           <article class="card dept-card"><h3>Procurement</h3><ul class="dept-list"><li class="dept-empty">Loading…</li></ul></article>
           <article class="card dept-card"><h3>Sales</h3><ul class="dept-list"><li class="dept-empty">Loading…</li></ul></article>
         </div>
 
-        <div class="section-head"><div><h2>Upcoming Shipments</h2><p>Active-status case volume for the current week plus the next four.</p></div><span class="badge" id="shipments-badge">Loading…</span></div>
+        <div class="section-head" id="section-shipments"><div><h2>Upcoming Shipments</h2><p>Active-status case volume for the current week plus the next four.</p></div><span class="badge" id="shipments-badge">Loading…</span></div>
         <a class="card shipment-card" href="/shipment-detail.html" target="_blank" rel="noopener">
           <h3>By Sales Unit of Measure</h3>
           <div class="viz-legend" id="shipments-unit-legend"></div>
@@ -834,55 +928,6 @@
           <div class="shipment-rows" id="shipments-group-rows"><p class="dept-empty">Loading…</p></div>
           <p class="shipment-detail-hint">View full item-level detail →</p>
         </a>
-
-        <div class="section-head"><div><h2>This Month</h2><p>Promotions and campaigns running in <span id="this-month-label">this month</span>.</p></div><span class="badge" id="this-month-badge">Loading…</span></div>
-        <div class="grid grid-2">
-          <a class="card month-list-card" href="/ebe-promo-calendar.html" target="_blank" rel="noopener">
-            <h3>Promotions</h3>
-            <ul class="month-list" id="month-promotions-list"><li class="dept-empty">Loading…</li></ul>
-          </a>
-          <a class="card month-list-card" href="/ebe-promo-calendar.html" target="_blank" rel="noopener">
-            <h3>Campaigns</h3>
-            <ul class="month-list" id="month-campaigns-list"><li class="dept-empty">Loading…</li></ul>
-          </a>
-        </div>
-
-        <div class="section-head"><div><h2>Explore your hub</h2><p>Everything your team needs in one protected workspace.</p></div></div>
-        <div class="grid grid-3">
-          <a class="card feature-card" href="#dashboards" data-page-link="dashboards">
-            <div class="feature-art violet"></div>
-            <div class="feature-body"><div class="feature-title">Dashboards <span class="arrow">→</span></div><p>Open custom analytics, executive summaries, and CPG decision tools.</p></div>
-          </a>
-          <a class="card feature-card" href="#skills" data-page-link="skills">
-            <div class="feature-art"><span class="orbit one"></span><span class="orbit two"></span><span class="orbit three"></span></div>
-            <div class="feature-body"><div class="feature-title">Claude Skills <span class="arrow">→</span></div><p>Use repeatable AI workflows built specifically for consumer brands.</p></div>
-          </a>
-          <a class="card feature-card" href="#integrations" data-page-link="integrations">
-            <div class="feature-art orange"><span class="orbit one"></span><span class="orbit two"></span></div>
-            <div class="feature-body"><div class="feature-title">Integrations <span class="arrow">→</span></div><p>Connect marketplaces, reporting systems, and company data sources.</p></div>
-          </a>
-        </div>
-
-        <div class="section-head"><div><h2>Available now</h2><p>Your secure analytics workflows.</p></div><span class="badge live">2 tools live</span></div>
-        <div class="grid grid-2">
-          <article class="card tool-card">
-            <div class="tool-top"><div class="tool-icon orange"><svg class="icon"><use href="#i-chart" /></svg></div><span class="badge live">Ready</span></div>
-            <h3>Review Sentiment Report</h3>
-            <p>Explore customer sentiment, product themes, flavor performance, representative quotes, and detailed reviews.</p>
-            <div class="actions">
-              <a class="button primary" href="/amazon-review-sentiment.html"><svg class="icon"><use href="#i-eye" /></svg>Open report</a>
-              <a class="button" href="/upload.html"><svg class="icon"><use href="#i-upload" /></svg>Upload review data</a>
-            </div>
-          </article>
-          <article class="card tool-card">
-            <div class="tool-top"><div class="tool-icon orange"><svg class="icon"><use href="#i-chart" /></svg></div><span class="badge live">Ready</span></div>
-            <h3>Instacart Campaign Analysis</h3>
-            <p>Sponsored Products and Sponsored Display performance, NTB% and ROAS trends, and campaign-level spend breakdowns.</p>
-            <div class="actions">
-              <a class="button primary" href="/instacart-campaign-analysis.html"><svg class="icon"><use href="#i-eye" /></svg>Open report</a>
-            </div>
-          </article>
-        </div>
       </section>
 
       <section class="page" id="page-software">
@@ -1007,52 +1052,234 @@
         return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
       }
 
-      function formatMonthLabel(isoDate) {
-        if (!isoDate) return "this month";
-        const d = new Date(`${isoDate}T00:00:00Z`);
-        if (Number.isNaN(d.getTime())) return "this month";
-        return d.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+      /* ---------- Promotions & Campaigns calendar ---------- */
+      let calendarViewDate = new Date();
+      calendarViewDate.setDate(1);
+      let calendarItems = null; // merged promotions + campaigns, loaded once
+      let calendarView = "calendar"; // 'calendar' | 'table'
+      const calendarExpandedWeeks = new Set(); // weekStart ISO strings currently showing all lanes
+      const CAL_VISIBLE_LANES = 2;
+
+      function calendarStatusOf(startIso, endIso, today) {
+        const s = new Date(`${startIso}T00:00:00`);
+        const e = new Date(`${endIso}T00:00:00`);
+        if (today > e) return "completed";
+        if (today < s) return "scheduled";
+        return "active";
       }
 
-      function renderThisMonthMarketing(data) {
-        const label = document.getElementById("this-month-label");
-        const badge = document.getElementById("this-month-badge");
-        const promoList = document.getElementById("month-promotions-list");
-        const campaignList = document.getElementById("month-campaigns-list");
+      async function loadCalendarData() {
+        try {
+          const [promoRes, campaignRes] = await Promise.all([
+            fetch("/api/marketing/promotions"),
+            fetch("/api/marketing/campaigns"),
+          ]);
+          if (!promoRes.ok || !campaignRes.ok) throw new Error("HTTP error");
+          const promoBody = await promoRes.json();
+          const campaignBody = await campaignRes.json();
 
-        if (!data) {
-          badge.textContent = "Unavailable";
-          promoList.innerHTML = `<li class="dept-empty">Couldn't load right now.</li>`;
-          campaignList.innerHTML = `<li class="dept-empty">Couldn't load right now.</li>`;
+          const promos = (promoBody.promotions || []).filter(p => p.start && p.end).map(p => ({
+            id: "promo-" + p.id,
+            type: "promotion",
+            title: p.desc || p.product,
+            meta: [p.channel, p.retailer].filter(Boolean).join(" · "),
+            start: p.start,
+            end: p.end,
+          }));
+          const campaigns = (campaignBody.campaigns || []).filter(c => c.start && c.end).map(c => ({
+            id: "campaign-" + c.id,
+            type: "campaign",
+            title: c.name,
+            meta: (c.channels || []).join(", "),
+            start: c.start,
+            end: c.end,
+          }));
+
+          calendarItems = promos.concat(campaigns);
+        } catch (err) {
+          calendarItems = null;
+          console.error("Failed to load promotions/campaigns calendar", err);
+        }
+        renderCalendarSection();
+      }
+
+      function calendarMonthGridWeeks(viewDate) {
+        const y = viewDate.getFullYear();
+        const m = viewDate.getMonth();
+        const firstOfMonth = new Date(y, m, 1);
+        const gridStart = new Date(firstOfMonth);
+        gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+
+        const weeks = [];
+        const cursor = new Date(gridStart);
+        for (let w = 0; w < 6; w++) {
+          const days = [];
+          for (let d = 0; d < 7; d++) {
+            days.push(new Date(cursor));
+            cursor.setDate(cursor.getDate() + 1);
+          }
+          weeks.push(days);
+          if (days[6].getMonth() !== m && days[6] > firstOfMonth) break;
+        }
+        return weeks;
+      }
+
+      function toIsoDate(d) {
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      }
+
+      // Greedy interval-lane assignment: items sorted by start (then longer
+      // first) each take the first lane whose last-placed item doesn't
+      // overlap their start column — same approach a month-view calendar
+      // (e.g. FullCalendar's dayGrid) uses to stack multi-day event bars.
+      function assignCalendarLanes(items, weekStartIso, weekEndIso) {
+        const clipped = items
+          .filter(it => it.start <= weekEndIso && it.end >= weekStartIso)
+          .map(it => {
+            const startCol = Math.max(0, Math.round((new Date(`${it.start}T00:00:00`) - new Date(`${weekStartIso}T00:00:00`)) / 86400000));
+            const rawEndCol = Math.round((new Date(`${it.end}T00:00:00`) - new Date(`${weekStartIso}T00:00:00`)) / 86400000);
+            const endCol = Math.min(6, rawEndCol);
+            return { ...it, startCol, endCol };
+          })
+          .sort((a, b) => a.startCol - b.startCol || (b.endCol - b.startCol) - (a.endCol - a.startCol));
+
+        const laneEnd = [];
+        const placed = [];
+        for (const item of clipped) {
+          let lane = laneEnd.findIndex(end => end < item.startCol);
+          if (lane === -1) { lane = laneEnd.length; laneEnd.push(item.endCol); }
+          else { laneEnd[lane] = item.endCol; }
+          placed.push({ ...item, lane });
+        }
+        return placed;
+      }
+
+      function renderCalendarGrid() {
+        const wrap = document.getElementById("calendar-weeks");
+        if (!calendarItems) {
+          wrap.innerHTML = `<p class="dept-empty" style="padding:16px;">Couldn't load promotions/campaigns right now.</p>`;
           return;
         }
 
-        label.textContent = formatMonthLabel(data.monthStart);
-        badge.textContent = `${data.promotions.length} promotion${data.promotions.length === 1 ? "" : "s"} · ${data.campaigns.length} campaign${data.campaigns.length === 1 ? "" : "s"}`;
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const weeks = calendarMonthGridWeeks(calendarViewDate);
+        const viewMonth = calendarViewDate.getMonth();
+        const todayIso = toIsoDate(today);
 
-        promoList.innerHTML = data.promotions.length
-          ? data.promotions.map(p => `
-              <li>
-                <span class="month-item-title">${esc(p.desc || p.product)}</span>
-                <span class="month-item-meta">
-                  <span class="month-item-chip">${esc(p.channel)}</span>
-                  ${p.retailer ? `<span>${esc(p.retailer)}</span> · ` : ""}
-                  <span>${formatDate(p.start)} – ${formatDate(p.end)}</span>
-                </span>
-              </li>`).join("")
-          : `<li class="dept-empty">No promotions running this month.</li>`;
+        wrap.innerHTML = weeks.map(days => {
+          const weekStartIso = toIsoDate(days[0]);
+          const weekEndIso = toIsoDate(days[6]);
+          const placed = assignCalendarLanes(calendarItems, weekStartIso, weekEndIso);
+          const expanded = calendarExpandedWeeks.has(weekStartIso);
+          const maxLane = placed.reduce((m, it) => Math.max(m, it.lane), -1);
+          const visibleLanes = expanded ? maxLane + 1 : Math.min(CAL_VISIBLE_LANES, maxLane + 1);
+          const hiddenCount = expanded ? 0 : placed.filter(it => it.lane >= CAL_VISIBLE_LANES).length;
 
-        campaignList.innerHTML = data.campaigns.length
-          ? data.campaigns.map(c => `
-              <li>
-                <span class="month-item-title">${esc(c.name)}</span>
-                <span class="month-item-meta">
-                  ${(c.channels || []).map(ch => `<span class="month-item-chip">${esc(ch)}</span>`).join("")}
-                  ${c.status ? `<span>${esc(c.status)}</span> · ` : ""}
-                  <span>${formatDate(c.start)} – ${formatDate(c.end)}</span>
-                </span>
-              </li>`).join("")
-          : `<li class="dept-empty">No campaigns running this month.</li>`;
+          const dayCells = days.map((d, i) => {
+            const outside = d.getMonth() !== viewMonth;
+            const isToday = toIsoDate(d) === todayIso;
+            return `<div class="cal-daynum${outside ? " outside" : ""}${isToday ? " today" : ""}" style="grid-column:${i + 1}; grid-row:1;">${d.getDate()}</div>`;
+          }).join("");
+
+          const bars = placed
+            .filter(it => it.lane < visibleLanes)
+            .map(it => {
+              const status = calendarStatusOf(it.start, it.end, today);
+              const title = `${it.title}${it.meta ? " — " + it.meta : ""} (${formatDate(it.start)} – ${formatDate(it.end)})`;
+              return `<div class="cal-event-bar status-${status} type-${it.type}" style="grid-column:${it.startCol + 1} / ${it.endCol + 2}; grid-row:${it.lane + 2};" title="${esc(title)}">${esc(it.title)}</div>`;
+            }).join("");
+
+          const moreBtn = hiddenCount > 0
+            ? `<button class="cal-more-toggle" type="button" data-week="${weekStartIso}" style="grid-row:${visibleLanes + 2};">+${hiddenCount} more</button>`
+            : (expanded && maxLane >= CAL_VISIBLE_LANES
+                ? `<button class="cal-more-toggle" type="button" data-week="${weekStartIso}" style="grid-row:${visibleLanes + 2};">Show less</button>`
+                : "");
+
+          return `<div class="cal-week">${dayCells}${bars}${moreBtn}</div>`;
+        }).join("");
+
+        wrap.querySelectorAll(".cal-more-toggle").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const week = btn.dataset.week;
+            if (calendarExpandedWeeks.has(week)) calendarExpandedWeeks.delete(week);
+            else calendarExpandedWeeks.add(week);
+            renderCalendarGrid();
+          });
+        });
+      }
+
+      function renderCalendarTable() {
+        const body = document.getElementById("calendar-table-body");
+        if (!calendarItems) {
+          body.innerHTML = `<tr><td colspan="5" class="dept-empty">Couldn't load promotions/campaigns right now.</td></tr>`;
+          return;
+        }
+
+        const monthStartIso = toIsoDate(new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth(), 1));
+        const monthEndIso = toIsoDate(new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + 1, 0));
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+
+        const inMonth = calendarItems
+          .filter(it => it.start <= monthEndIso && it.end >= monthStartIso)
+          .sort((a, b) => a.start.localeCompare(b.start));
+
+        body.innerHTML = inMonth.length
+          ? inMonth.map(it => {
+              const status = calendarStatusOf(it.start, it.end, today);
+              const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+              return `
+                <tr>
+                  <td>${esc(it.title)}</td>
+                  <td>${it.type === "campaign" ? "Campaign" : "Promotion"}</td>
+                  <td>${esc(it.meta || "—")}</td>
+                  <td>${formatDate(it.start)} – ${formatDate(it.end)}</td>
+                  <td><span class="calendar-status-chip status-${status}">${statusLabel}</span></td>
+                </tr>`;
+            }).join("")
+          : `<tr><td colspan="5" class="dept-empty">Nothing running this month.</td></tr>`;
+      }
+
+      function renderCalendarSection() {
+        const label = document.getElementById("calendar-month-label");
+        label.textContent = calendarViewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        renderCalendarGrid();
+        renderCalendarTable();
+      }
+
+      function initCalendarControls() {
+        document.getElementById("calendar-prev").addEventListener("click", () => {
+          calendarViewDate.setMonth(calendarViewDate.getMonth() - 1);
+          calendarExpandedWeeks.clear();
+          renderCalendarSection();
+        });
+        document.getElementById("calendar-next").addEventListener("click", () => {
+          calendarViewDate.setMonth(calendarViewDate.getMonth() + 1);
+          calendarExpandedWeeks.clear();
+          renderCalendarSection();
+        });
+        document.getElementById("calendar-view-btn").addEventListener("click", () => {
+          calendarView = "calendar";
+          document.getElementById("calendar-view-btn").classList.add("active");
+          document.getElementById("table-view-btn").classList.remove("active");
+          document.getElementById("calendar-grid-wrap").style.display = "";
+          document.getElementById("calendar-table-wrap").style.display = "none";
+        });
+        document.getElementById("table-view-btn").addEventListener("click", () => {
+          calendarView = "table";
+          document.getElementById("table-view-btn").classList.add("active");
+          document.getElementById("calendar-view-btn").classList.remove("active");
+          document.getElementById("calendar-grid-wrap").style.display = "none";
+          document.getElementById("calendar-table-wrap").style.display = "";
+        });
+      }
+
+      function initQuickNav() {
+        document.querySelectorAll(".quicknav-item").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const target = document.getElementById(btn.dataset.target);
+            if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
       }
 
       function renderDataStatus(tiles) {
@@ -1171,11 +1398,9 @@
 
           renderReviewsCarousel(summary.reviewHighlights);
           renderDataStatus(summary.dataStatus);
-          renderThisMonthMarketing(summary.thisMonthMarketing);
         } catch (err) {
           grid.querySelectorAll(".stat-card-value").forEach(el => { el.textContent = "Unavailable right now"; });
           renderDataStatus(null);
-          renderThisMonthMarketing(null);
           console.error("Failed to load Today summary", err);
         }
       }
@@ -1521,6 +1746,9 @@
       loadIssues();
       loadShipments();
       loadSentimentAnalysis();
+      initCalendarControls();
+      initQuickNav();
+      loadCalendarData();
 
       // This page is meant to be left running on a shared screen — refresh the
       // live sections periodically rather than only on load/manual reload.
@@ -1531,6 +1759,7 @@
         loadIssues();
         loadShipments();
         loadSentimentAnalysis();
+        loadCalendarData();
       }, 5 * 60 * 1000);
 
       const initialPage = location.hash.replace("#", "");

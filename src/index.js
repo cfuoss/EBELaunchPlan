@@ -1745,39 +1745,8 @@ function dataStatusTile(label, lastUpdated, thresholdHours, referenceDate) {
   return { label, lastUpdated, status: dataFreshnessStatus(lastUpdated, thresholdHours, referenceDate) };
 }
 
-function monthBounds(referenceDate) {
-  const y = referenceDate.getUTCFullYear();
-  const m = referenceDate.getUTCMonth();
-  const toStr = (d) => d.toISOString().slice(0, 10);
-  return { start: toStr(new Date(Date.UTC(y, m, 1))), end: toStr(new Date(Date.UTC(y, m + 1, 0))) };
-}
-
-function overlapsRange(itemStart, itemEnd, rangeStart, rangeEnd) {
-  if (!itemStart || !itemEnd) return false;
-  return itemStart <= rangeEnd && itemEnd >= rangeStart;
-}
-
-// Promotions/campaigns come from the same "marketing" D1 used by
-// ebe-promo-calendar.html (getPromotions/getCampaigns below) — this just
-// filters that live list down to whatever overlaps the current calendar
-// month, so the home page never needs its own copy of the data.
-async function getThisMonthMarketing(env, referenceDate) {
-  const { start: monthStart, end: monthEnd } = monthBounds(referenceDate);
-  const [promotions, campaigns] = await Promise.all([getPromotions(env), getCampaigns(env)]);
-
-  const activePromotions = promotions
-    .filter((p) => overlapsRange(p.start, p.end, monthStart, monthEnd))
-    .sort((a, b) => a.start.localeCompare(b.start));
-
-  const activeCampaigns = campaigns
-    .filter((c) => overlapsRange(c.start, c.end, monthStart, monthEnd))
-    .sort((a, b) => (a.start || "").localeCompare(b.start || ""));
-
-  return { monthStart, monthEnd, promotions: activePromotions, campaigns: activeCampaigns };
-}
-
 async function getNewsSummary(env, referenceDate = new Date()) {
-  const [reviews, latestSop, issues, shipments, amazonUpdated, okendoUpdated, instacartUpdated, bcUpdated, thisMonthMarketing] = await Promise.all([
+  const [reviews, latestSop, issues, shipments, amazonUpdated, okendoUpdated, instacartUpdated, bcUpdated] = await Promise.all([
     getReviewData(env),
     getLatestSop(env),
     getIssuesOpportunities(env, referenceDate),
@@ -1786,7 +1755,6 @@ async function getNewsSummary(env, referenceDate = new Date()) {
     getReviewSourceFreshness(env, "okendo"),
     getInstacartLastSynced(env),
     getBcLastSynced(env),
-    getThisMonthMarketing(env, referenceDate),
   ]);
 
   const reviewFreshness = getReviewFreshness(reviews, referenceDate);
@@ -1816,7 +1784,6 @@ async function getNewsSummary(env, referenceDate = new Date()) {
     shipmentsSourceFileUpdated: shipments ? shipments.sourceFileUpdated : null,
     shipmentsTotal: shipmentWindow ? shipmentWindow.total : null,
     dataStatus,
-    thisMonthMarketing,
   };
 }
 
