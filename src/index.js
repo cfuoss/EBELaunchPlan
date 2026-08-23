@@ -1698,17 +1698,78 @@ function canonicalizeFlavor(taxonomyGroups, group, rawFlavor) {
   return prefixMatches.length === 1 ? prefixMatches[0] : flavor;
 }
 
+// One row per D1 review import batch, keyed by source ('amazon'/'okendo') —
+// MAX(imported_at) is when that source's data was last refreshed, distinct
+// from the reviews' own posted dates (used elsewhere for "newest review").
+async function getReviewSourceFreshness(env, source) {
+  const row = await env.secure_cpg_reviews
+    .prepare("SELECT MAX(imported_at) as lastUpdated FROM reviews WHERE source = ?")
+    .bind(source)
+    .first();
+  return row?.lastUpdated || null;
+}
+
+// instacart-data-mcp (separate Worker) writes this single row at the end of
+// every successful daily sync — see its src/ingest.ts recordSyncCompleted().
+async function getInstacartLastSynced(env) {
+  try {
+    const row = await env.instacart_data.prepare("SELECT last_synced_at FROM sync_state WHERE id = 1").first();
+    return row?.last_synced_at || null;
+  } catch (err) {
+    console.error("Failed to read Instacart sync_state", err);
+    return null;
+  }
+}
+
+// ebe-bc-mcp (separate Worker) tracks per-table sync times in sync_state;
+// MAX() across tables gives the most recent Business Central refresh.
+async function getBcLastSynced(env) {
+  try {
+    const row = await env.ebe_bc_database.prepare("SELECT MAX(lastSyncedAt) as lastUpdated FROM sync_state").first();
+    return row?.lastUpdated || null;
+  } catch (err) {
+    console.error("Failed to read BC MCP sync_state", err);
+    return null;
+  }
+}
+
+function dataFreshnessStatus(lastUpdated, thresholdHours, referenceDate) {
+  if (!lastUpdated) return "red";
+  const updated = new Date(lastUpdated);
+  if (Number.isNaN(updated.getTime())) return "red";
+  const hoursAgo = (referenceDate.getTime() - updated.getTime()) / 3600000;
+  return hoursAgo <= thresholdHours ? "green" : "red";
+}
+
+function dataStatusTile(label, lastUpdated, thresholdHours, referenceDate) {
+  return { label, lastUpdated, status: dataFreshnessStatus(lastUpdated, thresholdHours, referenceDate) };
+}
+
 async function getNewsSummary(env, referenceDate = new Date()) {
-  const [reviews, latestSop, issues, shipments] = await Promise.all([
+  const [reviews, latestSop, issues, shipments, amazonUpdated, okendoUpdated, instacartUpdated, bcUpdated] = await Promise.all([
     getReviewData(env),
     getLatestSop(env),
     getIssuesOpportunities(env, referenceDate),
     getShipmentWeeks(env),
+    getReviewSourceFreshness(env, "amazon"),
+    getReviewSourceFreshness(env, "okendo"),
+    getInstacartLastSynced(env),
+    getBcLastSynced(env),
   ]);
 
   const reviewFreshness = getReviewFreshness(reviews, referenceDate);
   const shipmentWindow = shipments ? selectShipmentWindow(shipments.weeks, referenceDate) : null;
   const reviewHighlights = getReviewHighlights(reviews);
+
+  const SEVEN_DAYS_HOURS = 24 * 7;
+  const dataStatus = [
+    dataStatusTile("Instacart", instacartUpdated, 24, referenceDate),
+    dataStatusTile("Issues/Opportunities", issues ? issues.sourceFileUpdated : null, SEVEN_DAYS_HOURS, referenceDate),
+    dataStatusTile("Shipment Data (Demand Plan)", shipments ? shipments.sourceFileUpdated : null, SEVEN_DAYS_HOURS, referenceDate),
+    dataStatusTile("Okendo Reviews", okendoUpdated, SEVEN_DAYS_HOURS, referenceDate),
+    dataStatusTile("Amazon Reviews", amazonUpdated, SEVEN_DAYS_HOURS, referenceDate),
+    dataStatusTile("BC MCP", bcUpdated, SEVEN_DAYS_HOURS, referenceDate),
+  ];
 
   return {
     latestReviews: {
@@ -1722,6 +1783,7 @@ async function getNewsSummary(env, referenceDate = new Date()) {
     resolvedThisWeek: issues ? issues.resolvedThisWeek : [],
     shipmentsSourceFileUpdated: shipments ? shipments.sourceFileUpdated : null,
     shipmentsTotal: shipmentWindow ? shipmentWindow.total : null,
+    dataStatus,
   };
 }
 
