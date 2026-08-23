@@ -157,32 +157,73 @@ async function validateUpload(request) {
   });
 }
 
-// --- Data access helper (Gatekeeper-ready: no HTTP/req logic inside) ---
-async function getReviewData(env, limit = null) {
-  const object = await env.CPG_DATA.get("reviews/ebe_review_data_updated.json");
-  if (!object) return null;
+// --- D1-backed review data access (Gatekeeper-ready: no HTTP/req logic
+// inside). `reviews` (secure_cpg_reviews D1) is the source of truth — the
+// old R2 blob (reviews/ebe_review_data_updated.json) is retired, nothing
+// reads or writes it anymore. Every row carries a source ('amazon' |
+// 'okendo') so callers can filter to one platform or see everything. ---
 
-  const data = await object.json();
-  const reviews = Array.isArray(data) ? data : data.reviews;
-
-  if (limit) {
-    return reviews.slice(0, limit);
-  }
-  return reviews;
+function reviewRowFromDb(row) {
+  return {
+    id: row.id,
+    source: row.source,
+    author: row.author,
+    title: row.title,
+    content: row.content,
+    rating: row.rating,
+    sentiment: row.sentiment,
+    product_group: row.product_group,
+    flavor: row.flavor,
+    date: row.date,
+    helpful: row.helpful,
+    verified: row.verified,
+    variations: row.variations,
+    pack_size: row.pack_size,
+    themes: JSON.parse(row.themes || "[]"),
+  };
 }
 
-// Returns the full precomputed report object (meta, overall_stats,
-// overall_themes, groups, group_order, flavor_summary, reviews) as stored by
-// the upload tool — the same shape build_report.py produces. Older uploads
-// stored as a flat reviews array have no report structure, so this returns
-// null for those (getReviewData above still works for the flat-array case).
-async function getReviewReportData(env) {
-  const object = await env.CPG_DATA.get("reviews/ebe_review_data_updated.json");
-  if (!object) return null;
+async function getReviewData(env, limit = null, source = null) {
+  let sql =
+    "SELECT r.*, t.product_group as product_group, t.flavor as flavor FROM reviews r " +
+    "LEFT JOIN product_taxonomy t ON t.id = r.taxonomy_id";
+  const binds = [];
+  if (source && source !== "all") {
+    sql += " WHERE r.source = ?";
+    binds.push(source);
+  }
+  sql += " ORDER BY r.date DESC";
+  if (Number.isFinite(Number(limit)) && Number(limit) > 0) {
+    sql += " LIMIT ?";
+    binds.push(Number(limit));
+  }
 
-  const data = await object.json();
-  if (Array.isArray(data)) return null;
-  return data;
+  const { results } = await env.secure_cpg_reviews
+    .prepare(sql)
+    .bind(...binds)
+    .all();
+  return results.map(reviewRowFromDb);
+}
+
+// Builds the full report structure (meta, overall_stats, overall_themes,
+// groups, group_order, flavor_summary, reviews) fresh from D1 on every call.
+// There's no stored report to fetch anymore — buildFullReviewReport is cheap
+// enough (a handful of array passes over a couple thousand rows) to run per
+// request rather than cache, and it means the report can never drift from
+// what's actually in the reviews table.
+async function getReviewReportData(env, source = null) {
+  const reviews = await getReviewData(env, null, source);
+  if (reviews.length === 0) return null;
+  const report = buildFullReviewReport(null, reviews);
+
+  // Overlay live platform (Amazon listing) numbers from the separate
+  // platform-metrics D1 upload — independent of review source, since a
+  // listing's review count/star rating describes the product, not which
+  // review-data source we're viewing.
+  const platformSummary = await getPlatformMetricsSummary(env);
+  applyPlatformMetrics(report, platformSummary);
+
+  return report;
 }
 
 // --- SOP data access helpers (Gatekeeper-ready: no HTTP/req logic inside) ---
@@ -857,12 +898,125 @@ async function getFlavorRecommendations(env, report) {
 // Salt Crispbread) gets caught before it reaches the report, not baked in
 // silently. ---
 
-const PRODUCT_TAXONOMY = {
-  Thins: ["Cheese-Less", "Chive & Garlic", "Fiery Chile Lime", "Sea Salt Chia", "Variety (Thins)"],
-  Cookies: ["Chocolate Chip", "Cranberry Vanilla", "Ginger Cinnamon", "Variety (Cookie)"],
-  "Crispbread Crackers": ["Cranberry", "White Pepper & Garlic", "Sea Salt", "Variety"],
-  Pretzel: ["Pretzel"],
-};
+// --- Consolidated product taxonomy (D1: product_taxonomy + product_aliases)
+// — the single canonical (product_group, flavor) list plus a generic
+// raw-identifier -> taxonomy mapping, replacing three things that used to
+// drift independently: a hardcoded PRODUCT_TAXONOMY const here, a matching
+// TAXONOMY object in update-reviews.html, and platform_metric_map. Every
+// importer (platform metrics, Amazon reviews, Okendo reviews) now resolves
+// through the same product_aliases table, keyed by its own `source`. ---
+
+async function getTaxonomyGroups(env) {
+  const list = await getTaxonomyList(env);
+  const groups = {};
+  for (const r of list) {
+    (groups[r.product_group] ||= []).push(r.flavor);
+  }
+  return groups;
+}
+
+async function getTaxonomyList(env) {
+  const { results } = await env.secure_cpg_reviews
+    .prepare("SELECT id, product_group, flavor FROM product_taxonomy ORDER BY sort_order")
+    .all();
+  return results;
+}
+
+// group::flavor -> taxonomy id, for resolving an already-known pair.
+async function getTaxonomyIdMap(env) {
+  const list = await getTaxonomyList(env);
+  const map = new Map();
+  for (const r of list) map.set(`${r.product_group}::${r.flavor}`, r.id);
+  return map;
+}
+
+async function getOrCreateTaxonomy(env, productGroup, flavor) {
+  const db = env.secure_cpg_reviews;
+  const existing = await db
+    .prepare("SELECT id FROM product_taxonomy WHERE product_group = ? AND flavor = ?")
+    .bind(productGroup, flavor)
+    .first();
+  if (existing) return existing.id;
+
+  const maxRow = await db.prepare("SELECT COALESCE(MAX(sort_order), 0) as maxOrder FROM product_taxonomy").first();
+  const inserted = await db
+    .prepare(
+      "INSERT INTO product_taxonomy (product_group, flavor, sort_order, updated_at) VALUES (?, ?, ?, ?) RETURNING id",
+    )
+    .bind(productGroup, flavor, (maxRow?.maxOrder || 0) + 1, new Date().toISOString())
+    .first();
+  return inserted.id;
+}
+
+// One raw identifier (an Amazon item_name/SKU or Okendo product name) -> its
+// resolved taxonomy row, if a mapping already exists for it.
+async function resolveAlias(env, source, rawValue) {
+  const row = await env.secure_cpg_reviews
+    .prepare(
+      `SELECT a.taxonomy_id, a.auto_suggested, t.product_group, t.flavor
+       FROM product_aliases a JOIN product_taxonomy t ON t.id = a.taxonomy_id
+       WHERE a.source = ? AND a.raw_value = ?`,
+    )
+    .bind(source, rawValue)
+    .first();
+  if (!row) return null;
+  return {
+    taxonomyId: row.taxonomy_id,
+    product_group: row.product_group,
+    flavor: row.flavor,
+    autoSuggested: !!row.auto_suggested,
+  };
+}
+
+// Batched version of resolveAlias for import previews scanning many rows at
+// once — one query instead of one per row.
+async function resolveAliasesBulk(env, source, rawValues) {
+  const unique = [...new Set(rawValues.filter(Boolean))];
+  const map = new Map();
+  if (unique.length === 0) return map;
+  // D1 caps bound parameters per statement well under vanilla SQLite's
+  // default (999) — keep chunks small, leaving room for the `source` bind.
+  const CHUNK = 90;
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK);
+    const placeholders = chunk.map(() => "?").join(",");
+    const { results } = await env.secure_cpg_reviews
+      .prepare(
+        `SELECT a.raw_value, a.taxonomy_id, a.auto_suggested, t.product_group, t.flavor
+         FROM product_aliases a JOIN product_taxonomy t ON t.id = a.taxonomy_id
+         WHERE a.source = ? AND a.raw_value IN (${placeholders})`,
+      )
+      .bind(source, ...chunk)
+      .all();
+    for (const r of results) {
+      map.set(r.raw_value, {
+        taxonomyId: r.taxonomy_id,
+        product_group: r.product_group,
+        flavor: r.flavor,
+        autoSuggested: !!r.auto_suggested,
+      });
+    }
+  }
+  return map;
+}
+
+async function upsertAlias(env, { taxonomyId, source, rawValue, fnsku = null, asin = null, packSize = null, bcItemNumber = null, autoSuggested = false }) {
+  await env.secure_cpg_reviews
+    .prepare(
+      `INSERT INTO product_aliases (taxonomy_id, source, raw_value, fnsku, asin, pack_size, bc_item_number, auto_suggested, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(source, raw_value) DO UPDATE SET
+         taxonomy_id = excluded.taxonomy_id,
+         fnsku = excluded.fnsku,
+         asin = excluded.asin,
+         pack_size = excluded.pack_size,
+         bc_item_number = excluded.bc_item_number,
+         auto_suggested = excluded.auto_suggested,
+         updated_at = excluded.updated_at`,
+    )
+    .bind(taxonomyId, source, rawValue, fnsku, asin, packSize, bcItemNumber, autoSuggested ? 1 : 0, new Date().toISOString())
+    .run();
+}
 
 function round2(n) {
   return Math.round(n * 100) / 100;
@@ -920,7 +1074,13 @@ function suggestPlatformMapping(itemName) {
 }
 
 async function getPlatformMetricMappings(env) {
-  const { results } = await env.secure_cpg_reviews.prepare("SELECT * FROM platform_metric_map").all();
+  const { results } = await env.secure_cpg_reviews
+    .prepare(
+      `SELECT a.raw_value as item_name, a.auto_suggested, t.product_group, t.flavor
+       FROM product_aliases a JOIN product_taxonomy t ON t.id = a.taxonomy_id
+       WHERE a.source = 'platform_metric'`,
+    )
+    .all();
   const map = {};
   for (const row of results) {
     map[row.item_name] = { product_group: row.product_group, flavor: row.flavor, autoSuggested: !!row.auto_suggested };
@@ -964,20 +1124,29 @@ async function replacePlatformMetricRows(env, rows, sourceFile) {
 async function upsertPlatformMetricMappings(env, mappings) {
   if (mappings.length === 0) return;
   const db = env.secure_cpg_reviews;
+  const idMap = await getTaxonomyIdMap(env);
   const updatedAt = new Date().toISOString();
-  const statements = mappings.map((m) =>
-    db
-      .prepare(
-        `INSERT INTO platform_metric_map (item_name, product_group, flavor, auto_suggested, updated_at)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(item_name) DO UPDATE SET
-           product_group = excluded.product_group,
-           flavor = excluded.flavor,
-           auto_suggested = excluded.auto_suggested,
-           updated_at = excluded.updated_at`,
-      )
-      .bind(m.item_name, m.product_group, m.flavor, m.autoSuggested ? 1 : 0, updatedAt),
-  );
+  const statements = [];
+  for (const m of mappings) {
+    const key = `${m.product_group}::${m.flavor}`;
+    let taxonomyId = idMap.get(key);
+    if (!taxonomyId) {
+      taxonomyId = await getOrCreateTaxonomy(env, m.product_group, m.flavor);
+      idMap.set(key, taxonomyId);
+    }
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO product_aliases (taxonomy_id, source, raw_value, auto_suggested, updated_at)
+           VALUES (?, 'platform_metric', ?, ?, ?)
+           ON CONFLICT(source, raw_value) DO UPDATE SET
+             taxonomy_id = excluded.taxonomy_id,
+             auto_suggested = excluded.auto_suggested,
+             updated_at = excluded.updated_at`,
+        )
+        .bind(taxonomyId, m.item_name, m.autoSuggested ? 1 : 0, updatedAt),
+    );
+  }
   await db.batch(statements);
 }
 
@@ -1272,31 +1441,177 @@ function buildFullReviewReport(previousReport, allReviews) {
   };
 }
 
-// Normalizes one incoming row (already tagged with product_group/flavor by
-// the uploader) into the same review object shape stored in R2, classifying
-// sentiment and detecting themes fresh rather than trusting anything the
-// client sent.
-function normalizeIncomingReview(row) {
+// --- Per-source row normalizers. Each turns one raw import row into the
+// shared shape the `reviews` table stores, classifying sentiment and themes
+// fresh rather than trusting anything the client sent. ---
+
+// Amazon reviews are still assigned product_group/flavor per FILE in the
+// browser (update-reviews.html), directly from the canonical taxonomy
+// dropdown — so unlike Okendo, there's no raw name to resolve here; the
+// group/flavor the client sent already IS the canonical pair, matched
+// directly against product_taxonomy (getOrCreateTaxonomy), never an alias.
+function normalizeAmazonReviewRow(row) {
   const rating = Math.max(1, Math.min(5, Math.round(Number(row.rating) || 0)));
   const title = String(row.title || "").trim();
   const content = String(row.content || "").trim();
   const fullText = `${title} ${content}`;
   return {
     id: String(row.id || "").trim(),
+    source: "amazon",
     author: String(row.author || "Amazon Customer").trim() || "Amazon Customer",
     title,
     content,
     rating,
     sentiment: classifyReviewSentiment(rating),
-    product_group: row.product_group,
-    flavor: row.flavor,
+    product_group: String(row.product_group || "").trim(),
+    flavor: String(row.flavor || "").trim(),
     date: String(row.date || "").trim(),
     helpful: Number(row.helpful) || 0,
     verified: String(row.verified || "").toLowerCase().startsWith("y") ? "Yes" : "No",
     variations: String(row.variations || "").trim(),
     pack_size: String(row.pack_size || "").trim(),
     themes: detectReviewThemes(fullText),
+    positiveKeywords: null,
+    negativeKeywords: null,
+    mixedKeywords: null,
   };
+}
+
+// Okendo's export truncates timestamps to a date (dateCreated is ISO with
+// time, everywhere else in the app a review date is just YYYY-MM-DD).
+// Keywords Okendo already extracted (positive/negative/mixedKeywords) are
+// kept verbatim alongside our own detectReviewThemes() scan, rather than
+// thrown away — they're strictly better signal than reconstructing themes
+// from free text alone, which is all Amazon-scraped reviews ever had.
+function normalizeOkendoReviewRow(row) {
+  const rating = Math.max(1, Math.min(5, Math.round(Number(row.rating) || 0)));
+  const title = String(row.title || "").trim();
+  const content = String(row.body || row.content || "").trim();
+  const fullText = `${title} ${content}`;
+  const dateCreated = String(row.dateCreated || "").trim();
+  return {
+    id: String(row.hash || row.externalId || row.id || "").trim(),
+    source: "okendo",
+    author: String(row.name || row.author || "Okendo Customer").trim() || "Okendo Customer",
+    title,
+    content,
+    rating,
+    sentiment: classifyReviewSentiment(rating),
+    raw_product_name: String(row.productName || row.raw_product_name || "").trim() || null,
+    date: dateCreated ? dateCreated.slice(0, 10) : "",
+    helpful: Number(row.upvotes) || 0,
+    verified: String(row.isVerifiedBuyer || "").toLowerCase() === "true" ? "Yes" : "No",
+    variations: "",
+    pack_size: "",
+    themes: detectReviewThemes(fullText),
+    positiveKeywords: row.positiveKeywords || null,
+    negativeKeywords: row.negativeKeywords || null,
+    mixedKeywords: row.mixedKeywords || null,
+  };
+}
+
+const REVIEW_NORMALIZERS = { amazon: normalizeAmazonReviewRow, okendo: normalizeOkendoReviewRow };
+
+async function findExistingReviewIds(env, source, ids) {
+  const unique = [...new Set(ids.filter(Boolean))];
+  const found = new Set();
+  // D1 caps bound parameters per statement well under vanilla SQLite's
+  // default (999) — keep chunks small, leaving room for the `source` bind.
+  const CHUNK = 90;
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK);
+    if (chunk.length === 0) continue;
+    const placeholders = chunk.map(() => "?").join(",");
+    const { results } = await env.secure_cpg_reviews
+      .prepare(`SELECT id FROM reviews WHERE source = ? AND id IN (${placeholders})`)
+      .bind(source, ...chunk)
+      .all();
+    for (const r of results) found.add(r.id);
+  }
+  return found;
+}
+
+async function countReviews(env, source) {
+  const row = await env.secure_cpg_reviews.prepare("SELECT COUNT(*) as n FROM reviews WHERE source = ?").bind(source).first();
+  return row?.n || 0;
+}
+
+// Inserts a batch of normalized, taxonomy-resolved review rows into D1,
+// chunked so one very large import (Okendo exports run 1,000+ rows) stays
+// well under a single request's practical statement/time budget.
+async function insertReviewsBatch(env, rows, source, sourceFile) {
+  const db = env.secure_cpg_reviews;
+  const importedAt = new Date().toISOString();
+  const CHUNK = 100;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const statements = chunk.map((r) =>
+      db
+        .prepare(
+          `INSERT INTO reviews
+             (id, source, author, title, content, rating, sentiment, taxonomy_id, raw_product_name, date, helpful, verified, variations, pack_size, themes, positive_keywords, negative_keywords, mixed_keywords, imported_at, source_file)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          r.id,
+          source,
+          r.author,
+          r.title,
+          r.content,
+          r.rating,
+          r.sentiment,
+          r.taxonomyId,
+          r.raw_product_name ?? null,
+          r.date,
+          r.helpful,
+          r.verified,
+          r.variations,
+          r.pack_size,
+          JSON.stringify(r.themes || []),
+          r.positiveKeywords ?? null,
+          r.negativeKeywords ?? null,
+          r.mixedKeywords ?? null,
+          importedAt,
+          sourceFile,
+        ),
+    );
+    await db.batch(statements);
+  }
+}
+
+function reviewsToCsv(reviews) {
+  const cols = ["id", "source", "product_group", "flavor", "author", "title", "content", "rating", "sentiment", "date", "helpful", "verified", "themes"];
+  const esc = (v) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [cols.join(",")];
+  for (const r of reviews) {
+    lines.push(cols.map((c) => esc(c === "themes" ? (r.themes || []).join("; ") : r[c])).join(","));
+  }
+  return lines.join("\n");
+}
+
+// Taxonomy rows with every alias mapped to them, for the taxonomy admin view
+// — lets Chris see (and correct) exactly which raw Amazon SKUs, platform
+// metric item names, and Okendo product names resolve to each flavor.
+async function getTaxonomyWithAliases(env) {
+  const [taxonomy, aliasResult] = await Promise.all([
+    getTaxonomyList(env),
+    env.secure_cpg_reviews
+      .prepare("SELECT id, taxonomy_id, source, raw_value, auto_suggested FROM product_aliases ORDER BY source, raw_value")
+      .all(),
+  ]);
+  const byTaxonomy = {};
+  for (const a of aliasResult.results) {
+    (byTaxonomy[a.taxonomy_id] ||= []).push({
+      id: a.id,
+      source: a.source,
+      raw_value: a.raw_value,
+      autoSuggested: !!a.auto_suggested,
+    });
+  }
+  return taxonomy.map((t) => ({ ...t, aliases: byTaxonomy[t.id] || [] }));
 }
 
 // --- Amazon Product Table — the SKU/FNSKU/ASIN → Product Group/Flavor/Pack
@@ -1337,7 +1652,7 @@ function productTableToCsv(doc) {
 // product table, for callers that have a real ASIN to join against
 // (most metric-data.xlsx exports don't populate ASIN, so this is a
 // best-available lookup, not something every row will hit).
-function buildAsinLookup(doc) {
+function buildAsinLookup(doc, taxonomyGroups) {
   const lookup = {};
   const asinCol = doc.columns.find((c) => c.toLowerCase() === "asin");
   const pgCol = doc.columns.find((c) => c.toLowerCase().replace(/[^a-z]/g, "") === "productgroup");
@@ -1350,7 +1665,7 @@ function buildAsinLookup(doc) {
     const group = pgCol ? row[pgCol] : null;
     lookup[asin] = {
       product_group: group,
-      flavor: canonicalizeFlavor(group, flCol ? row[flCol] : null),
+      flavor: canonicalizeFlavor(taxonomyGroups, group, flCol ? row[flCol] : null),
       pack_size: packCol ? row[packCol] : null,
     };
   }
@@ -1363,8 +1678,8 @@ function buildAsinLookup(doc) {
 // "Variety (Thins)"/"Variety (Cookie)"). Rather than requiring the product
 // table itself to be edited to match, treat a value as a match if it's an
 // unambiguous prefix of exactly one known flavor in that group.
-function canonicalizeFlavor(group, rawFlavor) {
-  const flavors = PRODUCT_TAXONOMY[group];
+function canonicalizeFlavor(taxonomyGroups, group, rawFlavor) {
+  const flavors = taxonomyGroups[group];
   const flavor = String(rawFlavor || "").trim();
   if (!flavors || !flavor) return flavor;
   if (flavors.includes(flavor)) return flavor;
@@ -2103,19 +2418,14 @@ export default {
 
     if (url.pathname === "/api/reviews/report" && request.method === "GET") {
       try {
-        const report = await getReviewReportData(env);
+        const source = url.searchParams.get("source") || "all";
+        const report = await getReviewReportData(env, source);
         if (!report) {
           return jsonResponse(
-            { error: "No structured review report data found. Re-upload via the review JSON validator." },
+            { error: "No reviews found for that source yet. Import some via Update Reviews." },
             404,
           );
         }
-
-        // Overlay live platform (Amazon listing) numbers from D1, where
-        // available — falls back to the R2-baked values for anything not
-        // yet uploaded through the platform-metrics tool.
-        const platformSummary = await getPlatformMetricsSummary(env);
-        applyPlatformMetrics(report, platformSummary);
 
         // Recommendations are served from a separate endpoint (see
         // /api/reviews/recommendations below) — they require an AI Gateway
@@ -2134,8 +2444,12 @@ export default {
         const rows = Array.isArray(body?.rows) ? body.rows : null;
         if (!rows) return jsonResponse({ error: "Request body must include a 'rows' array." }, 400);
 
-        const [existingMap, productTable] = await Promise.all([getPlatformMetricMappings(env), getProductTable(env)]);
-        const asinLookup = buildAsinLookup(productTable);
+        const [existingMap, productTable, taxonomyGroups] = await Promise.all([
+          getPlatformMetricMappings(env),
+          getProductTable(env),
+          getTaxonomyGroups(env),
+        ]);
+        const asinLookup = buildAsinLookup(productTable, taxonomyGroups);
 
         const annotated = rows.map((r) => {
           const itemName = String(r.item_name || "").trim();
@@ -2163,7 +2477,7 @@ export default {
           };
         });
 
-        return jsonResponse({ rows: annotated, taxonomy: PRODUCT_TAXONOMY });
+        return jsonResponse({ rows: annotated, taxonomy: taxonomyGroups });
       } catch (err) {
         return jsonResponse({ error: err.message }, 500);
       }
@@ -2177,8 +2491,9 @@ export default {
           return jsonResponse({ error: "Request body must include a non-empty 'rows' array." }, 400);
         }
 
+        const taxonomyGroups = await getTaxonomyGroups(env);
         for (const r of rows) {
-          const validFlavors = PRODUCT_TAXONOMY[r.product_group];
+          const validFlavors = taxonomyGroups[r.product_group];
           if (!validFlavors || !validFlavors.includes(r.flavor)) {
             return jsonResponse(
               { error: `Unknown product group/flavor "${r.product_group} / ${r.flavor}" for item "${r.item_name}".` },
@@ -2246,27 +2561,73 @@ export default {
       }
     }
 
+    // Amazon rows arrive already tagged with a canonical product_group/flavor
+    // (picked per-file from the taxonomy dropdown in the browser), so they
+    // resolve straight against product_taxonomy. Okendo rows arrive with a
+    // raw productName that has to go through product_aliases (source
+    // 'okendo_name') first — auto-suggested via suggestPlatformMapping()
+    // where no alias exists yet, same conservative logic platform-metrics
+    // imports already use. Both branches return one entry per row plus a
+    // deduped `productMappings` map (Okendo only) so the UI can show one
+    // correction control per distinct product name instead of per row.
+    async function resolveImportTaxonomy(env, source, normalizedRows) {
+      if (source === "amazon") {
+        const idMap = await getTaxonomyIdMap(env);
+        const rows = normalizedRows.map((r) => {
+          const key = `${r.product_group}::${r.flavor}`;
+          const taxonomyId = idMap.get(key) || null;
+          return { ...r, taxonomyId, needsReview: !taxonomyId, matchedBy: taxonomyId ? "selected" : "unmatched" };
+        });
+        return { rows, productMappings: {} };
+      }
+
+      const rawNames = normalizedRows.map((r) => r.raw_product_name);
+      const aliasMap = await resolveAliasesBulk(env, "okendo_name", rawNames);
+      const productMappings = {};
+      const rows = normalizedRows.map((r) => {
+        const alias = aliasMap.get(r.raw_product_name);
+        const guess = alias ? null : suggestPlatformMapping(r.raw_product_name);
+        const product_group = alias?.product_group ?? guess?.product_group ?? "";
+        const flavor = alias?.flavor ?? guess?.flavor ?? "";
+        const taxonomyId = alias?.taxonomyId ?? null;
+        const matchedBy = alias ? (alias.autoSuggested ? "remembered-unconfirmed" : "remembered") : guess ? "guessed" : "unmatched";
+        if (!productMappings[r.raw_product_name]) {
+          productMappings[r.raw_product_name] = { product_group, flavor, matchedBy, count: 0 };
+        }
+        productMappings[r.raw_product_name].count += 1;
+        return { ...r, product_group, flavor, taxonomyId, needsReview: matchedBy !== "remembered", matchedBy };
+      });
+      return { rows, productMappings };
+    }
+
     if (url.pathname === "/api/reviews/import/preview" && request.method === "POST") {
       try {
         const body = await request.json().catch(() => null);
+        const source = body?.source === "okendo" ? "okendo" : body?.source === "amazon" ? "amazon" : null;
         const rows = Array.isArray(body?.rows) ? body.rows : null;
+        if (!source) return jsonResponse({ error: "Request body must include source: 'amazon' or 'okendo'." }, 400);
         if (!rows) return jsonResponse({ error: "Request body must include a 'rows' array." }, 400);
 
-        const previousReport = await getReviewReportData(env);
-        const existingIds = new Set((previousReport?.reviews || []).map((r) => r.id));
-
-        const normalized = rows.map((r) => normalizeIncomingReview(r));
+        const normalized = rows.map(REVIEW_NORMALIZERS[source]);
         const noId = normalized.filter((r) => !r.id);
         const withId = normalized.filter((r) => r.id);
-        const duplicates = withId.filter((r) => existingIds.has(r.id));
+
+        const existingIds = await findExistingReviewIds(env, source, withId.map((r) => r.id));
         const fresh = withId.filter((r) => !existingIds.has(r.id));
+        const duplicates = withId.filter((r) => existingIds.has(r.id));
+
+        const { rows: resolvedFresh, productMappings } = await resolveImportTaxonomy(env, source, fresh);
+        const needsReviewCount = resolvedFresh.filter((r) => r.needsReview).length;
 
         return jsonResponse({
+          source,
           totalIncoming: rows.length,
           newCount: fresh.length,
           duplicateCount: duplicates.length,
           skippedNoId: noId.length,
-          sample: fresh.slice(0, 25),
+          needsReviewCount,
+          productMappings,
+          sample: resolvedFresh.slice(0, 25),
         });
       } catch (err) {
         return jsonResponse({ error: err.message }, 500);
@@ -2276,26 +2637,119 @@ export default {
     if (url.pathname === "/api/reviews/import/commit" && request.method === "POST") {
       try {
         const body = await request.json().catch(() => null);
+        const source = body?.source === "okendo" ? "okendo" : body?.source === "amazon" ? "amazon" : null;
         const rows = Array.isArray(body?.rows) ? body.rows : null;
+        // { [rawProductName]: { product_group, flavor } } — corrections Chris
+        // made on the preview screen for Okendo names that guessed wrong or
+        // didn't match at all. Ignored for source "amazon".
+        const mappingOverrides = body?.mappingOverrides && typeof body.mappingOverrides === "object" ? body.mappingOverrides : {};
+        if (!source) return jsonResponse({ error: "Request body must include source: 'amazon' or 'okendo'." }, 400);
         if (!rows) return jsonResponse({ error: "Request body must include a 'rows' array." }, 400);
 
-        const previousReport = await getReviewReportData(env);
-        const existingReviews = previousReport?.reviews || [];
-        const existingIds = new Set(existingReviews.map((r) => r.id));
-
-        const normalized = rows.map((r) => normalizeIncomingReview(r));
-        const fresh = normalized.filter((r) => r.id && !existingIds.has(r.id));
+        const normalized = rows.map(REVIEW_NORMALIZERS[source]);
+        const withId = normalized.filter((r) => r.id);
+        const existingIds = await findExistingReviewIds(env, source, withId.map((r) => r.id));
+        const fresh = withId.filter((r) => !existingIds.has(r.id));
 
         if (fresh.length === 0) {
-          return jsonResponse({ ok: true, addedCount: 0, totalReviews: existingReviews.length, message: "No new reviews to add — every row was already in the database or missing a Review ID." });
+          return jsonResponse({
+            ok: true,
+            addedCount: 0,
+            skippedDuplicate: withId.length,
+            skippedNoId: normalized.length - withId.length,
+            message: "No new reviews to add — every row was already in the database or missing an ID.",
+          });
         }
 
-        const allReviews = [...existingReviews, ...fresh];
-        const newReport = buildFullReviewReport(previousReport, allReviews);
+        let mapped;
+        if (source === "amazon") {
+          const idMap = await getTaxonomyIdMap(env);
+          mapped = [];
+          for (const r of fresh) {
+            let taxonomyId = idMap.get(`${r.product_group}::${r.flavor}`);
+            if (!taxonomyId && r.product_group && r.flavor) {
+              taxonomyId = await getOrCreateTaxonomy(env, r.product_group, r.flavor);
+              idMap.set(`${r.product_group}::${r.flavor}`, taxonomyId);
+            }
+            mapped.push({ ...r, taxonomyId: taxonomyId || null });
+          }
+        } else {
+          const idMap = new Map(); // raw_product_name -> taxonomyId, resolved once per unique name
+          mapped = [];
+          for (const r of fresh) {
+            const rawName = r.raw_product_name;
+            if (!idMap.has(rawName)) {
+              const override = mappingOverrides[rawName];
+              const alias = override ? null : await resolveAlias(env, "okendo_name", rawName);
+              const guess = override || alias || suggestPlatformMapping(rawName);
+              let taxonomyId = null;
+              if (guess?.product_group && guess?.flavor) {
+                taxonomyId = await getOrCreateTaxonomy(env, guess.product_group, guess.flavor);
+                await upsertAlias(env, { taxonomyId, source: "okendo_name", rawValue: rawName, autoSuggested: false });
+              }
+              idMap.set(rawName, taxonomyId);
+            }
+            mapped.push({ ...r, taxonomyId: idMap.get(rawName) });
+          }
+        }
 
-        await env.CPG_DATA.put("reviews/ebe_review_data_updated.json", JSON.stringify(newReport));
+        const skippedNoMapping = mapped.filter((r) => !r.taxonomyId);
+        const toInsert = mapped.filter((r) => r.taxonomyId);
 
-        return jsonResponse({ ok: true, addedCount: fresh.length, totalReviews: allReviews.length });
+        await insertReviewsBatch(env, toInsert, source, body.sourceFile || null);
+
+        const totalForSource = await countReviews(env, source);
+
+        return jsonResponse({
+          ok: true,
+          addedCount: toInsert.length,
+          skippedDuplicate: withId.length - fresh.length,
+          skippedNoId: normalized.length - withId.length,
+          skippedNoMapping: skippedNoMapping.length,
+          skippedNoMappingNames: [...new Set(skippedNoMapping.map((r) => r.raw_product_name))],
+          totalReviews: totalForSource,
+        });
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/reviews/export.csv" && request.method === "GET") {
+      try {
+        const source = url.searchParams.get("source") || "all";
+        const reviews = await getReviewData(env, null, source);
+        return new Response(reviewsToCsv(reviews), {
+          headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": `attachment; filename="ebe-reviews-${source}.csv"`,
+          },
+        });
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/product-taxonomy" && request.method === "GET") {
+      try {
+        return jsonResponse(await getTaxonomyWithAliases(env));
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/product-taxonomy/alias" && request.method === "PUT") {
+      try {
+        const body = await request.json().catch(() => null);
+        const source = String(body?.source || "").trim();
+        const rawValue = String(body?.raw_value || "").trim();
+        const productGroup = String(body?.product_group || "").trim();
+        const flavor = String(body?.flavor || "").trim();
+        if (!source || !rawValue || !productGroup || !flavor) {
+          return jsonResponse({ error: "Request body must include source, raw_value, product_group, and flavor." }, 400);
+        }
+        const taxonomyId = await getOrCreateTaxonomy(env, productGroup, flavor);
+        await upsertAlias(env, { taxonomyId, source, rawValue, autoSuggested: false });
+        return jsonResponse({ ok: true, taxonomy_id: taxonomyId, product_group: productGroup, flavor });
       } catch (err) {
         return jsonResponse({ error: err.message }, 500);
       }
