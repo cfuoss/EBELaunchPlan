@@ -171,6 +171,20 @@ async function getReviewData(env, limit = null) {
   return reviews;
 }
 
+// Returns the full precomputed report object (meta, overall_stats,
+// overall_themes, groups, group_order, flavor_summary, reviews) as stored by
+// the upload tool — the same shape build_report.py produces. Older uploads
+// stored as a flat reviews array have no report structure, so this returns
+// null for those (getReviewData above still works for the flat-array case).
+async function getReviewReportData(env) {
+  const object = await env.CPG_DATA.get("reviews/ebe_review_data_updated.json");
+  if (!object) return null;
+
+  const data = await object.json();
+  if (Array.isArray(data)) return null;
+  return data;
+}
+
 // --- SOP data access helpers (Gatekeeper-ready: no HTTP/req logic inside) ---
 const SOP_ID_PATTERN = /^[a-z0-9-]+$/;
 
@@ -213,7 +227,7 @@ const WEEKLY_DATA_SOURCES = {
   plan: {
     rawKey: "weekly-data/2026-plan-latest.xlsx",
     parsedKey: "weekly-data/2026-plan-latest.parsed.json",
-    version: 1,
+    version: 3,
   },
 };
 
@@ -363,18 +377,29 @@ function selectIssuesView(allIssues, referenceDate) {
 
 const PLAN_SHEET_NAME = "Master Plnr";
 const PLAN_HEADER_ROW = 3; // row 4, 0-indexed
+const PLAN_SALES_UOM_COL = 4; // column E
+const PLAN_POSTING_GROUP_COL = 5; // column F
 const PLAN_STATUS_COL = 6; // column G
 const PLAN_FIRST_WEEK_COL = 7; // column H
 
+function addTo(map, key, amount) {
+  map[key] = (map[key] || 0) + amount;
+}
+
 // Parses every weekly column in the sheet (expensive xlsx work — this is what
-// gets cached). Returns each week's Monday (UTC midnight ms) and the summed
-// case count across Active-status rows for that week.
+// gets cached). Returns each week's Monday (UTC midnight ms), the summed case
+// count across Active-status rows for that week, and that same total broken
+// down by Sales Unit of Measure and by Gen. Prod. Posting Group.
 function parseShipmentWeeks(workbookBuffer) {
   const wb = XLSX.read(workbookBuffer, { type: "array", cellDates: true });
   const ws = wb.Sheets[PLAN_SHEET_NAME];
   if (!ws || !ws["!ref"]) return { weeks: [] };
 
   const range = XLSX.utils.decode_range(ws["!ref"]);
+  const cellVal = (r, c) => {
+    const cell = ws[XLSX.utils.encode_cell({ r, c })];
+    return cell && cell.v != null ? String(cell.v).trim() : "";
+  };
 
   const weekCols = [];
   for (let c = PLAN_FIRST_WEEK_COL; c <= range.e.c; c++) {
@@ -388,19 +413,43 @@ function parseShipmentWeeks(workbookBuffer) {
   }
 
   const totals = weekCols.map(() => 0);
+  const byUnit = weekCols.map(() => ({}));
+  const byPostingGroup = weekCols.map(() => ({}));
+  const items = [];
+
   for (let r = PLAN_HEADER_ROW + 1; r <= range.e.r; r++) {
-    const statusCell = ws[XLSX.utils.encode_cell({ r, c: PLAN_STATUS_COL })];
-    const status = statusCell && statusCell.v != null ? String(statusCell.v).trim() : "";
+    const status = cellVal(r, PLAN_STATUS_COL);
     if (status !== "Active") continue;
-    weekCols.forEach((wc, i) => {
+    const description = cellVal(r, 2) || "Unspecified item"; // column C
+    const unit = cellVal(r, PLAN_SALES_UOM_COL) || "Unspecified";
+    const group = cellVal(r, PLAN_POSTING_GROUP_COL) || "Unspecified";
+
+    const itemCases = weekCols.map((wc, i) => {
       const cell = ws[XLSX.utils.encode_cell({ r, c: wc.col })];
       const v = cell && typeof cell.v === "number" ? cell.v : 0;
+      if (!v) return 0;
       totals[i] += v;
+      addTo(byUnit[i], unit, v);
+      addTo(byPostingGroup[i], group, v);
+      return Math.round(v);
     });
+
+    if (itemCases.some((v) => v > 0)) {
+      items.push({ description, unit, postingGroup: group, cases: itemCases });
+    }
   }
 
+  const round = (n) => Math.round(n);
+  const roundMap = (m) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, round(v)]));
+
   return {
-    weeks: weekCols.map((wc, i) => ({ weekStart: wc.weekStart, cases: Math.round(totals[i]) })),
+    weeks: weekCols.map((wc, i) => ({
+      weekStart: wc.weekStart,
+      cases: round(totals[i]),
+      byUnit: roundMap(byUnit[i]),
+      byPostingGroup: roundMap(byPostingGroup[i]),
+    })),
+    items,
   };
 }
 
@@ -414,23 +463,52 @@ function mondayOfWeekUTC(referenceDate) {
   return d.getTime();
 }
 
+// Categories get a stable color slot by alphabetical order (never re-cycled
+// per request), so the same unit/group always renders the same color across
+// page loads even as the 5-week window advances week to week.
+function fixedCategoryOrder(weeks, key) {
+  const names = new Set();
+  weeks.forEach((w) => Object.keys(w[key]).forEach((name) => names.add(name)));
+  return [...names].sort();
+}
+
 // Cheap, always-live: picks the current week's column plus the next 4 out of
 // an already-parsed week list, based on referenceDate. Never cached — this is
 // the part that must never go stale between uploads.
-function selectShipmentWindow(allWeeks, referenceDate) {
+function selectShipmentWindow(allWeeks, referenceDate, items = []) {
   const mondayMs = mondayOfWeekUTC(referenceDate);
   let startIdx = allWeeks.findIndex((w) => w.weekStart >= mondayMs);
   if (startIdx === -1) startIdx = Math.max(0, allWeeks.length - 5);
   const slice = allWeeks.slice(startIdx, startIdx + 5);
   const total = slice.reduce((sum, w) => sum + w.cases, 0);
-  return { weeks: slice, total };
+
+  // Same startIdx/window applied to each item's per-week case array (aligned
+  // index-for-index with allWeeks) — only items with any volume in this
+  // specific window are worth showing in the full-detail table.
+  const itemsWindow = items
+    .map((item) => {
+      const cases = item.cases.slice(startIdx, startIdx + 5);
+      return { description: item.description, unit: item.unit, postingGroup: item.postingGroup, cases, total: cases.reduce((s, v) => s + v, 0) };
+    })
+    .filter((item) => item.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  return {
+    weeks: slice.map((w) => ({ weekStart: w.weekStart, cases: w.cases })),
+    total,
+    units: fixedCategoryOrder(slice, "byUnit"),
+    byUnit: slice.map((w) => ({ weekStart: w.weekStart, values: w.byUnit })),
+    postingGroups: fixedCategoryOrder(slice, "byPostingGroup"),
+    byPostingGroup: slice.map((w) => ({ weekStart: w.weekStart, values: w.byPostingGroup })),
+    items: itemsWindow,
+  };
 }
 
 // Self-contained/testable: parses the workbook and windows it in one call
 // given any referenceDate, without needing to know about the R2 cache below.
 function parseShipmentForecast(workbookBuffer, referenceDate) {
-  const { weeks } = parseShipmentWeeks(workbookBuffer);
-  return selectShipmentWindow(weeks, referenceDate);
+  const { weeks, items } = parseShipmentWeeks(workbookBuffer);
+  return selectShipmentWindow(weeks, referenceDate, items);
 }
 
 // Loads a source's cached parse if it's still fresh for the raw object's
@@ -464,18 +542,18 @@ async function getIssuesOpportunities(env, referenceDate) {
   );
   if (!result) return null;
   const { departments, resolvedThisWeek } = selectIssuesView(result.parsed.allIssues, referenceDate);
-  return { sourceTab: result.parsed.sourceTab, departments, resolvedThisWeek };
+  return { sourceTab: result.parsed.sourceTab, departments, resolvedThisWeek, sourceFileUpdated: result.lastModified };
 }
 
 async function getShipmentWeeks(env) {
   const result = await getCachedParse(env, WEEKLY_DATA_SOURCES.plan, parseShipmentWeeks);
   if (!result) return null;
-  return { weeks: result.parsed.weeks, sourceFileUpdated: result.lastModified };
+  return { weeks: result.parsed.weeks, items: result.parsed.items || [], sourceFileUpdated: result.lastModified };
 }
 
 function getReviewFreshness(reviews, referenceDate) {
   if (!reviews || reviews.length === 0) {
-    return { newestDate: null, addedLast7Days: 0 };
+    return { newestDate: null, addedLast7Days: 0, addedLast7DaysIds: [] };
   }
   const dates = reviews.map((r) => r.date).filter((d) => typeof d === "string").sort();
   const newestDate = dates.length ? dates[dates.length - 1] : null;
@@ -483,9 +561,9 @@ function getReviewFreshness(reviews, referenceDate) {
   const cutoff = new Date(referenceDate);
   cutoff.setUTCDate(cutoff.getUTCDate() - 7);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
-  const addedLast7Days = reviews.filter((r) => typeof r.date === "string" && r.date >= cutoffStr).length;
+  const recentIds = reviews.filter((r) => typeof r.date === "string" && r.date >= cutoffStr).map((r) => r.id);
 
-  return { newestDate, addedLast7Days };
+  return { newestDate, addedLast7Days: recentIds.length, addedLast7DaysIds: recentIds };
 }
 
 async function getLatestSop(env) {
@@ -496,28 +574,802 @@ async function getLatestSop(env) {
   );
 }
 
-// Fallback content for the "Today" reviews tile when nothing new came in this
-// week: the most recent positive and negative reviews, for the auto-scrolling
-// carousel. Only computed when it'll actually be used (see getNewsSummary).
-function getReviewHighlights(reviews, count = 10) {
-  if (!reviews || reviews.length === 0) return { positive: [], negative: [] };
-  const byDateDesc = (a, b) => (b.date || "").localeCompare(a.date || "");
-  const pick = (sentiment) =>
-    reviews
-      .filter((r) => String(r.sentiment || "").toLowerCase() === sentiment)
-      .sort(byDateDesc)
-      .slice(0, count)
-      .map((r) => ({
-        id: r.id,
-        title: r.title,
-        content: r.content,
-        rating: r.rating,
-        author: r.author,
-        date: r.date,
-        flavor: r.flavor,
-        productGroup: r.product_group,
-      }));
-  return { positive: pick("positive"), negative: pick("negative") };
+// Always-on breakdown for the reviews carousel: the most recent `sampleSize`
+// reviews by date, split into positive/negative (by the stored sentiment
+// field) for the two scrolling rows, plus the count of each — so the
+// carousel has something to show regardless of how recently reviews came in.
+function getReviewHighlights(reviews, sampleSize = 20) {
+  if (!reviews || reviews.length === 0) {
+    return { sampleSize: 0, positiveCount: 0, negativeCount: 0, neutralCount: 0, positive: [], negative: [], neutral: [] };
+  }
+  const recent = reviews
+    .filter((r) => typeof r.date === "string")
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, sampleSize);
+
+  const toChip = (r) => ({
+    id: r.id,
+    title: r.title,
+    content: r.content,
+    rating: r.rating,
+    author: r.author,
+    date: r.date,
+    flavor: r.flavor,
+    productGroup: r.product_group,
+  });
+
+  const positive = recent.filter((r) => String(r.sentiment || "").toLowerCase() === "positive");
+  const negative = recent.filter((r) => String(r.sentiment || "").toLowerCase() === "negative");
+  // Everything left over (sentiment "neutral", missing, or unrecognized) —
+  // defined as the complement of positive/negative rather than a strict
+  // equality check, so this count always reconciles exactly with sampleSize.
+  const neutral = recent.filter((r) => {
+    const s = String(r.sentiment || "").toLowerCase();
+    return s !== "positive" && s !== "negative";
+  });
+
+  return {
+    sampleSize: recent.length,
+    positiveCount: positive.length,
+    negativeCount: negative.length,
+    neutralCount: neutral.length,
+    positive: positive.map(toChip),
+    negative: negative.map(toChip),
+    neutral: neutral.map(toChip),
+  };
+}
+
+// --- 30-day review sentiment analysis (AI Gateway-backed, cached by content
+// signature so a page left open with periodic refresh doesn't re-run Claude
+// unless the underlying 30-day review set actually changed) ---
+const SENTIMENT_ANALYSIS_WINDOW_DAYS = 30;
+const SENTIMENT_ANALYSIS_CACHE_KEY = "reviews/sentiment-analysis-cache.json";
+const SENTIMENT_ANALYSIS_MAX_REVIEWS_PER_SIDE = 60;
+// Bumped whenever the analysis JSON shape changes, so a code deploy
+// invalidates old cached results even though the review set (the other half
+// of the cache key) hasn't changed.
+const SENTIMENT_ANALYSIS_SCHEMA_VERSION = 2;
+
+function filterReviewsByWindow(reviews, referenceDate, days) {
+  const cutoff = new Date(referenceDate);
+  cutoff.setUTCDate(cutoff.getUTCDate() - days);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  return reviews.filter((r) => typeof r.date === "string" && r.date >= cutoffStr);
+}
+
+async function hashIds(ids) {
+  const data = new TextEncoder().encode(ids.slice().sort().join(","));
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function reviewsForPrompt(reviews) {
+  return reviews
+    .slice(0, SENTIMENT_ANALYSIS_MAX_REVIEWS_PER_SIDE)
+    .map((r) => `- [${r.id}] (${r.date}, ${r.rating}★, ${r.flavor || "unknown flavor"}) ${r.title || ""}: ${r.content || ""}`)
+    .join("\n");
+}
+
+const SENTIMENT_ANALYSIS_SYSTEM_PROMPT =
+  'You are a CPG customer insights analyst reviewing recent Amazon customer reviews for a snack brand. Each review below is prefixed with its ID in brackets, e.g. "[R1234ABC]". Respond with ONLY a single JSON object — no markdown fences, no commentary before or after — in exactly this shape: {"positiveSummary": string, "negativeSummary": string, "anomalies": [{"issue": string, "severity": "low"|"medium"|"high", "reviewIds": string[], "suggestedAction": string}]}. An anomaly is a cluster of 2 or more negative reviews describing the same or closely related problem (a specific defect, an off flavor or smell, a packaging issue, a formula change, etc.) — a single isolated complaint is not an anomaly. Always flag safety-related issues (illness, allergic reaction, foreign objects, spoilage/mold) as "high" severity even if only one review mentions it — a single review is enough for a safety anomaly. reviewIds must be the exact bracketed IDs (copied verbatim, no brackets) of every review that contributes to that anomaly — never invent an ID that wasn\'t given to you. Each suggestedAction should be a concrete, specific next step someone on the team could take. If there are no negative reviews, or no reviews at all for a side, say so plainly in that summary field and return an empty anomalies array. Ground every statement only in the reviews given — never invent details, flavors, or counts.';
+
+function parseJsonFromText(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start !== -1 && end !== -1 && end > start) {
+      return JSON.parse(text.slice(start, end + 1));
+    }
+    throw new Error("Could not find JSON in Claude's response");
+  }
+}
+
+async function analyzeRecentReviewSentiment(env, referenceDate = new Date()) {
+  const reviews = await getReviewData(env);
+  if (!reviews || reviews.length === 0) return null;
+
+  const recent = filterReviewsByWindow(reviews, referenceDate, SENTIMENT_ANALYSIS_WINDOW_DAYS);
+  const positive = recent.filter((r) => String(r.sentiment || "").toLowerCase() === "positive");
+  const negative = recent.filter((r) => String(r.sentiment || "").toLowerCase() === "negative");
+
+  const base = {
+    windowDays: SENTIMENT_ANALYSIS_WINDOW_DAYS,
+    positiveCount: positive.length,
+    negativeCount: negative.length,
+    totalCount: recent.length,
+    // Full pools behind the two summary cards — computed fresh every call
+    // (cheap, no LLM involved) so they're never stale relative to the cache.
+    positiveReviewIds: positive.map((r) => r.id),
+    negativeReviewIds: negative.map((r) => r.id),
+  };
+
+  if (recent.length === 0) {
+    return {
+      ...base,
+      positiveSummary: "No reviews in the last 30 days.",
+      negativeSummary: "No reviews in the last 30 days.",
+      anomalies: [],
+      generatedAt: null,
+      cached: false,
+    };
+  }
+
+  const signature = await hashIds(recent.map((r) => r.id));
+
+  const cachedObj = await env.CPG_DATA.get(SENTIMENT_ANALYSIS_CACHE_KEY);
+  if (cachedObj) {
+    try {
+      const cached = await cachedObj.json();
+      if (cached.signature === signature && cached.schemaVersion === SENTIMENT_ANALYSIS_SCHEMA_VERSION) {
+        return { ...base, ...cached.analysis, generatedAt: cached.generatedAt, cached: true };
+      }
+    } catch {
+      // fall through and regenerate
+    }
+  }
+
+  const prompt = `Positive reviews (past ${SENTIMENT_ANALYSIS_WINDOW_DAYS} days, ${positive.length} total):\n${reviewsForPrompt(positive) || "(none)"}\n\nNegative reviews (past ${SENTIMENT_ANALYSIS_WINDOW_DAYS} days, ${negative.length} total):\n${reviewsForPrompt(negative) || "(none)"}`;
+
+  const result = await postToClaude(
+    env,
+    {
+      model: CLAUDE_MODEL,
+      max_tokens: 1500,
+      system: SENTIMENT_ANALYSIS_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+    },
+    {},
+    { task: "sentiment_analysis_30d" },
+  );
+
+  const text = result.content?.[0]?.text || "{}";
+  const rawAnalysis = parseJsonFromText(text);
+  const generatedAt = new Date().toISOString();
+
+  // Cross-check Claude's cited review IDs against the actual negative-review
+  // set rather than trusting them blindly — drops any hallucinated ID and
+  // derives the displayed count from what's actually verifiable, since the
+  // "N reviews" link only works for IDs we can really look up.
+  const negativeIdSet = new Set(negative.map((r) => r.id));
+  const anomalies = (rawAnalysis.anomalies || [])
+    .map((a) => {
+      const reviewIds = Array.isArray(a.reviewIds) ? a.reviewIds.filter((id) => negativeIdSet.has(id)) : [];
+      return {
+        issue: a.issue,
+        severity: a.severity,
+        suggestedAction: a.suggestedAction,
+        reviewIds,
+        reviewCount: reviewIds.length,
+      };
+    })
+    .filter((a) => a.reviewCount > 0);
+
+  const analysis = {
+    positiveSummary: rawAnalysis.positiveSummary,
+    negativeSummary: rawAnalysis.negativeSummary,
+    anomalies,
+  };
+
+  await env.CPG_DATA.put(
+    SENTIMENT_ANALYSIS_CACHE_KEY,
+    JSON.stringify({ signature, schemaVersion: SENTIMENT_ANALYSIS_SCHEMA_VERSION, generatedAt, analysis }),
+  );
+
+  return { ...base, ...analysis, generatedAt, cached: false };
+}
+
+// --- Per-flavor action recommendations for the review sentiment report
+// (AI Gateway-backed, cached by content signature of each flavor's themes/
+// quotes so recommendations only regenerate when that underlying data
+// actually changes — same pattern as the 30-day sentiment cache above) ---
+const RECOMMENDATIONS_CACHE_KEY = "reviews/recommendations-cache.json";
+const RECOMMENDATIONS_SCHEMA_VERSION = 1;
+
+async function hashString(str) {
+  const data = new TextEncoder().encode(str);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function buildRecommendationPrompt(flavorEntries) {
+  return flavorEntries
+    .map((f) => {
+      const pos = f.themesPos.map((t) => `  + ${t.display} (${t.count}x): ${t.top_quote}`).join("\n") || "  (none)";
+      const neg = f.themesNeg.map((t) => `  - ${t.display} (${t.count}x): ${t.top_quote}`).join("\n") || "  (none)";
+      return `### ${f.group} :: ${f.flavor}\nStats: ${f.stats.count} written reviews, ${f.stats.pos_pct}% positive, ${f.stats.neg_pct}% negative, ${f.stats.avg_rating}★ avg\nTop positive themes:\n${pos}\nTop negative themes:\n${neg}`;
+    })
+    .join("\n\n");
+}
+
+const RECOMMENDATIONS_SYSTEM_PROMPT =
+  'You are a CPG listing strategist writing action recommendations for an Amazon review sentiment report. For each product group/flavor below, write 3-5 recommendation bullets grounded in the specific themes and quotes given — never generic advice. Each bullet should: quote or closely paraphrase the customer language that signals the issue or strength, state the concrete listing implication (copy change, A+ content, brand response, product fix, packaging change), and be specific about which theme/star cohort the signal comes from. Prioritize the top positive theme (feature it) and any negative themes with 2 or more mentions (address them, ranked by mention count — skip negative themes with only 1 mention unless it is a safety issue). Respond with ONLY a single JSON object — no markdown fences, no commentary before or after — shaped exactly like {"Group Name::Flavor Name": ["bullet 1", "bullet 2", "bullet 3"]}, with one key per group/flavor given, using the exact "Group Name::Flavor Name" strings provided. Keep each bullet to one or two sentences.';
+
+async function getFlavorRecommendations(env, report) {
+  const entries = [];
+  for (const group of report.group_order || []) {
+    const groupData = report.groups?.[group];
+    if (!groupData) continue;
+    for (const flavor of groupData.flavor_order || []) {
+      const flavorData = groupData.flavors?.[flavor];
+      if (!flavorData || flavorData.metric_only || !flavorData.stats?.count) continue;
+      entries.push({
+        group,
+        flavor,
+        stats: flavorData.stats,
+        themesPos: (flavorData.themes_pos || []).slice(0, 5),
+        themesNeg: (flavorData.themes_neg || []).slice(0, 5),
+      });
+    }
+  }
+
+  if (entries.length === 0) {
+    return { recommendations: {}, generatedAt: null, cached: false };
+  }
+
+  const signature = await hashString(JSON.stringify(entries));
+
+  const cachedObj = await env.CPG_DATA.get(RECOMMENDATIONS_CACHE_KEY);
+  if (cachedObj) {
+    try {
+      const cached = await cachedObj.json();
+      if (cached.signature === signature && cached.schemaVersion === RECOMMENDATIONS_SCHEMA_VERSION) {
+        return { recommendations: cached.recommendations, generatedAt: cached.generatedAt, cached: true };
+      }
+    } catch {
+      // fall through and regenerate
+    }
+  }
+
+  const prompt = buildRecommendationPrompt(entries);
+
+  const result = await postToClaude(
+    env,
+    {
+      model: CLAUDE_MODEL,
+      max_tokens: 6000,
+      system: RECOMMENDATIONS_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+    },
+    {},
+    { task: "flavor_recommendations" },
+  );
+
+  const text = result.content?.[0]?.text || "{}";
+  const recommendations = parseJsonFromText(text);
+  const generatedAt = new Date().toISOString();
+
+  await env.CPG_DATA.put(
+    RECOMMENDATIONS_CACHE_KEY,
+    JSON.stringify({ signature, schemaVersion: RECOMMENDATIONS_SCHEMA_VERSION, generatedAt, recommendations }),
+  );
+
+  return { recommendations, generatedAt, cached: false };
+}
+
+// --- Platform (Amazon listing) review metrics — uploaded from metric-data.xlsx
+// into D1 (secure_cpg_reviews), independent of the R2-stored written-review
+// database. Lets Chris re-upload metric-data at any time without needing to
+// re-run the full review-analysis pipeline, and keeps a persistent,
+// human-correctable item-name -> product group/flavor mapping so a bad
+// automatic keyword match (like the one that produced "74 reviews" for Sea
+// Salt Crispbread) gets caught before it reaches the report, not baked in
+// silently. ---
+
+const PRODUCT_TAXONOMY = {
+  Thins: ["Cheese-Less", "Chive & Garlic", "Fiery Chile Lime", "Sea Salt Chia", "Variety (Thins)"],
+  Cookies: ["Chocolate Chip", "Cranberry Vanilla", "Ginger Cinnamon", "Variety (Cookie)"],
+  "Crispbread Crackers": ["Cranberry", "White Pepper & Garlic", "Sea Salt", "Variety"],
+  Pretzel: ["Pretzel"],
+};
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+// Best-effort auto-suggestion for an unmapped item name. Deliberately
+// conservative: a name that mentions more than one product line (a
+// cross-category variety pack) or doesn't clearly match any flavor keyword
+// returns null rather than guessing, so it surfaces for manual review
+// instead of silently landing in the wrong bucket.
+function suggestPlatformMapping(itemName) {
+  const name = String(itemName || "").toLowerCase().trim();
+  if (!name) return null;
+
+  const mentions = {
+    pretzel: name.includes("pretzel"),
+    crispbread: name.includes("crispbread"),
+    cookie: name.includes("cookie"),
+    // "cracker" alone isn't enough to flag this as a separate category — the
+    // "Crispbread Crackers" line contains that substring too, which would
+    // otherwise make every Crispbread item look cross-category.
+    thin: !name.includes("crispbread") && (name.includes("thin") || name.includes("cracker")),
+  };
+  const categoryCount = Object.values(mentions).filter(Boolean).length;
+  if (categoryCount > 1 && name.includes("variety")) return null;
+
+  if (mentions.pretzel) return { product_group: "Pretzel", flavor: "Pretzel" };
+
+  if (mentions.crispbread) {
+    if (name.includes("white pepper")) return { product_group: "Crispbread Crackers", flavor: "White Pepper & Garlic" };
+    if (name.includes("sea salt")) return { product_group: "Crispbread Crackers", flavor: "Sea Salt" };
+    if (name.includes("cranberry")) return { product_group: "Crispbread Crackers", flavor: "Cranberry" };
+    if (name.includes("variety")) return { product_group: "Crispbread Crackers", flavor: "Variety" };
+    return null;
+  }
+
+  if (mentions.cookie) {
+    if (name.includes("chocolate chip")) return { product_group: "Cookies", flavor: "Chocolate Chip" };
+    if (name.includes("cranberry")) return { product_group: "Cookies", flavor: "Cranberry Vanilla" };
+    if (name.includes("ginger")) return { product_group: "Cookies", flavor: "Ginger Cinnamon" };
+    if (name.includes("variety")) return { product_group: "Cookies", flavor: "Variety (Cookie)" };
+    return null;
+  }
+
+  if (mentions.thin) {
+    if (name.includes("cheese")) return { product_group: "Thins", flavor: "Cheese-Less" };
+    if (name.includes("chive") || name.includes("garlic")) return { product_group: "Thins", flavor: "Chive & Garlic" };
+    if (name.includes("fiery") || name.includes("chile") || name.includes("flame")) return { product_group: "Thins", flavor: "Fiery Chile Lime" };
+    if (name.includes("sea salt")) return { product_group: "Thins", flavor: "Sea Salt Chia" };
+    if (name.includes("variety")) return { product_group: "Thins", flavor: "Variety (Thins)" };
+    return null;
+  }
+
+  return null;
+}
+
+async function getPlatformMetricMappings(env) {
+  const { results } = await env.secure_cpg_reviews.prepare("SELECT * FROM platform_metric_map").all();
+  const map = {};
+  for (const row of results) {
+    map[row.item_name] = { product_group: row.product_group, flavor: row.flavor, autoSuggested: !!row.auto_suggested };
+  }
+  return map;
+}
+
+// Each metric-data.xlsx upload is a full snapshot, not incremental data, so
+// this replaces the whole table in one batch (same whole-list-replace
+// pattern as the marketing promotions/campaigns tables above).
+async function replacePlatformMetricRows(env, rows, sourceFile) {
+  const db = env.secure_cpg_reviews;
+  const uploadedAt = new Date().toISOString();
+  const statements = [db.prepare("DELETE FROM platform_metric_rows")];
+  for (const r of rows) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO platform_metric_rows
+             (item_name, product_group, flavor, review_count, star_rating, refund_rate, ordered_units, ordered_revenue, raw_product_group, uploaded_at, source_file)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          r.item_name,
+          r.product_group,
+          r.flavor,
+          r.review_count,
+          r.star_rating,
+          r.refund_rate ?? null,
+          r.ordered_units ?? null,
+          r.ordered_revenue ?? null,
+          r.raw_product_group ?? null,
+          uploadedAt,
+          sourceFile ?? null,
+        ),
+    );
+  }
+  await db.batch(statements);
+}
+
+async function upsertPlatformMetricMappings(env, mappings) {
+  if (mappings.length === 0) return;
+  const db = env.secure_cpg_reviews;
+  const updatedAt = new Date().toISOString();
+  const statements = mappings.map((m) =>
+    db
+      .prepare(
+        `INSERT INTO platform_metric_map (item_name, product_group, flavor, auto_suggested, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(item_name) DO UPDATE SET
+           product_group = excluded.product_group,
+           flavor = excluded.flavor,
+           auto_suggested = excluded.auto_suggested,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(m.item_name, m.product_group, m.flavor, m.autoSuggested ? 1 : 0, updatedAt),
+  );
+  await db.batch(statements);
+}
+
+// Dedupes by (group, flavor, review_count, star_rating): different SKU/pack
+// rows for the same Amazon listing (variation children) report identical
+// numbers because they share one review pool, so counting each row would
+// multiply-count the same reviews. Rows with genuinely different numbers are
+// summed as distinct listings. Mirrors the original build_report.py logic.
+function aggregatePlatformMetrics(rows) {
+  const seen = new Set();
+  const perFlavor = {};
+  for (const r of rows) {
+    const dedupKey = `${r.product_group}::${r.flavor}::${r.review_count}::${r.star_rating}`;
+    if (seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
+
+    const key = `${r.product_group}::${r.flavor}`;
+    if (!perFlavor[key]) perFlavor[key] = { reviews: 0, wtdSum: 0 };
+    perFlavor[key].reviews += r.review_count;
+    perFlavor[key].wtdSum += r.review_count * r.star_rating;
+  }
+
+  const result = {};
+  for (const [key, v] of Object.entries(perFlavor)) {
+    result[key] = { reviews: v.reviews, rating: v.reviews > 0 ? round2(v.wtdSum / v.reviews) : 0 };
+  }
+  return result;
+}
+
+async function getPlatformMetricsSummary(env) {
+  const { results } = await env.secure_cpg_reviews
+    .prepare("SELECT product_group, flavor, review_count, star_rating FROM platform_metric_rows")
+    .all();
+  if (results.length === 0) return null;
+  return aggregatePlatformMetrics(results);
+}
+
+// Overlays D1-sourced platform numbers onto the R2-stored report, per
+// (group, flavor) — only for pairs the D1 summary actually has data for, so
+// anything not yet uploaded keeps its existing R2-baked value rather than
+// getting zeroed out. Group- and meta-level platform totals are then
+// recomputed as a weighted rollup of the (possibly overridden) flavor
+// numbers, so every level of the report stays internally consistent.
+function applyPlatformMetrics(report, summary) {
+  if (!summary) return report;
+
+  let totalReviews = 0;
+  let totalWtdSum = 0;
+
+  for (const group of report.group_order || []) {
+    const groupData = report.groups[group];
+    let groupReviews = 0;
+    let groupWtdSum = 0;
+
+    for (const flavor of groupData.flavor_order || []) {
+      const key = `${group}::${flavor}`;
+      const override = summary[key];
+      const flavorData = groupData.flavors[flavor];
+      if (override) {
+        flavorData.platform_reviews = override.reviews;
+        flavorData.platform_wtd_rating = override.rating;
+
+        const summaryRow = (report.flavor_summary || []).find(
+          (r) => r.product_group === group && r.flavor === flavor,
+        );
+        if (summaryRow) {
+          summaryRow.platform_reviews = override.reviews;
+          summaryRow.platform_wtd_rating = override.rating;
+        }
+      }
+      groupReviews += flavorData.platform_reviews || 0;
+      groupWtdSum += (flavorData.platform_reviews || 0) * (flavorData.platform_wtd_rating || 0);
+    }
+
+    groupData.platform_reviews = groupReviews;
+    groupData.platform_wtd_rating = groupReviews > 0 ? round2(groupWtdSum / groupReviews) : 0;
+
+    totalReviews += groupReviews;
+    totalWtdSum += groupWtdSum;
+  }
+
+  report.meta = report.meta || {};
+  report.meta.total_platform_reviews = totalReviews;
+  report.meta.total_platform_wtd_rating = totalReviews > 0 ? round2(totalWtdSum / totalReviews) : 0;
+
+  return report;
+}
+
+// --- Review database import — merges newly scraped Amazon review exports
+// into the existing review set (deduped by Review ID) and rebuilds every
+// derived field (sentiment counts, theme frequencies, top quotes, flavor
+// summary) from the combined set. Ports the same classification rules
+// amazon-review-sentiment-report's build_report.py used, so a review added
+// here reads identically to one that went through the original skill.
+// Nothing separately "refreshes" the sentiment report or homepage after
+// this runs — both already read this same R2 object live on every request
+// (the report via /api/reviews/report, the homepage's Reviews tile via
+// /api/news-summary), so writing the merged JSON here is the whole update. ---
+
+const REVIEW_THEME_DEFS = [
+  ["great_taste", "Great Taste", "positive", /delici|tasty|yummy|yum\b|love.{0,15}flavor|amazing.{0,10}taste|so good|great taste|wonderful flavor|wonderful taste/i],
+  ["crunch_texture", "Crunch / Texture", "positive", /crisp|crunch|crunchy|texture/i],
+  ["gluten_free", "Gluten-Free", "positive", /gluten.?free|gluten free/i],
+  ["dairy_free_vegan", "Dairy-Free / Vegan", "positive", /dairy.?free|dairy free|vegan/i],
+  ["allergy_friendly", "Allergy-Friendly", "positive", /nut.?free|nut free|allergy|allerg|school safe|allergen/i],
+  ["good_replacement", "Good Replacement", "positive", /alternative|replacement|instead of|substitute|swap/i],
+  ["repeat_purchase", "Repeat Purchase", "positive", /buy again|will order|reorder|repurchase|keep buying|stock up/i],
+  ["clean_ingredients", "Clean Ingredients", "positive", /clean ingredient|simple ingredient|real ingredient|minimal ingredient|whole food/i],
+  ["addictive", "Addictive", "positive", /can.t stop|addictive|addicted|one more|hard to stop/i],
+  ["value_price", "Good Value", "positive", /worth.{0,10}(price|money|it)|great value|good price|affordable/i],
+  ["broken_crumbs", "Broken / Crumbs", "negative", /broken|crumbs|crumbled|crushed|shattered|in pieces/i],
+  ["bland_flavor", "Bland / Dry", "negative", /bland|dry\b|flavorless|tasteless|no flavor|boring|watery|not much flavor/i],
+  ["too_spicy", "Too Spicy", "negative", /too spicy|too hot|very spicy|burn.{0,15}mouth|spice.{0,10}too much/i],
+  ["too_salty", "Too Salty", "negative", /too salt|very salt|overly salt|way too salt/i],
+  ["packaging", "Packaging Issues", "negative", /packag|reseal|seal|bag.{0,15}(broke|open|problem)|zip/i],
+  ["small_quantity", "Small / Overpriced", "negative", /not enough|small amount|tiny.{0,10}(portion|amount|serving)|overpriced|too expensive|not worth.{0,10}(price|money)/i],
+  ["arrived_damaged", "Arrived Damaged", "negative", /arriv.{0,10}(damaged|broken|crushed|smashed)|damaged.{0,10}shipping|shipping damage/i],
+  ["stale", "Stale", "negative", /stale|old\b|expired|not fresh|gone bad/i],
+  ["false_advertising", "False Advertising", "negative", /mislead|false.{0,15}(claim|label|ad)|lie|not as describ|bait.{0,5}switch|misrepresent/i],
+  ["texture_issue", "Texture Issue", "negative", /mushy|soggy|too (hard|tough|dense)|chip.{0,10}tooth|rock hard/i],
+  ["not_pretzel", "Doesn't Taste Like Pretzel", "negative", /not.{0,10}pretzel|nothing like.{0,10}pretzel|doesn.t taste like.{0,10}pretzel|not a (real )?pretzel/i],
+  ["palm_oil", "Palm Oil Alert", "negative", /palm oil|hidden.{0,10}(ingredient|oil)|unlisted.{0,10}ingredient/i],
+];
+
+function classifyReviewSentiment(rating) {
+  const r = Math.round(Number(rating));
+  if (r >= 4) return "positive";
+  if (r === 3) return "neutral";
+  return "negative";
+}
+
+function detectReviewThemes(text) {
+  const found = [];
+  for (const [key, , , pattern] of REVIEW_THEME_DEFS) {
+    if (pattern.test(text)) found.push(key);
+  }
+  return found;
+}
+
+function computeReviewStats(reviews) {
+  const n = reviews.length;
+  if (n === 0) {
+    return { count: 0, positive: 0, neutral: 0, negative: 0, pos_pct: 0, neu_pct: 0, neg_pct: 0, avg_rating: 0, stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+  }
+  const positive = reviews.filter((r) => r.sentiment === "positive").length;
+  const neutral = reviews.filter((r) => r.sentiment === "neutral").length;
+  const negative = reviews.filter((r) => r.sentiment === "negative").length;
+  const rated = reviews.filter((r) => r.rating > 0);
+  const avg_rating = rated.length ? round2(rated.reduce((s, r) => s + r.rating, 0) / rated.length) : 0;
+  const stars = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  for (const r of reviews) if (stars[r.rating] !== undefined) stars[r.rating]++;
+  return {
+    count: n,
+    positive,
+    neutral,
+    negative,
+    pos_pct: round2((positive / n) * 100),
+    neu_pct: round2((neutral / n) * 100),
+    neg_pct: round2((negative / n) * 100),
+    avg_rating,
+    stars,
+  };
+}
+
+function computeReviewThemeStats(reviews, polarity) {
+  const defs = REVIEW_THEME_DEFS.filter((t) => !polarity || t[2] === polarity);
+  const counts = {};
+  const quotes = {};
+  for (const r of reviews) {
+    for (const [key] of defs) {
+      if (!r.themes.includes(key)) continue;
+      counts[key] = (counts[key] || 0) + 1;
+      const snippet = (r.title ? r.title + " — " : "") + String(r.content || "").slice(0, 180);
+      if (!quotes[key] || snippet.length > quotes[key].text.length) {
+        quotes[key] = { text: snippet, author: r.author, rating: r.rating };
+      }
+    }
+  }
+  const result = defs
+    .filter(([key]) => counts[key] > 0)
+    .map(([key, display, polarityVal]) => ({
+      key,
+      display,
+      polarity: polarityVal,
+      count: counts[key],
+      pct: reviews.length ? round2((counts[key] / reviews.length) * 100) : 0,
+      top_quote: `"${quotes[key].text}"`,
+      quote_author: quotes[key].author,
+      quote_rating: quotes[key].rating,
+    }));
+  return result.sort((a, b) => b.count - a.count);
+}
+
+// Rebuilds the full report structure from a merged review set. Platform
+// (Amazon listing) numbers are carried forward unchanged from the previous
+// report — they come from the separate platform-metrics D1 upload, not from
+// review data, and /api/reviews/report overlays live D1 numbers on top of
+// whatever is here anyway, so staleness here is harmless.
+function buildFullReviewReport(previousReport, allReviews) {
+  const overall_stats = computeReviewStats(allReviews);
+  const overall_themes = computeReviewThemeStats(allReviews, null);
+
+  const group_order = [...new Set(allReviews.map((r) => r.product_group))].sort();
+  const groups = {};
+
+  for (const pg of group_order) {
+    const pgReviews = allReviews.filter((r) => r.product_group === pg);
+    const oldGroup = previousReport?.groups?.[pg] || {};
+
+    const flavorsWithReviews = [...new Set(pgReviews.map((r) => r.flavor))].sort();
+    const oldMetricOnlyFlavors = (oldGroup.flavor_order || []).filter(
+      (fl) => !flavorsWithReviews.includes(fl) && oldGroup.flavors?.[fl]?.metric_only,
+    );
+    const flavor_order = [...flavorsWithReviews, ...oldMetricOnlyFlavors];
+
+    const flavors = {};
+    for (const fl of flavor_order) {
+      const flReviews = pgReviews.filter((r) => r.flavor === fl);
+      const oldFlavor = oldGroup.flavors?.[fl] || {};
+      const themesPos = computeReviewThemeStats(flReviews, "positive");
+      const themesNeg = computeReviewThemeStats(flReviews, "negative");
+      flavors[fl] = {
+        stats: computeReviewStats(flReviews),
+        themes_pos: themesPos.slice(0, 5),
+        themes_neg: themesNeg.slice(0, 5),
+        all_themes_pos: themesPos,
+        all_themes_neg: themesNeg,
+        platform_reviews: oldFlavor.platform_reviews || 0,
+        platform_wtd_rating: oldFlavor.platform_wtd_rating || 0,
+        metric_only: flReviews.length === 0,
+      };
+    }
+
+    const groupPlatformReviews = Object.values(flavors).reduce((s, f) => s + (f.platform_reviews || 0), 0);
+    const groupPlatformWtdSum = Object.values(flavors).reduce(
+      (s, f) => s + (f.platform_reviews || 0) * (f.platform_wtd_rating || 0),
+      0,
+    );
+
+    groups[pg] = {
+      stats: computeReviewStats(pgReviews),
+      themes_pos: computeReviewThemeStats(pgReviews, "positive").slice(0, 5),
+      themes_neg: computeReviewThemeStats(pgReviews, "negative").slice(0, 5),
+      platform_reviews: groupPlatformReviews,
+      platform_wtd_rating: groupPlatformReviews > 0 ? round2(groupPlatformWtdSum / groupPlatformReviews) : 0,
+      flavors,
+      flavor_order,
+    };
+  }
+
+  const flavor_summary = [];
+  let totalPlatformReviews = 0;
+  let totalPlatformWtdSum = 0;
+  for (const pg of group_order) {
+    totalPlatformReviews += groups[pg].platform_reviews;
+    totalPlatformWtdSum += groups[pg].platform_reviews * groups[pg].platform_wtd_rating;
+    for (const fl of groups[pg].flavor_order) {
+      const fd = groups[pg].flavors[fl];
+      const topTheme = fd.all_themes_pos[0]?.display || fd.all_themes_neg[0]?.display || "—";
+      flavor_summary.push({
+        product_group: pg,
+        flavor: fl,
+        platform_reviews: fd.platform_reviews,
+        platform_wtd_rating: fd.platform_wtd_rating,
+        written_reviews: fd.stats.count,
+        written_avg_rating: fd.stats.avg_rating,
+        positive: fd.stats.positive,
+        neutral: fd.stats.neutral,
+        negative: fd.stats.negative,
+        pos_pct: fd.stats.pos_pct,
+        neu_pct: fd.stats.neu_pct,
+        neg_pct: fd.stats.neg_pct,
+        top_theme: topTheme,
+        metric_only: fd.metric_only,
+      });
+    }
+  }
+
+  return {
+    meta: {
+      brand: "Every Body Eat",
+      total_written_reviews: allReviews.length,
+      total_platform_reviews: totalPlatformReviews,
+      total_platform_wtd_rating: totalPlatformReviews > 0 ? round2(totalPlatformWtdSum / totalPlatformReviews) : 0,
+    },
+    overall_stats,
+    overall_themes,
+    groups,
+    group_order,
+    flavor_summary,
+    reviews: allReviews,
+  };
+}
+
+// Normalizes one incoming row (already tagged with product_group/flavor by
+// the uploader) into the same review object shape stored in R2, classifying
+// sentiment and detecting themes fresh rather than trusting anything the
+// client sent.
+function normalizeIncomingReview(row) {
+  const rating = Math.max(1, Math.min(5, Math.round(Number(row.rating) || 0)));
+  const title = String(row.title || "").trim();
+  const content = String(row.content || "").trim();
+  const fullText = `${title} ${content}`;
+  return {
+    id: String(row.id || "").trim(),
+    author: String(row.author || "Amazon Customer").trim() || "Amazon Customer",
+    title,
+    content,
+    rating,
+    sentiment: classifyReviewSentiment(rating),
+    product_group: row.product_group,
+    flavor: row.flavor,
+    date: String(row.date || "").trim(),
+    helpful: Number(row.helpful) || 0,
+    verified: String(row.verified || "").toLowerCase().startsWith("y") ? "Yes" : "No",
+    variations: String(row.variations || "").trim(),
+    pack_size: String(row.pack_size || "").trim(),
+    themes: detectReviewThemes(fullText),
+  };
+}
+
+// --- Amazon Product Table — the SKU/FNSKU/ASIN → Product Group/Flavor/Pack
+// Size reference sheet, editable in the hub and downloadable as CSV. Stored
+// as a single R2 JSON document (columns + rows) rather than a D1 table:
+// Chris wants to add whole new columns from the UI, not just rows, which
+// SQLite doesn't do gracefully — a document with a column list is much
+// simpler to extend than migrating a table schema on every edit. ---
+
+const PRODUCT_TABLE_KEY = "reference/amazon-product-table.json";
+const PRODUCT_TABLE_DEFAULT_COLUMNS = ["sku", "fnsku", "asin", "product_group", "flavor", "pack_size", "bc_item_number"];
+
+async function getProductTable(env) {
+  const object = await env.CPG_DATA.get(PRODUCT_TABLE_KEY);
+  if (!object) return { columns: PRODUCT_TABLE_DEFAULT_COLUMNS, rows: [], updatedAt: null };
+  return await object.json();
+}
+
+async function saveProductTable(env, columns, rows) {
+  const doc = { columns, rows, updatedAt: new Date().toISOString() };
+  await env.CPG_DATA.put(PRODUCT_TABLE_KEY, JSON.stringify(doc));
+  return doc;
+}
+
+function productTableToCsv(doc) {
+  const esc = (v) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [doc.columns.map(esc).join(",")];
+  for (const row of doc.rows) {
+    lines.push(doc.columns.map((c) => esc(row[c])).join(","));
+  }
+  return lines.join("\n");
+}
+
+// Builds an ASIN -> {product_group, flavor, pack_size} lookup from the
+// product table, for callers that have a real ASIN to join against
+// (most metric-data.xlsx exports don't populate ASIN, so this is a
+// best-available lookup, not something every row will hit).
+function buildAsinLookup(doc) {
+  const lookup = {};
+  const asinCol = doc.columns.find((c) => c.toLowerCase() === "asin");
+  const pgCol = doc.columns.find((c) => c.toLowerCase().replace(/[^a-z]/g, "") === "productgroup");
+  const flCol = doc.columns.find((c) => c.toLowerCase() === "flavor");
+  const packCol = doc.columns.find((c) => c.toLowerCase().replace(/[^a-z]/g, "") === "packsize");
+  if (!asinCol) return lookup;
+  for (const row of doc.rows) {
+    const asin = String(row[asinCol] || "").trim();
+    if (!asin || lookup[asin]) continue;
+    const group = pgCol ? row[pgCol] : null;
+    lookup[asin] = {
+      product_group: group,
+      flavor: canonicalizeFlavor(group, flCol ? row[flCol] : null),
+      pack_size: packCol ? row[packCol] : null,
+    };
+  }
+  return lookup;
+}
+
+// The product table's flavor spelling doesn't always match the taxonomy
+// used everywhere else (e.g. it has bare "Variety" for Thins/Cookies, where
+// the rest of the app — including the D1 upload validator — expects
+// "Variety (Thins)"/"Variety (Cookie)"). Rather than requiring the product
+// table itself to be edited to match, treat a value as a match if it's an
+// unambiguous prefix of exactly one known flavor in that group.
+function canonicalizeFlavor(group, rawFlavor) {
+  const flavors = PRODUCT_TAXONOMY[group];
+  const flavor = String(rawFlavor || "").trim();
+  if (!flavors || !flavor) return flavor;
+  if (flavors.includes(flavor)) return flavor;
+  const prefixMatches = flavors.filter((f) => f.toLowerCase().startsWith(flavor.toLowerCase() + " ("));
+  return prefixMatches.length === 1 ? prefixMatches[0] : flavor;
 }
 
 async function getNewsSummary(env, referenceDate = new Date()) {
@@ -530,13 +1382,13 @@ async function getNewsSummary(env, referenceDate = new Date()) {
 
   const reviewFreshness = getReviewFreshness(reviews, referenceDate);
   const shipmentWindow = shipments ? selectShipmentWindow(shipments.weeks, referenceDate) : null;
-  // Only worth computing when the primary "new this week" stat is empty.
-  const reviewHighlights = reviewFreshness.addedLast7Days === 0 ? getReviewHighlights(reviews) : null;
+  const reviewHighlights = getReviewHighlights(reviews);
 
   return {
     latestReviews: {
       newestDate: reviewFreshness.newestDate,
       addedLast7Days: reviewFreshness.addedLast7Days,
+      addedLast7DaysIds: reviewFreshness.addedLast7DaysIds,
     },
     reviewHighlights,
     latestSop: latestSop ? { title: latestSop.title, uploadedDate: latestSop.uploadedDate } : null,
@@ -691,6 +1543,79 @@ async function deleteCampaignAsset(env, campaignId, filename) {
 
 async function deleteAllCampaignAssets(env, campaignId) {
   const listed = await env.CPG_DATA.list({ prefix: `${MARKETING_ASSET_PREFIX}${campaignId}/` });
+  await Promise.all(listed.objects.map((o) => env.CPG_DATA.delete(o.key)));
+}
+
+const MARKETING_EVENT_ASSET_PREFIX = "marketing/events/";
+
+function rowToEvent(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    channels: JSON.parse(row.channels || "[]"),
+    start: row.start_date,
+    end: row.end_date,
+    status: row.status,
+    owner: row.owner,
+    brief: row.brief,
+    assetsNeeded: JSON.parse(row.assets_needed || "[]"),
+    createdAt: row.created_at,
+  };
+}
+
+async function getEvents(env) {
+  const { results } = await env.secure_cpg_marketing.prepare("SELECT * FROM events ORDER BY id").all();
+  return results.map(rowToEvent);
+}
+
+async function upsertEvent(env, ev) {
+  await env.secure_cpg_marketing
+    .prepare(
+      `INSERT INTO events (id, name, channels, start_date, end_date, status, owner, brief, assets_needed, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET
+         name=excluded.name, channels=excluded.channels, start_date=excluded.start_date,
+         end_date=excluded.end_date, status=excluded.status, owner=excluded.owner,
+         brief=excluded.brief, assets_needed=excluded.assets_needed, updated_at=datetime('now')`,
+    )
+    .bind(
+      ev.id,
+      ev.name,
+      JSON.stringify(ev.channels || []),
+      ev.start ?? null,
+      ev.end ?? null,
+      ev.status ?? null,
+      ev.owner ?? null,
+      ev.brief ?? null,
+      JSON.stringify(ev.assetsNeeded || []),
+    )
+    .run();
+}
+
+async function deleteEventRow(env, id) {
+  await env.secure_cpg_marketing.prepare("DELETE FROM events WHERE id = ?").bind(id).run();
+}
+
+function eventAssetKey(eventId, filename) {
+  return `${MARKETING_EVENT_ASSET_PREFIX}${eventId}/${filename}`;
+}
+
+async function putEventAsset(env, eventId, filename, file) {
+  await env.CPG_DATA.put(eventAssetKey(eventId, filename), file.stream(), {
+    httpMetadata: { contentType: file.type || "application/octet-stream" },
+  });
+}
+
+async function getEventAsset(env, eventId, filename) {
+  return env.CPG_DATA.get(eventAssetKey(eventId, filename));
+}
+
+async function deleteEventAsset(env, eventId, filename) {
+  await env.CPG_DATA.delete(eventAssetKey(eventId, filename));
+}
+
+async function deleteAllEventAssets(env, eventId) {
+  const listed = await env.CPG_DATA.list({ prefix: `${MARKETING_EVENT_ASSET_PREFIX}${eventId}/` });
   await Promise.all(listed.objects.map((o) => env.CPG_DATA.delete(o.key)));
 }
 
@@ -1002,6 +1927,13 @@ export default {
       return validateUpload(request);
     }
 
+    if (url.pathname === "/api/me" && request.method === "GET") {
+      // Set by Cloudflare Access on every request that passes through it —
+      // not present in local `wrangler dev` (no Access in front of it there).
+      const email = request.headers.get("Cf-Access-Authenticated-User-Email");
+      return jsonResponse({ email: email || null });
+    }
+
     if (url.pathname === "/api/chat" && request.method === "POST") {
       const requestId = crypto.randomUUID();
       const handlerStart = Date.now();
@@ -1107,10 +2039,18 @@ export default {
           404,
         );
       }
-      const { weeks, total } = selectShipmentWindow(data.weeks, new Date());
+      const window = selectShipmentWindow(data.weeks, new Date(), data.items);
+      const isoWeek = (w) => new Date(w.weekStart).toISOString().slice(0, 10);
+      const weekDates = window.weeks.map(isoWeek);
       return jsonResponse({
-        weeks: weeks.map((w) => ({ weekStart: new Date(w.weekStart).toISOString().slice(0, 10), cases: w.cases })),
-        total,
+        weeks: window.weeks.map((w) => ({ weekStart: isoWeek(w), cases: w.cases })),
+        total: window.total,
+        units: window.units,
+        byUnit: window.byUnit.map((w) => ({ weekStart: isoWeek(w), values: w.values })),
+        postingGroups: window.postingGroups,
+        byPostingGroup: window.byPostingGroup.map((w) => ({ weekStart: isoWeek(w), values: w.values })),
+        weekDates,
+        items: window.items,
         sourceFileUpdated: data.sourceFileUpdated,
       });
     }
@@ -1118,6 +2058,263 @@ export default {
     if (url.pathname === "/api/news-summary" && request.method === "GET") {
       const summary = await getNewsSummary(env);
       return jsonResponse(summary);
+    }
+
+    if (url.pathname === "/api/reviews/sentiment-analysis" && request.method === "GET") {
+      try {
+        const analysis = await analyzeRecentReviewSentiment(env, new Date());
+        if (!analysis) {
+          return jsonResponse({ error: "No review data found." }, 404);
+        }
+        return jsonResponse(analysis);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/reviews/by-ids" && request.method === "GET") {
+      const ids = (url.searchParams.get("ids") || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 150);
+      if (ids.length === 0) return jsonResponse({ reviews: [] });
+
+      const reviews = await getReviewData(env);
+      if (!reviews) return jsonResponse({ reviews: [] });
+
+      const idSet = new Set(ids);
+      const matched = reviews
+        .filter((r) => idSet.has(r.id))
+        .map((r) => ({
+          id: r.id,
+          author: r.author,
+          title: r.title,
+          content: r.content,
+          rating: r.rating,
+          date: r.date,
+          flavor: r.flavor,
+          productGroup: r.product_group,
+          verified: r.verified,
+          helpful: r.helpful,
+        }));
+      return jsonResponse({ reviews: matched });
+    }
+
+    if (url.pathname === "/api/reviews/report" && request.method === "GET") {
+      try {
+        const report = await getReviewReportData(env);
+        if (!report) {
+          return jsonResponse(
+            { error: "No structured review report data found. Re-upload via the review JSON validator." },
+            404,
+          );
+        }
+
+        // Overlay live platform (Amazon listing) numbers from D1, where
+        // available — falls back to the R2-baked values for anything not
+        // yet uploaded through the platform-metrics tool.
+        const platformSummary = await getPlatformMetricsSummary(env);
+        applyPlatformMetrics(report, platformSummary);
+
+        // Recommendations are served from a separate endpoint (see
+        // /api/reviews/recommendations below) — they require an AI Gateway
+        // round-trip that can take 10s of seconds on an uncached signature,
+        // and everything else in the report is deterministic and fast, so
+        // the page shouldn't block on Claude just to show the numbers.
+        return jsonResponse(report);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/platform-metrics/preview" && request.method === "POST") {
+      try {
+        const body = await request.json().catch(() => null);
+        const rows = Array.isArray(body?.rows) ? body.rows : null;
+        if (!rows) return jsonResponse({ error: "Request body must include a 'rows' array." }, 400);
+
+        const [existingMap, productTable] = await Promise.all([getPlatformMetricMappings(env), getProductTable(env)]);
+        const asinLookup = buildAsinLookup(productTable);
+
+        const annotated = rows.map((r) => {
+          const itemName = String(r.item_name || "").trim();
+          const asin = String(r.asin || "").trim();
+          // Prefer a real ASIN match against the product table — it's the
+          // authoritative mapping — before falling back to a remembered or
+          // freshly-guessed item-name match. Most metric-data.xlsx exports
+          // don't populate ASIN, so this is best-available, not universal.
+          const fromAsin = asin ? asinLookup[asin] : null;
+          const existing = existingMap[itemName];
+          const suggestion = fromAsin || existing || suggestPlatformMapping(itemName);
+          return {
+            item_name: itemName,
+            asin,
+            review_count: Number(r.review_count) || 0,
+            star_rating: Number(r.star_rating) || 0,
+            refund_rate: r.refund_rate ?? null,
+            ordered_units: r.ordered_units ?? null,
+            ordered_revenue: r.ordered_revenue ?? null,
+            raw_product_group: r.raw_product_group ?? null,
+            product_group: suggestion?.product_group ?? "",
+            flavor: suggestion?.flavor ?? "",
+            needsReview: !fromAsin && !existing,
+            matchedBy: fromAsin ? "asin" : existing ? "remembered" : "guessed",
+          };
+        });
+
+        return jsonResponse({ rows: annotated, taxonomy: PRODUCT_TAXONOMY });
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/platform-metrics/upload" && request.method === "POST") {
+      try {
+        const body = await request.json().catch(() => null);
+        const rows = Array.isArray(body?.rows) ? body.rows : null;
+        if (!rows || rows.length === 0) {
+          return jsonResponse({ error: "Request body must include a non-empty 'rows' array." }, 400);
+        }
+
+        for (const r of rows) {
+          const validFlavors = PRODUCT_TAXONOMY[r.product_group];
+          if (!validFlavors || !validFlavors.includes(r.flavor)) {
+            return jsonResponse(
+              { error: `Unknown product group/flavor "${r.product_group} / ${r.flavor}" for item "${r.item_name}".` },
+              400,
+            );
+          }
+          if (!r.item_name || !Number.isFinite(Number(r.review_count)) || !Number.isFinite(Number(r.star_rating))) {
+            return jsonResponse({ error: `Invalid row for item "${r.item_name}".` }, 400);
+          }
+        }
+
+        await replacePlatformMetricRows(env, rows, body.sourceFile || null);
+        await upsertPlatformMetricMappings(
+          env,
+          rows.map((r) => ({
+            item_name: r.item_name,
+            product_group: r.product_group,
+            flavor: r.flavor,
+            autoSuggested: false,
+          })),
+        );
+
+        return jsonResponse({ ok: true, rowCount: rows.length, summary: aggregatePlatformMetrics(rows) });
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/product-table" && request.method === "GET") {
+      try {
+        const doc = await getProductTable(env);
+        return jsonResponse(doc);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/product-table" && request.method === "PUT") {
+      try {
+        const body = await request.json().catch(() => null);
+        const columns = Array.isArray(body?.columns) ? body.columns.map((c) => String(c)) : null;
+        const rows = Array.isArray(body?.rows) ? body.rows : null;
+        if (!columns || columns.length === 0) return jsonResponse({ error: "Request body must include a non-empty 'columns' array." }, 400);
+        if (!rows) return jsonResponse({ error: "Request body must include a 'rows' array." }, 400);
+
+        const doc = await saveProductTable(env, columns, rows);
+        return jsonResponse(doc);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/product-table/download" && request.method === "GET") {
+      try {
+        const doc = await getProductTable(env);
+        const csv = productTableToCsv(doc);
+        return new Response(csv, {
+          headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": 'attachment; filename="amazon-product-table.csv"',
+          },
+        });
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/reviews/import/preview" && request.method === "POST") {
+      try {
+        const body = await request.json().catch(() => null);
+        const rows = Array.isArray(body?.rows) ? body.rows : null;
+        if (!rows) return jsonResponse({ error: "Request body must include a 'rows' array." }, 400);
+
+        const previousReport = await getReviewReportData(env);
+        const existingIds = new Set((previousReport?.reviews || []).map((r) => r.id));
+
+        const normalized = rows.map((r) => normalizeIncomingReview(r));
+        const noId = normalized.filter((r) => !r.id);
+        const withId = normalized.filter((r) => r.id);
+        const duplicates = withId.filter((r) => existingIds.has(r.id));
+        const fresh = withId.filter((r) => !existingIds.has(r.id));
+
+        return jsonResponse({
+          totalIncoming: rows.length,
+          newCount: fresh.length,
+          duplicateCount: duplicates.length,
+          skippedNoId: noId.length,
+          sample: fresh.slice(0, 25),
+        });
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/reviews/import/commit" && request.method === "POST") {
+      try {
+        const body = await request.json().catch(() => null);
+        const rows = Array.isArray(body?.rows) ? body.rows : null;
+        if (!rows) return jsonResponse({ error: "Request body must include a 'rows' array." }, 400);
+
+        const previousReport = await getReviewReportData(env);
+        const existingReviews = previousReport?.reviews || [];
+        const existingIds = new Set(existingReviews.map((r) => r.id));
+
+        const normalized = rows.map((r) => normalizeIncomingReview(r));
+        const fresh = normalized.filter((r) => r.id && !existingIds.has(r.id));
+
+        if (fresh.length === 0) {
+          return jsonResponse({ ok: true, addedCount: 0, totalReviews: existingReviews.length, message: "No new reviews to add — every row was already in the database or missing a Review ID." });
+        }
+
+        const allReviews = [...existingReviews, ...fresh];
+        const newReport = buildFullReviewReport(previousReport, allReviews);
+
+        await env.CPG_DATA.put("reviews/ebe_review_data_updated.json", JSON.stringify(newReport));
+
+        return jsonResponse({ ok: true, addedCount: fresh.length, totalReviews: allReviews.length });
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/reviews/recommendations" && request.method === "GET") {
+      try {
+        const report = await getReviewReportData(env);
+        if (!report) return jsonResponse({ error: "No structured review report data found." }, 404);
+
+        const recs = await getFlavorRecommendations(env, report);
+        return jsonResponse({
+          recommendations: recs.recommendations,
+          generatedAt: recs.generatedAt,
+          cached: recs.cached,
+        });
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
     }
 
     if (url.pathname === "/api/weekly-data/upload" && request.method === "POST") {
@@ -1229,6 +2426,70 @@ export default {
 
       if (request.method === "DELETE") {
         await deleteCampaignAsset(env, campaignId, filename);
+        return jsonResponse({ ok: true });
+      }
+    }
+
+    if (url.pathname === "/api/marketing/events" && request.method === "GET") {
+      const events = await getEvents(env);
+      return jsonResponse({ events });
+    }
+
+    if (url.pathname === "/api/marketing/events" && request.method === "PUT") {
+      const ev = await request.json().catch(() => null);
+      if (!ev || !CAMPAIGN_ID_PATTERN.test(ev.id || "") || typeof ev.name !== "string" || !ev.name.trim()) {
+        return jsonResponse({ error: "Event needs a valid id and a name." }, 422);
+      }
+      await upsertEvent(env, ev);
+      return jsonResponse({ ok: true });
+    }
+
+    const eventMatch = url.pathname.match(/^\/api\/marketing\/events\/([A-Za-z0-9_-]+)$/);
+    if (eventMatch && request.method === "DELETE") {
+      await deleteEventRow(env, eventMatch[1]);
+      await deleteAllEventAssets(env, eventMatch[1]);
+      return jsonResponse({ ok: true });
+    }
+
+    const eventAssetMatch = url.pathname.match(/^\/api\/marketing\/events\/([A-Za-z0-9_-]+)\/assets\/([^/]+)$/);
+    if (eventAssetMatch) {
+      const eventId = eventAssetMatch[1];
+      const filename = decodeURIComponent(eventAssetMatch[2]);
+
+      if (request.method === "POST") {
+        const contentLength = Number(request.headers.get("content-length") || 0);
+        if (contentLength > MAX_FILE_BYTES + 100_000) {
+          return jsonResponse({ error: "The file is larger than 5 MB." }, 413);
+        }
+
+        const formData = await request.formData().catch(() => null);
+        const file = formData?.get("file");
+        if (!(file instanceof File)) {
+          return jsonResponse({ error: "Choose a file to upload." }, 400);
+        }
+        if (file.size > MAX_FILE_BYTES) {
+          return jsonResponse({ error: "The file is larger than 5 MB." }, 413);
+        }
+
+        await putEventAsset(env, eventId, filename, file);
+        return jsonResponse({ ok: true, name: filename, type: file.type, size: file.size });
+      }
+
+      if (request.method === "GET") {
+        const object = await getEventAsset(env, eventId, filename);
+        if (!object) return jsonResponse({ error: "Asset not found." }, 404);
+
+        return new Response(object.body, {
+          headers: {
+            "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+            "Content-Disposition": `inline; filename="${filename}"`,
+            "Cache-Control": "private, max-age=300",
+          },
+        });
+      }
+
+      if (request.method === "DELETE") {
+        await deleteEventAsset(env, eventId, filename);
         return jsonResponse({ ok: true });
       }
     }

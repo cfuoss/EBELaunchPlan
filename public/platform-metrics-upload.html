@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Metrics Upload — Every Body Eat</title>
+<script src="/vendor/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg:#FFFFFF; --bg-soft:#F7F5EE; --card-border:#E8E4D6;
+    --text:#1A1A1A; --text-dim:#6B6B64;
+    --brand:#2878FF; --brand-light:rgba(40,120,255,0.08);
+    --pos:#00bf63; --neg:#ff3131; --neu:#ca8a04;
+    --pos-bg:rgba(0,191,99,0.12); --neg-bg:rgba(255,49,49,0.1); --neu-bg:rgba(202,138,4,0.12);
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-soft); color: var(--text); font-size: 14px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
+  a.back { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+  a.back:hover { color: var(--text); }
+  h1 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin: 10px 0 4px; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 24px; }
+  .card { background: #fff; border: 1px solid var(--card-border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  .upload-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .upload-btn { background: var(--text); color: #fff; border: none; border-radius: 999px; padding: 10px 20px; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .upload-btn:hover { background: var(--brand); }
+  input[type=file] { display: none; }
+  .filename { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-dim); }
+  .status { font-size: 13px; margin-top: 10px; }
+  .status.error { color: var(--neg); }
+  .status.ok { color: var(--pos); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { background: #f3f4f6; padding: 8px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--card-border); position: sticky; top: 0; }
+  td { padding: 6px 10px; border-bottom: 1px solid var(--card-border); vertical-align: middle; }
+  tr.needs-review td { background: var(--neu-bg); }
+  tr.ignored td { opacity: 0.4; }
+  .table-wrap { max-height: 560px; overflow-y: auto; border: 1px solid var(--card-border); border-radius: 8px; }
+  .item-name { max-width: 340px; }
+  select { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--card-border); font-size: 12.5px; font-family: inherit; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+  .badge-review { background: var(--neu-bg); color: #92400e; }
+  .badge-ok { background: var(--pos-bg); color: #166534; }
+  .summary-bar { display: flex; gap: 20px; font-size: 13px; margin-bottom: 14px; flex-wrap: wrap; }
+  .summary-bar strong { color: var(--brand); }
+  .save-row { display: flex; align-items: center; gap: 14px; margin-top: 16px; }
+  .save-btn { background: var(--brand); color: #fff; border: none; border-radius: 999px; padding: 11px 26px; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+  .save-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
+  .result-table th, .result-table td { font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/amazon-review-sentiment.html">← Back to Review Sentiment Report</a>
+  <h1>Platform Metrics Upload</h1>
+  <p class="subtitle">Upload <code>metric-data.xlsx</code> to refresh Amazon platform review counts and ratings. Review the group/flavor mapping for any new item names before saving — this replaces the previous platform snapshot.</p>
+
+  <div class="card">
+    <div class="upload-row">
+      <button type="button" class="upload-btn" id="pickBtn">Choose metric-data.xlsx</button>
+      <input type="file" id="fileInput" accept=".xlsx">
+      <span class="filename" id="fileName">No file chosen</span>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card" id="reviewCard" style="display:none">
+    <div class="summary-bar">
+      <div><strong id="rowCount">0</strong> rows</div>
+      <div><strong id="reviewCount">0</strong> need review</div>
+      <div><strong id="ignoredCount">0</strong> ignored</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36px"></th>
+            <th class="item-name">Item Name</th>
+            <th>Reviews</th>
+            <th>Rating</th>
+            <th>Product Group</th>
+            <th>Flavor</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rowsBody"></tbody>
+      </table>
+    </div>
+    <div class="save-row">
+      <button type="button" class="save-btn" id="saveBtn">Save to Database</button>
+      <span class="status" id="saveStatus"></span>
+    </div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <h3 style="margin:0 0 10px">Saved — new platform totals</h3>
+    <div class="table-wrap">
+      <table class="result-table">
+        <thead><tr><th>Product Group</th><th>Flavor</th><th>Platform Reviews</th><th>Platform Wtd ★</th></tr></thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+    <p class="subtitle" style="margin-top:14px"><a href="/amazon-review-sentiment.html">View the updated Review Sentiment Report →</a></p>
+  </div>
+</div>
+
+<script>
+const TAXONOMY_FALLBACK = {
+  "Thins": ["Cheese-Less", "Chive & Garlic", "Fiery Chile Lime", "Sea Salt Chia", "Variety (Thins)"],
+  "Cookies": ["Chocolate Chip", "Cranberry Vanilla", "Ginger Cinnamon", "Variety (Cookie)"],
+  "Crispbread Crackers": ["Cranberry", "White Pepper & Garlic", "Sea Salt", "Variety"],
+  "Pretzel": ["Pretzel"],
+};
+
+let rows = [];
+let taxonomy = TAXONOMY_FALLBACK;
+
+const pickBtn = document.getElementById('pickBtn');
+const fileInput = document.getElementById('fileInput');
+const fileName = document.getElementById('fileName');
+const statusEl = document.getElementById('status');
+const reviewCard = document.getElementById('reviewCard');
+const rowsBody = document.getElementById('rowsBody');
+const saveBtn = document.getElementById('saveBtn');
+const saveStatus = document.getElementById('saveStatus');
+const resultCard = document.getElementById('resultCard');
+const resultBody = document.getElementById('resultBody');
+
+pickBtn.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+  fileName.textContent = file.name;
+  handleFile(file);
+});
+
+function setStatus(msg, cls) {
+  statusEl.textContent = msg || '';
+  statusEl.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+function readXlsx(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try { resolve(XLSX.read(new Uint8Array(e.target.result), { type: 'array' })); }
+      catch (err) { reject(err); }
+    };
+    reader.onerror = () => reject(reader.error || new Error('Could not read the file.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Some metric-data exports store ASIN as a HYPERLINK() formula
+// (=HYPERLINK("https://amazon.com/dp/B0FVHQZ2Z2","B0FVHQZ2Z2")) with no
+// cached result — Excel computes the displayed text on open, but a
+// script-based reader like SheetJS only sees pre-cached values, so the cell
+// reads as blank until Excel resaves it. The ASIN is still right there in
+// the formula text, so pull it from there when the plain value is empty.
+function findHeaderColumn(sheet, range, headerName) {
+  if (!range) return null;
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = sheet[XLSX.utils.encode_cell({ r: range.s.r, c })];
+    if (cell && cell.v != null && String(cell.v).trim().toLowerCase() === headerName.toLowerCase()) {
+      return XLSX.utils.encode_col(c);
+    }
+  }
+  return null;
+}
+function asinFromHyperlinkFormula(f) {
+  if (!f) return '';
+  const m = f.match(/HYPERLINK\("[^"]*",\s*"([^"]+)"\)/i);
+  return m ? m[1] : '';
+}
+
+async function handleFile(file) {
+  setStatus('Reading file…');
+  reviewCard.style.display = 'none';
+  resultCard.style.display = 'none';
+  try {
+    const wb = await readXlsx(file);
+    const sheetName = wb.SheetNames.includes('metric-data') ? 'metric-data' : wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    const parsed = XLSX.utils.sheet_to_json(sheet, { defval: null });
+    const range = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']) : null;
+    const asinCol = findHeaderColumn(sheet, range, 'ASIN');
+
+    const extracted = parsed
+      .map((r, i) => {
+        let asin = r['ASIN'] != null ? String(r['ASIN']).trim() : '';
+        if (!asin && asinCol) {
+          const cell = sheet[asinCol + (i + 2)]; // +2: row 1 is the header, sheet_to_json rows are 0-indexed
+          asin = asinFromHyperlinkFormula(cell && cell.f);
+        }
+        return {
+          item_name: r['Item name'] != null ? String(r['Item name']).trim() : '',
+          asin,
+          review_count: Number(r['Customer review count']) || 0,
+          star_rating: Number(r['Raw star ratings']) || 0,
+          refund_rate: r['Refund rate (%)'] ?? null,
+          ordered_units: r['Ordered units'] ?? null,
+          ordered_revenue: r['Ordered revenue ($)'] ?? null,
+          raw_product_group: r['Product group'] ?? null,
+        };
+      })
+      .filter(r => r.item_name);
+
+    if (extracted.length === 0) {
+      setStatus('No rows with an Item name were found in this file.', 'error');
+      return;
+    }
+
+    setStatus(`Parsed ${extracted.length} rows — checking mappings…`);
+
+    const res = await fetch('/api/platform-metrics/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: extracted }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+
+    taxonomy = body.taxonomy || TAXONOMY_FALLBACK;
+    rows = body.rows.map(r => ({ ...r, ignored: !r.product_group }));
+
+    setStatus(`Loaded ${rows.length} rows from "${file.name}". Review flagged rows below, then save.`, 'ok');
+    renderRows();
+    reviewCard.style.display = '';
+  } catch (err) {
+    setStatus('Error: ' + err.message, 'error');
+  }
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function groupOptionsHtml(selected) {
+  const groups = Object.keys(taxonomy);
+  return '<option value="">— choose —</option>' + groups.map(g =>
+    `<option value="${escHtml(g)}"${g === selected ? ' selected' : ''}>${escHtml(g)}</option>`
+  ).join('');
+}
+
+function flavorOptionsHtml(group, selected) {
+  const flavors = taxonomy[group] || [];
+  return '<option value="">— choose —</option>' + flavors.map(f =>
+    `<option value="${escHtml(f)}"${f === selected ? ' selected' : ''}>${escHtml(f)}</option>`
+  ).join('');
+}
+
+function renderRows() {
+  rowsBody.innerHTML = rows.map((r, i) => `
+    <tr class="${r.ignored ? 'ignored' : (r.needsReview ? 'needs-review' : '')}" data-idx="${i}">
+      <td><input type="checkbox" class="ignore-cb" ${r.ignored ? 'checked' : ''} title="Exclude this row"></td>
+      <td class="item-name" title="${escHtml(r.item_name)}">${escHtml(r.item_name)}</td>
+      <td>${r.review_count}</td>
+      <td>${r.star_rating}</td>
+      <td><select class="group-sel">${groupOptionsHtml(r.product_group)}</select></td>
+      <td><select class="flavor-sel">${flavorOptionsHtml(r.product_group, r.flavor)}</select></td>
+      <td>${r.ignored ? '' : (r.needsReview ? '<span class="badge badge-review">needs review</span>' : '<span class="badge badge-ok">on file</span>')}</td>
+    </tr>
+  `).join('');
+  updateSummary();
+  updateSaveState();
+}
+
+rowsBody.addEventListener('change', (e) => {
+  const tr = e.target.closest('tr');
+  if (!tr) return;
+  const idx = Number(tr.dataset.idx);
+  const row = rows[idx];
+
+  if (e.target.classList.contains('ignore-cb')) {
+    row.ignored = e.target.checked;
+    tr.classList.toggle('ignored', row.ignored);
+  } else if (e.target.classList.contains('group-sel')) {
+    row.product_group = e.target.value;
+    row.flavor = '';
+    row.needsReview = false;
+    const flavorSel = tr.querySelector('.flavor-sel');
+    flavorSel.innerHTML = flavorOptionsHtml(row.product_group, '');
+    tr.classList.remove('needs-review');
+  } else if (e.target.classList.contains('flavor-sel')) {
+    row.flavor = e.target.value;
+    row.needsReview = false;
+    tr.classList.remove('needs-review');
+    const badgeCell = tr.children[6];
+    badgeCell.innerHTML = row.ignored ? '' : '<span class="badge badge-ok">on file</span>';
+  }
+  updateSummary();
+  updateSaveState();
+});
+
+function updateSummary() {
+  document.getElementById('rowCount').textContent = rows.length;
+  document.getElementById('reviewCount').textContent = rows.filter(r => !r.ignored && r.needsReview).length;
+  document.getElementById('ignoredCount').textContent = rows.filter(r => r.ignored).length;
+}
+
+function updateSaveState() {
+  const active = rows.filter(r => !r.ignored);
+  const unmapped = active.filter(r => !r.product_group || !r.flavor);
+  saveBtn.disabled = active.length === 0 || unmapped.length > 0;
+  saveStatus.className = 'status';
+  saveStatus.textContent = unmapped.length > 0
+    ? `${unmapped.length} row(s) still need a Product Group / Flavor before you can save (or check "ignore" to exclude them).`
+    : '';
+}
+
+saveBtn.addEventListener('click', async () => {
+  const active = rows.filter(r => !r.ignored);
+  saveBtn.disabled = true;
+  saveStatus.className = 'status';
+  saveStatus.textContent = 'Saving…';
+  try {
+    const res = await fetch('/api/platform-metrics/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: active, sourceFile: fileName.textContent }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+
+    saveStatus.className = 'status ok';
+    saveStatus.textContent = `Saved ${body.rowCount} rows.`;
+
+    const entries = Object.entries(body.summary).sort((a,b) => a[0].localeCompare(b[0]));
+    resultBody.innerHTML = entries.map(([key, v]) => {
+      const [group, flavor] = key.split('::');
+      return `<tr><td>${escHtml(group)}</td><td>${escHtml(flavor)}</td><td>${v.reviews}</td><td>${v.rating.toFixed(2)} ★</td></tr>`;
+    }).join('');
+    resultCard.style.display = '';
+  } catch (err) {
+    saveStatus.className = 'status error';
+    saveStatus.textContent = 'Error: ' + err.message;
+    saveBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

@@ -70,7 +70,10 @@
         height: 62px;
         padding: 0 18px;
         border-bottom: 1px solid var(--line);
+        cursor: pointer;
+        transition: background .15s;
       }
+      .brand:hover { background: var(--soft); }
 
       .brand-mark {
         display: grid;
@@ -342,6 +345,9 @@
       .badge.live { background: var(--green-soft); color: #13834c; }
       .badge.live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #22c56e; }
       .badge.orange { background: var(--orange-soft); color: #b66a00; }
+      .badge.severity-high { background: #fdecea; color: #b3261e; }
+      .badge.severity-medium { background: var(--orange-soft); color: #b66a00; }
+      .badge.severity-low { background: var(--soft); color: #76787f; }
 
       .tool-card h3 { margin: 17px 0 7px; font-size: 16px; letter-spacing: -.02em; }
       .tool-card p { min-height: 42px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
@@ -429,6 +435,9 @@
       .software-card h3 { margin: 2px 0 6px; font-size: 15px; }
       .software-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
       .software-card .badge { margin-top: 13px; }
+      .software-card.placeholder { align-items: center; border-style: dashed; }
+      .software-card.placeholder .tool-icon { opacity: .5; }
+      .software-card.placeholder .badge { margin-top: 0; }
 
       .notice {
         display: flex;
@@ -472,7 +481,8 @@
       .resolved-banner-dept { padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.65); font-size: 10.5px; font-weight: 760; text-transform: uppercase; letter-spacing: .04em; }
       .resolved-banner-date { margin-left: auto; color: #3d8462; font-size: 11.5px; }
 
-      .stat-card { display: flex; align-items: flex-start; gap: 13px; padding: 17px 18px; }
+      .stat-card { display: flex; align-items: flex-start; gap: 13px; padding: 17px 18px; text-decoration: none; }
+      a.stat-card { cursor: pointer; }
       .stat-card .tool-icon { width: 36px; height: 36px; flex: 0 0 auto; }
       .stat-card-body { min-width: 0; }
       .stat-card-label { margin: 0; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
@@ -496,10 +506,11 @@
       .issue-update { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
       .issue-update-label { color: #85878e; font-weight: 650; }
 
-      .marquee-card { padding: 16px 0 16px 20px; overflow: hidden; }
+      .marquee-card { display: block; padding: 16px 0 16px 20px; overflow: hidden; text-decoration: none; color: inherit; cursor: pointer; }
       .marquee-card + .marquee-card { margin-top: 12px; }
       .marquee-label { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: #13834c; font-size: 11px; font-weight: 760; letter-spacing: .06em; text-transform: uppercase; }
       .marquee-label.negative { color: #c0392b; }
+      .marquee-label.neutral { color: #b66a00; }
       .marquee-viewport { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, black 24px, black calc(100% - 24px), transparent); mask-image: linear-gradient(90deg, transparent, black 24px, black calc(100% - 24px), transparent); }
       .marquee-track { display: flex; gap: 14px; width: max-content; animation: marquee-scroll linear infinite; }
       .marquee-track:hover { animation-play-state: paused; }
@@ -516,15 +527,87 @@
         background: var(--soft);
       }
       .review-chip-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 700; color: var(--muted); }
+      .review-chip-stars { color: #ffa41c; letter-spacing: 1px; }
       .review-chip-title { margin: 0; font-size: 13px; font-weight: 680; line-height: 1.35; }
       .review-chip-content { margin: 0; color: #55565c; font-size: 12px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-      .shipment-card { padding: 22px; }
+      .sentiment-summary-card { display: block; padding: 20px; text-decoration: none; cursor: pointer; }
+      .sentiment-summary-card h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; }
+      .sentiment-summary-card.positive h3 { color: #13834c; }
+      .sentiment-summary-card.negative h3 { color: #c0392b; }
+      .sentiment-summary-card p { margin: 0; color: #46474d; font-size: 13px; line-height: 1.6; }
+
+      .anomaly-card { padding: 18px 19px; }
+      .anomaly-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+      .anomaly-count { color: var(--muted); font-size: 11.5px; font-weight: 650; }
+      .anomaly-issue { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+      .anomaly-action { margin: 0; color: #46474d; font-size: 12.5px; line-height: 1.55; }
+      .anomaly-action strong { color: var(--ink); }
+
+      .anomalies-details {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--white);
+        overflow: hidden;
+      }
+      .anomalies-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 20px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 700;
+        list-style: none;
+      }
+      .anomalies-summary::-webkit-details-marker { display: none; }
+      .anomalies-summary:hover { background: var(--soft); }
+      .anomalies-chevron { transition: transform .18s ease; transform: rotate(90deg); }
+      .anomalies-details[open] .anomalies-chevron { transform: rotate(-90deg); }
+      .anomalies-details #sentiment-anomalies-wrap { padding: 4px 20px 20px; border-top: 1px solid var(--line); }
+
+      .anomaly-count-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        color: var(--blue);
+        font-size: 11.5px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .anomaly-count-link:hover { text-decoration: underline; }
+
+      /* Categorical palette (dataviz skill default order, adjacent-pair
+         validated) — same fixed slot order used across both shipment charts
+         so a given unit/group always renders the same color. */
+      :root {
+        --series-1: #2a78d6; /* blue */
+        --series-2: #eb6834; /* orange */
+        --series-3: #1baf7a; /* aqua */
+        --series-4: #eda100; /* yellow */
+        --series-5: #e87ba4; /* magenta */
+        --series-6: #008300; /* green */
+      }
+
+      .shipment-card + .shipment-card { margin-top: 16px; }
+      .shipment-card { display: block; padding: 22px; text-decoration: none; cursor: pointer; }
+      .shipment-card h3 { margin: 0 0 14px; font-size: 14px; color: var(--ink); }
+      .shipment-detail-hint { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); color: var(--blue); font-size: 12px; font-weight: 700; }
+
+      .viz-legend { display: flex; flex-wrap: wrap; gap: 14px 18px; margin-bottom: 16px; }
+      .viz-legend-item { display: flex; align-items: center; gap: 7px; color: var(--ink); font-size: 12px; font-weight: 600; }
+      .viz-legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+
       .shipment-rows { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
       .shipment-row { display: grid; grid-template-columns: 92px 1fr 64px; align-items: center; gap: 12px; }
       .shipment-week { color: var(--muted); font-size: 12px; font-weight: 650; }
-      .shipment-track { height: 10px; border-radius: 999px; background: var(--soft); overflow: hidden; }
-      .shipment-fill { height: 100%; border-radius: 999px; background: var(--blue); }
+      .shipment-track { display: flex; height: 14px; border-radius: 4px; background: var(--soft); overflow: hidden; }
+      .shipment-segment { height: 100%; cursor: default; }
+      .shipment-segment + .shipment-segment { margin-left: 2px; }
+      .shipment-segment:first-child { border-radius: 4px 0 0 4px; }
+      .shipment-segment:last-child { border-radius: 0 4px 4px 0; }
+      .shipment-segment:only-child { border-radius: 4px; }
       .shipment-cases { text-align: right; font-size: 12.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
       .shipment-total-row {
         display: grid;
@@ -605,7 +688,7 @@
     <div class="overlay" id="overlay"></div>
 
     <aside class="sidebar" id="sidebar">
-      <div class="brand">
+      <div class="brand" data-page="home" title="Back to LaunchPlan Hub">
         <div class="brand-mark">LP</div>
         <div class="brand-name">LaunchPlan Hub</div>
         <svg class="icon brand-collapse"><use href="#i-chevron" /></svg>
@@ -658,28 +741,51 @@
           <div class="eyebrow"><span class="eyebrow-dot"></span>LaunchPlan Intelligence</div>
           <button class="button tv-toggle" id="tv-toggle" type="button"><svg class="icon"><use href="#i-expand" /></svg><span>Fullscreen / TV display</span></button>
         </div>
-        <h1 class="home-title"><span id="greeting">Welcome</span>, Chris <span class="accent">▰</span><span style="color:#ffd64f">▪</span><span style="color:#438df4">●</span></h1>
+        <h1 class="home-title"><span id="greeting">Welcome</span>, <span id="greeting-name">Chris</span> <span class="accent">▰</span><span style="color:#ffd64f">▪</span><span style="color:#438df4">●</span></h1>
         <p class="lede">Your secure home for CPG analytics, AI workflows, software, and connected data.</p>
 
         <div class="section-head"><div><h2>Today</h2><p>Computed live from the weekly source files — no manual snapshot to update.</p></div></div>
         <div class="grid grid-2" id="today-grid">
-          <div class="card stat-card"><div class="tool-icon orange"><svg class="icon"><use href="#i-chart" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Reviews</p><p class="stat-card-value">Loading…</p></div></div>
+          <a class="card stat-card" id="today-reviews-tile" target="_blank" rel="noopener"><div class="tool-icon orange"><svg class="icon"><use href="#i-chart" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Reviews</p><p class="stat-card-value">Loading…</p></div></a>
           <div class="card stat-card"><div class="tool-icon violet"><svg class="icon"><use href="#i-file" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Latest SOP</p><p class="stat-card-value">Loading…</p></div></div>
           <div class="card stat-card"><div class="tool-icon green"><svg class="icon"><use href="#i-merge" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Issues data</p><p class="stat-card-value">Loading…</p></div></div>
           <div class="card stat-card"><div class="tool-icon"><svg class="icon"><use href="#i-box" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Shipment data</p><p class="stat-card-value">Loading…</p></div></div>
         </div>
 
         <div id="reviews-carousel-section" style="display:none;">
-          <div class="section-head"><div><h2>Recent Reviews</h2><p>No new reviews this week — here's the latest positive and critical feedback on file.</p></div></div>
-          <article class="card marquee-card">
-            <div class="marquee-label"><svg class="icon"><use href="#i-chart" /></svg>Positive</div>
+          <div class="section-head"><div><h2>Recent Reviews</h2><p>Positive/critical/neutral breakdown of the last <span id="reviews-sample-size">20</span> reviews. Click a section to see the full list.</p></div></div>
+          <a class="card marquee-card" id="marquee-positive-card" target="_blank" rel="noopener">
+            <div class="marquee-label"><svg class="icon"><use href="#i-chart" /></svg>Positive (<span id="marquee-positive-count">0</span>)</div>
             <div class="marquee-viewport"><div class="marquee-track" id="marquee-positive"></div></div>
-          </article>
-          <article class="card marquee-card">
-            <div class="marquee-label negative"><svg class="icon"><use href="#i-chart" /></svg>Critical</div>
+          </a>
+          <a class="card marquee-card" id="marquee-negative-card" target="_blank" rel="noopener">
+            <div class="marquee-label negative"><svg class="icon"><use href="#i-chart" /></svg>Critical (<span id="marquee-negative-count">0</span>)</div>
             <div class="marquee-viewport"><div class="marquee-track" id="marquee-negative"></div></div>
-          </article>
+          </a>
+          <a class="card marquee-card" id="marquee-neutral-card" target="_blank" rel="noopener">
+            <div class="marquee-label neutral"><svg class="icon"><use href="#i-chart" /></svg>Neutral (<span id="marquee-neutral-count">0</span>)</div>
+            <div class="marquee-viewport"><div class="marquee-track" id="marquee-neutral"></div></div>
+          </a>
         </div>
+
+        <div class="section-head"><div><h2>Review Sentiment — Last 30 Days</h2><p>AI-generated summary of recent feedback, with anomalies flagged for follow-up.</p></div><span class="badge" id="sentiment-badge">Loading…</span></div>
+        <div class="grid grid-2">
+          <a class="card sentiment-summary-card positive" id="sentiment-positive-card" target="_blank" rel="noopener">
+            <h3><svg class="icon"><use href="#i-chart" /></svg>Positive (<span id="sentiment-positive-count">0</span>)</h3>
+            <p class="dept-empty" id="sentiment-positive-summary">Loading…</p>
+          </a>
+          <a class="card sentiment-summary-card negative" id="sentiment-negative-card" target="_blank" rel="noopener">
+            <h3><svg class="icon"><use href="#i-chart" /></svg>Negative (<span id="sentiment-negative-count">0</span>)</h3>
+            <p class="dept-empty" id="sentiment-negative-summary">Loading…</p>
+          </a>
+        </div>
+        <details class="anomalies-details" id="anomalies-details">
+          <summary class="anomalies-summary">
+            <span id="anomalies-summary-text">Loading anomalies…</span>
+            <svg class="icon anomalies-chevron"><use href="#i-chevron" /></svg>
+          </summary>
+          <div id="sentiment-anomalies-wrap"><p class="dept-empty">Loading…</p></div>
+        </details>
 
         <div id="resolved-banner-wrap"></div>
 
@@ -691,9 +797,18 @@
         </div>
 
         <div class="section-head"><div><h2>Upcoming Shipments</h2><p>Active-status case volume for the current week plus the next four.</p></div><span class="badge" id="shipments-badge">Loading…</span></div>
-        <article class="card shipment-card" id="shipments-card">
-          <div class="shipment-rows" id="shipments-rows"><p class="dept-empty">Loading…</p></div>
-        </article>
+        <a class="card shipment-card" href="/shipment-detail.html" target="_blank" rel="noopener">
+          <h3>By Sales Unit of Measure</h3>
+          <div class="viz-legend" id="shipments-unit-legend"></div>
+          <div class="shipment-rows" id="shipments-unit-rows"><p class="dept-empty">Loading…</p></div>
+          <p class="shipment-detail-hint">View full item-level detail →</p>
+        </a>
+        <a class="card shipment-card" href="/shipment-detail.html" target="_blank" rel="noopener">
+          <h3>By Gen. Prod. Posting Group</h3>
+          <div class="viz-legend" id="shipments-group-legend"></div>
+          <div class="shipment-rows" id="shipments-group-rows"><p class="dept-empty">Loading…</p></div>
+          <p class="shipment-detail-hint">View full item-level detail →</p>
+        </a>
 
         <div class="section-head"><div><h2>Explore your hub</h2><p>Everything your team needs in one protected workspace.</p></div></div>
         <div class="grid grid-3">
@@ -737,9 +852,8 @@
         <div class="eyebrow"><span class="eyebrow-dot"></span>Software directory</div>
         <h1>All your paid software,<br /><span class="accent">finally organized.</span></h1>
         <p class="lede">Track the tools each company pays for, who owns them, and how they support the business.</p>
-        <div class="search-row"><label class="search"><svg class="icon"><use href="#i-search" /></svg><input id="software-search" type="search" placeholder="Search software…" aria-label="Search software" /></label></div>
         <div class="grid grid-3" id="software-grid"></div>
-        <div class="notice"><svg class="icon"><use href="#i-spark" /></svg><div>These are starter entries only. Subscription cost, renewal date, owner, and login method can be added when we build the software database.</div></div>
+        <div class="notice"><svg class="icon"><use href="#i-spark" /></svg><div>These are empty placeholder slots. Software name, description, subscription cost, renewal date, owner, and login method can be added when we build the software database.</div></div>
       </section>
 
       <section class="page" id="page-dashboards">
@@ -790,17 +904,11 @@
         { name: "Marketing Analytics", icon: "i-megaphone", tone: "orange", description: "Customer voice, campaigns, content, retail media, and acquisition.", count: 3 },
         { name: "Sales Analytics", icon: "i-dollar", tone: "green", description: "Retailer, channel, SKU, velocity, and distribution performance.", count: 0 },
         { name: "Marketing/Sales Summaries", icon: "i-merge", tone: "violet", description: "One shared narrative connecting marketing activity to commercial results.", count: 0 },
-        { name: "Operations Analytics", icon: "i-gear", tone: "green", description: "Inventory, demand planning, fulfillment, and supply chain visibility.", count: 2 }
+        { name: "Operations Analytics", icon: "i-gear", tone: "green", description: "Inventory, demand planning, fulfillment, and supply chain visibility.", count: 4 }
       ];
 
-      const software = [
-        ["ChatGPT", "AI workbench and team productivity", "AI"],
-        ["Claude", "AI analysis and reusable skill workflows", "AI"],
-        ["Power BI", "Business intelligence and reporting", "Analytics"],
-        ["Shopify", "Direct-to-consumer commerce", "Commerce"],
-        ["QuickBooks Online", "Accounting and financial operations", "Finance"],
-        ["Cloudflare", "Secure applications and infrastructure", "Infrastructure"]
-      ];
+      // Six reserved slots, awaiting real entries once the software database is built.
+      const software = new Array(6).fill(null);
 
       const integrations = [
         ["Amazon Selling Partner API", "Sales, catalog, inventory, and marketplace operations.", "Amazon"],
@@ -816,6 +924,27 @@
       function setGreeting() {
         const hour = new Date().getHours();
         document.getElementById("greeting").textContent = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+      }
+
+      // e.g. "matt.rink@everybodyeating.com" -> "Matt"; "chris@..." -> "Chris"
+      function firstNameFromEmail(email) {
+        if (!email) return null;
+        const local = email.split("@")[0];
+        const first = local && local.split(".")[0];
+        if (!first) return null;
+        return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+      }
+
+      async function loadGreetingName() {
+        try {
+          const res = await fetch("/api/me");
+          if (!res.ok) return;
+          const { email } = await res.json();
+          const name = firstNameFromEmail(email);
+          if (name) document.getElementById("greeting-name").textContent = name;
+        } catch (err) {
+          console.error("Failed to load user identity", err);
+        }
       }
 
       function formatDate(isoDate) {
@@ -836,10 +965,19 @@
         return String(str ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
       }
 
+      function reviewDetailUrl(ids, issue, severity, action) {
+        const params = new URLSearchParams();
+        params.set("ids", (ids || []).join(","));
+        if (issue) params.set("issue", issue);
+        if (severity) params.set("severity", severity);
+        if (action) params.set("action", action);
+        return `/review-detail.html?${params.toString()}`;
+      }
+
       function reviewChip(review) {
         return `
           <article class="review-chip">
-            <div class="review-chip-head"><span>${review.rating ? "★".repeat(Math.round(review.rating)) : ""}</span><span>${formatDate(review.date)}</span></div>
+            <div class="review-chip-head"><span class="review-chip-stars">${review.rating ? "★".repeat(Math.round(review.rating)) : ""}</span><span>${formatDate(review.date)}</span></div>
             <p class="review-chip-title">${esc(review.title)}</p>
             <p class="review-chip-content">${esc(review.content)}</p>
           </article>`;
@@ -849,18 +987,27 @@
         const section = document.getElementById("reviews-carousel-section");
         const positive = highlights?.positive || [];
         const negative = highlights?.negative || [];
+        const neutral = highlights?.neutral || [];
 
-        if (!positive.length && !negative.length) {
+        // Only hides if there's genuinely no review data to sample from —
+        // the breakdown itself always shows once there's any data, even if
+        // one side (all-positive or all-negative) is empty.
+        if (!highlights || !highlights.sampleSize) {
           section.style.display = "none";
           return;
         }
         section.style.display = "";
 
+        document.getElementById("reviews-sample-size").textContent = highlights.sampleSize;
+        document.getElementById("marquee-positive-count").textContent = highlights.positiveCount;
+        document.getElementById("marquee-negative-count").textContent = highlights.negativeCount;
+        document.getElementById("marquee-neutral-count").textContent = highlights.neutralCount;
+
         const fill = (id, items) => {
           const track = document.getElementById(id);
           if (!items.length) {
             track.style.animation = "none";
-            track.innerHTML = `<p class="dept-empty">No reviews on file.</p>`;
+            track.innerHTML = `<p class="dept-empty">None in the last ${highlights.sampleSize} reviews.</p>`;
             return;
           }
           const chips = items.map(reviewChip).join("");
@@ -872,6 +1019,16 @@
 
         fill("marquee-positive", positive);
         fill("marquee-negative", negative);
+        fill("marquee-neutral", neutral);
+
+        // Each card links to the full list behind it (not just the visible
+        // chips), same pattern as the 30-day sentiment cards below.
+        document.getElementById("marquee-positive-card").href =
+          reviewDetailUrl(positive.map((r) => r.id), `Positive Reviews — Last ${highlights.sampleSize} Reviews`);
+        document.getElementById("marquee-negative-card").href =
+          reviewDetailUrl(negative.map((r) => r.id), `Critical Reviews — Last ${highlights.sampleSize} Reviews`);
+        document.getElementById("marquee-neutral-card").href =
+          reviewDetailUrl(neutral.map((r) => r.id), `Neutral Reviews — Last ${highlights.sampleSize} Reviews`);
       }
 
       async function loadToday() {
@@ -885,6 +1042,10 @@
           tiles[0].innerHTML = summary.latestReviews?.newestDate
             ? `<strong>${summary.latestReviews.addedLast7Days}</strong> new this week &middot; last ${formatDate(summary.latestReviews.newestDate)}`
             : "No review data on file";
+          document.getElementById("today-reviews-tile").href = reviewDetailUrl(
+            summary.latestReviews?.addedLast7DaysIds,
+            "New Reviews This Week",
+          );
 
           tiles[1].innerHTML = summary.latestSop
             ? `<strong>${summary.latestSop.title}</strong> &middot; ${formatDate(summary.latestSop.uploadedDate)}`
@@ -923,6 +1084,58 @@
           </div>`;
       }
 
+      async function loadSentimentAnalysis() {
+        const badge = document.getElementById("sentiment-badge");
+        const posSummary = document.getElementById("sentiment-positive-summary");
+        const negSummary = document.getElementById("sentiment-negative-summary");
+        const anomaliesWrap = document.getElementById("sentiment-anomalies-wrap");
+        try {
+          const res = await fetch("/api/reviews/sentiment-analysis");
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+
+          badge.textContent = data.generatedAt ? `Generated ${formatDateTime(data.generatedAt)}` : "No recent reviews";
+          document.getElementById("sentiment-positive-count").textContent = data.positiveCount ?? 0;
+          document.getElementById("sentiment-negative-count").textContent = data.negativeCount ?? 0;
+          document.getElementById("sentiment-positive-card").href = reviewDetailUrl(data.positiveReviewIds, "Positive Reviews — Last 30 Days");
+          document.getElementById("sentiment-negative-card").href = reviewDetailUrl(data.negativeReviewIds, "Negative Reviews — Last 30 Days");
+
+          posSummary.textContent = data.positiveSummary || "No summary available.";
+          posSummary.classList.remove("dept-empty");
+          negSummary.textContent = data.negativeSummary || "No summary available.";
+          negSummary.classList.remove("dept-empty");
+
+          const anomalies = data.anomalies || [];
+          const summaryText = document.getElementById("anomalies-summary-text");
+          summaryText.textContent = anomalies.length
+            ? `${anomalies.length} anomal${anomalies.length === 1 ? "y" : "ies"} flagged`
+            : "No anomalies flagged in the last 30 days";
+
+          anomaliesWrap.innerHTML = anomalies.length
+            ? `<div class="grid grid-2">${anomalies.map(a => {
+                const ids = (a.reviewIds || []).join(",");
+                const countLabel = `${a.reviewCount ?? 0} review${a.reviewCount === 1 ? "" : "s"}`;
+                const countHtml = ids
+                  ? `<a class="anomaly-count-link" target="_blank" rel="noopener" href="/review-detail.html?ids=${encodeURIComponent(ids)}&issue=${encodeURIComponent(a.issue || "")}&severity=${encodeURIComponent(a.severity || "low")}&action=${encodeURIComponent(a.suggestedAction || "")}">${countLabel} →</a>`
+                  : `<span class="anomaly-count">${countLabel}</span>`;
+                return `
+                <article class="card anomaly-card">
+                  <div class="anomaly-head"><span class="badge severity-${esc(a.severity || "low")}">${esc(a.severity || "low")}</span>${countHtml}</div>
+                  <h4 class="anomaly-issue">${esc(a.issue)}</h4>
+                  <p class="anomaly-action"><strong>Suggested action:</strong> ${esc(a.suggestedAction)}</p>
+                </article>`;
+              }).join("")}</div>`
+            : `<p class="dept-empty">No anomalies flagged in the last 30 days.</p>`;
+        } catch (err) {
+          badge.textContent = "Unavailable";
+          posSummary.textContent = "Couldn't load right now.";
+          negSummary.textContent = "Couldn't load right now.";
+          document.getElementById("anomalies-summary-text").textContent = "Unavailable";
+          anomaliesWrap.innerHTML = "";
+          console.error("Failed to load sentiment analysis", err);
+        }
+      }
+
       async function loadIssues() {
         const badge = document.getElementById("issues-badge");
         const grid = document.getElementById("issues-grid");
@@ -955,46 +1168,72 @@
         }
       }
 
+      // Fixed slot order (dataviz skill default categorical palette, validated
+      // for adjacent-pair CVD safety on stacked bars) — a given unit/group
+      // always lands on the same color since the backend hands back
+      // categories in a stable alphabetical order.
+      const SERIES_COLORS = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)", "var(--series-5)", "var(--series-6)"];
+
+      function renderStackedShipmentChart(legendEl, rowsEl, categories, breakdownWeeks, total) {
+        if (!categories.length || !breakdownWeeks.length) {
+          legendEl.innerHTML = "";
+          rowsEl.innerHTML = `<p class="dept-empty">No shipment weeks found.</p>`;
+          return;
+        }
+
+        legendEl.innerHTML = categories.map((cat, i) => `
+          <span class="viz-legend-item"><span class="viz-legend-swatch" style="background:${SERIES_COLORS[i % SERIES_COLORS.length]}"></span>${esc(cat)}</span>`).join("");
+
+        const weekTotals = breakdownWeeks.map(w => categories.reduce((sum, c) => sum + (w.values[c] || 0), 0));
+        const maxCases = Math.max(...weekTotals, 1);
+
+        rowsEl.innerHTML = breakdownWeeks.map((w, idx) => {
+          const segments = categories
+            .map((cat, i) => ({ cat, value: w.values[cat] || 0, color: SERIES_COLORS[i % SERIES_COLORS.length] }))
+            .filter(s => s.value > 0)
+            .map(s => `<div class="shipment-segment" style="width:${(s.value / maxCases) * 100}%;background:${s.color}" title="${esc(s.cat)}: ${s.value.toLocaleString()} cases"></div>`)
+            .join("");
+          return `
+            <div class="shipment-row">
+              <span class="shipment-week">${formatDate(w.weekStart)}</span>
+              <div class="shipment-track">${segments}</div>
+              <span class="shipment-cases">${weekTotals[idx].toLocaleString()}</span>
+            </div>`;
+        }).join("") + `
+          <div class="shipment-total-row">
+            <span>Total</span><span></span>
+            <span class="shipment-cases">${total.toLocaleString()}</span>
+          </div>`;
+      }
+
       async function loadShipments() {
         const badge = document.getElementById("shipments-badge");
-        const rows = document.getElementById("shipments-rows");
+        const unitLegend = document.getElementById("shipments-unit-legend");
+        const unitRows = document.getElementById("shipments-unit-rows");
+        const groupLegend = document.getElementById("shipments-group-legend");
+        const groupRows = document.getElementById("shipments-group-rows");
         try {
           const res = await fetch("/api/shipments/upcoming");
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
           badge.textContent = data.sourceFileUpdated ? `Updated ${formatDateTime(data.sourceFileUpdated)}` : "No data";
 
-          if (!data.weeks?.length) {
-            rows.innerHTML = `<p class="dept-empty">No shipment weeks found.</p>`;
-            return;
-          }
-
-          const maxCases = Math.max(...data.weeks.map(w => w.cases), 1);
-          rows.innerHTML = data.weeks.map(w => `
-            <div class="shipment-row">
-              <span class="shipment-week">${formatDate(w.weekStart)}</span>
-              <div class="shipment-track"><div class="shipment-fill" style="width:${Math.round((w.cases / maxCases) * 100)}%"></div></div>
-              <span class="shipment-cases">${w.cases.toLocaleString()}</span>
-            </div>`).join("") + `
-            <div class="shipment-total-row">
-              <span>Total</span><span></span>
-              <span class="shipment-cases">${data.total.toLocaleString()}</span>
-            </div>`;
+          renderStackedShipmentChart(unitLegend, unitRows, data.units || [], data.byUnit || [], data.total || 0);
+          renderStackedShipmentChart(groupLegend, groupRows, data.postingGroups || [], data.byPostingGroup || [], data.total || 0);
         } catch (err) {
           badge.textContent = "Unavailable";
-          rows.innerHTML = `<p class="dept-empty">Couldn't load right now.</p>`;
+          [unitRows, groupRows].forEach(el => { el.innerHTML = `<p class="dept-empty">Couldn't load right now.</p>`; });
+          [unitLegend, groupLegend].forEach(el => { el.innerHTML = ""; });
           console.error("Failed to load shipments", err);
         }
       }
 
-      function renderSoftware(filter = "") {
-        const term = filter.trim().toLowerCase();
+      function renderSoftware() {
         document.getElementById("software-grid").innerHTML = software
-          .filter(item => item.join(" ").toLowerCase().includes(term))
-          .map(([name, description, category], index) => `
-            <article class="card software-card">
+          .map((_, index) => `
+            <article class="card software-card placeholder">
               <div class="tool-icon ${index % 3 === 1 ? "violet" : index % 3 === 2 ? "green" : "orange"}">${icon(index % 2 ? "i-spark" : "i-software")}</div>
-              <div><h3>${name}</h3><p>${description}</p><span class="badge">Add subscription details · ${category}</span></div>
+              <span class="badge">Not yet added</span>
             </article>`).join("");
       }
 
@@ -1070,6 +1309,22 @@
             <div class="actions">
               <a class="button primary" href="/item-tracing-decomposition.html">${icon("i-eye")}Open tool</a>
             </div>
+          </article>
+          <article class="card tool-card">
+            <div class="tool-top"><div class="tool-icon green">${icon("i-upload")}</div><span class="badge live">Ready</span></div>
+            <h3>Weekly Data Upload</h3>
+            <p>Drop in the latest Demand Plan and Issues/Opportunities workbooks. The home page updates automatically on next load — no redeploy needed.</p>
+            <div class="actions">
+              <a class="button primary" href="/weekly-data-upload.html">${icon("i-upload")}Upload data</a>
+            </div>
+          </article>
+          <article class="card tool-card">
+            <div class="tool-top"><div class="tool-icon green">${icon("i-gear")}</div><span class="badge live">Ready</span></div>
+            <h3>Amazon Product Table</h3>
+            <p>Editable SKU / FNSKU / ASIN → Product Group, Flavor, Pack Size reference sheet. Add rows or columns, save, and download as CSV any time.</p>
+            <div class="actions">
+              <a class="button primary" href="/amazon-product-table.html">${icon("i-eye")}Open tool</a>
+            </div>
           </article>` : "";
 
         const categoryTools = marketingTool || operationsTool || `
@@ -1120,7 +1375,6 @@
         document.getElementById("dashboard-subnav").classList.toggle("open", !expanded);
       });
 
-      document.getElementById("software-search").addEventListener("input", event => renderSoftware(event.target.value));
       document.getElementById("menu-button").addEventListener("click", () => {
         document.getElementById("sidebar").classList.add("open");
         document.getElementById("overlay").classList.add("open");
@@ -1145,19 +1399,24 @@
       document.addEventListener("fullscreenchange", () => setTvMode(!!document.fullscreenElement));
 
       setGreeting();
+      loadGreetingName();
       renderSoftware();
       renderIntegrations();
       renderDashboards();
       loadToday();
       loadIssues();
       loadShipments();
+      loadSentimentAnalysis();
 
       // This page is meant to be left running on a shared screen — refresh the
       // live sections periodically rather than only on load/manual reload.
+      // Sentiment analysis is cheap to re-check: the backend only re-runs
+      // Claude when the underlying 30-day review set actually changed.
       setInterval(() => {
         loadToday();
         loadIssues();
         loadShipments();
+        loadSentimentAnalysis();
       }, 5 * 60 * 1000);
 
       const initialPage = location.hash.replace("#", "");

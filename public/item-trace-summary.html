@@ -54,6 +54,10 @@
     border-bottom:2px solid var(--ink);
     flex-wrap:wrap;
   }
+  .hub-brand{display:flex; align-items:center; gap:9px; padding-right:16px; margin-right:2px; border-right:1px solid var(--card-border); text-decoration:none; color:inherit; flex:none;}
+  .hub-brand-mark{width:30px; height:30px; border-radius:8px; background:var(--ink); color:#fff; display:flex; align-items:center; justify-content:center; font-family:'Anton',sans-serif; font-size:11px; letter-spacing:-.02em; flex:none;}
+  .hub-brand-name{font-family:'Barlow Semi Condensed',sans-serif; font-weight:700; font-size:13px; color:var(--text); white-space:nowrap;}
+  .hub-brand:hover .hub-brand-mark{background:var(--pretzel);}
   .brand{display:flex; align-items:center; gap:12px; padding-right:18px; border-right:1px solid var(--card-border);}
   .brand .mark{
     width:38px;height:38px;border-radius:50%;
@@ -245,7 +249,7 @@
 
   @media (max-width:720px){
     header{flex-wrap:wrap;}
-    .brand{border-right:none; padding-right:0;}
+    .hub-brand, .brand{border-right:none; padding-right:0;}
     .search-wrap{max-width:none; width:100%; order:3;}
   }
 </style>
@@ -253,6 +257,10 @@
 <body>
 
 <header>
+  <a class="hub-brand" href="/" title="Back to LaunchPlan Hub">
+    <div class="hub-brand-mark">LP</div>
+    <span class="hub-brand-name">LaunchPlan Hub</span>
+  </a>
   <div class="brand">
     <div class="mark" id="brandMark">?</div>
     <div>

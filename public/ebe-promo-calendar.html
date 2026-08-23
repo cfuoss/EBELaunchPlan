@@ -55,6 +55,10 @@ a { color: var(--pretzel-text); }
   overflow-y: auto; z-index: 100; padding: 0 0 40px; transition: transform .2s;
 }
 .sidenav.collapsed { transform: translateX(-220px); }
+.hub-brand { display: flex; align-items: center; height: 52px; padding: 0 16px; border-bottom: 1px solid var(--card-border); text-decoration: none; color: inherit; transition: background .15s; }
+.hub-brand:hover { background: rgba(0,0,0,0.05); }
+.hub-brand-mark { display: grid; width: 28px; height: 28px; margin-right: 9px; place-items: center; border-radius: 8px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 850; letter-spacing: -.04em; flex: none; }
+.hub-brand-name { font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--ink); }
 .sidenav-logo { padding: 20px 16px 12px; border-bottom: 1px solid var(--card-border); }
 .sidenav-logo h1 { color: var(--ink); font-size: 16px; letter-spacing: 0.04em; }
 .sidenav-logo p { color: var(--text-dim); font-size: 11px; margin: 4px 0 0; }
@@ -134,6 +138,12 @@ tr:hover td { background: var(--bg-soft); }
 .legend-row { display: flex; gap: 18px; margin-top: 14px; flex-wrap: wrap; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-dim); }
 .legend-swatch { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+.gantt-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.gantt-card-head .channel-head { flex: 1; min-width: 0; }
+.fullscreen-btn { flex: none; white-space: nowrap; }
+.card:fullscreen { background: var(--bg); padding: 28px 32px; overflow-y: auto; }
+.card:-webkit-full-screen { background: var(--bg); padding: 28px 32px; overflow-y: auto; }
+.card:fullscreen .gantt-scroll, .card:-webkit-full-screen .gantt-scroll { max-height: calc(100vh - 150px); }
 
 /* Analysis */
 .metric-good { color: #007a3d; font-weight: 700; }
@@ -207,6 +217,8 @@ tr:hover td { background: var(--bg-soft); }
 .asset-size-warn { color: var(--rose-text); font-size: 12px; margin-top: 8px; }
 .campaign-link { cursor: pointer; color: var(--pretzel-text); font-weight: 600; }
 .campaign-link:hover { text-decoration: underline; }
+.event-link { cursor: pointer; color: var(--pretzel-text); font-weight: 600; }
+.event-link:hover { text-decoration: underline; }
 
 @media (max-width: 780px) {
   .formgrid { grid-template-columns: 1fr; }
@@ -220,12 +232,17 @@ tr:hover td { background: var(--bg-soft); }
 <button class="navtoggle" id="navtoggle" onclick="toggleNav()"><span></span><span></span><span></span></button>
 
 <nav class="sidenav" id="sidenav">
+  <a class="hub-brand" href="/" title="Back to LaunchPlan Hub">
+    <div class="hub-brand-mark">LP</div>
+    <div class="hub-brand-name">LaunchPlan Hub</div>
+  </a>
   <div class="sidenav-logo">
     <h1>EVERY BODY EAT</h1>
     <p>Promotional Calendar</p>
   </div>
   <a onclick="showSection('add')" data-section="add" class="add-link">+ Add a Promotion</a>
   <a onclick="showSection('campaigns')" data-section="campaigns">Campaigns</a>
+  <a onclick="showSection('events')" data-section="events">Events</a>
   <a onclick="showSection('master')" data-section="master">Master Gantt Chart</a>
   <div class="nav-section">Channels</div>
   <div id="channelNavHost"></div>
@@ -362,7 +379,10 @@ tr:hover td { background: var(--bg-soft); }
     </div>
 
     <div class="card">
-      <h2>Campaign Gantt Calendar</h2>
+      <div class="gantt-card-head">
+        <h2>Campaign Gantt Calendar</h2>
+        <button class="btn btn-mini fullscreen-btn" onclick="toggleGanttFullscreen(this)">⛶ Full Screen</button>
+      </div>
       <div class="desc">Every campaign's window, at a glance. Click a bar for full details.</div>
       <div id="campaignGanttHost"></div>
       <div class="legend-row" id="campaignGanttLegend"></div>
@@ -384,11 +404,98 @@ tr:hover td { background: var(--bg-soft); }
     </div>
   </section>
 
+  <!-- EVENTS -->
+  <section class="section" id="section-events">
+    <div class="card">
+      <input type="hidden" id="editingEventId" value="">
+      <h2 id="eventFormTitle">New Event</h2>
+      <div class="desc">An omni-channel event that shares a window across any channel — plus a shared spot for briefs, creative, and other assets.</div>
+      <div class="formgrid">
+        <div class="full">
+          <label>Event Name</label>
+          <input id="e-name" placeholder="e.g. Fall Trade Show">
+        </div>
+        <div class="full">
+          <label>Participating Channels</label>
+          <div class="checkbox-group" id="e-channels"></div>
+        </div>
+        <div>
+          <label>Start Date</label>
+          <input type="date" id="e-start">
+        </div>
+        <div>
+          <label>End Date</label>
+          <input type="date" id="e-end">
+        </div>
+        <div>
+          <label>Status</label>
+          <select id="e-status" class="status-select">
+            <option>Identified</option>
+            <option>Planning</option>
+            <option>Approved</option>
+            <option>Live</option>
+            <option>Completed</option>
+            <option>On Hold</option>
+            <option>Cancelled</option>
+          </select>
+        </div>
+        <div>
+          <label>Owner</label>
+          <input id="e-owner" placeholder="e.g. Jamie Chen">
+        </div>
+        <div class="full">
+          <label>Event Brief</label>
+          <textarea id="e-brief" rows="4" placeholder="Goals, target audience, key message — whatever the team needs to build against."></textarea>
+        </div>
+        <div class="full">
+          <label>Assets Needed</label>
+          <div class="desc" style="margin-bottom:8px;">List what's needed line by line. Drop the file onto a line once it's ready — that's how the team can tell what's still outstanding.</div>
+          <div id="e-needed-list"></div>
+          <div class="asset-size-warn" id="eventAssetSizeWarn" style="display:none;"></div>
+        </div>
+      </div>
+      <div class="err" id="eventErr"></div>
+      <div class="ok" id="eventOk"></div>
+      <div style="display:flex; gap:10px; margin-top:18px;">
+        <button class="btn btn-primary" id="eventSubmitBtn" onclick="submitEvent()">Save Event</button>
+        <button class="btn" id="eventCancelBtn" onclick="cancelEventEdit()" style="display:none;">Cancel Edit</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="gantt-card-head">
+        <h2>Event Gantt Calendar</h2>
+        <button class="btn btn-mini fullscreen-btn" onclick="toggleGanttFullscreen(this)">⛶ Full Screen</button>
+      </div>
+      <div class="desc">Every event's window, at a glance. Click a bar for full details.</div>
+      <div id="eventGanttHost"></div>
+      <div class="legend-row" id="eventGanttLegend"></div>
+    </div>
+
+    <div class="card">
+      <h2>All Events</h2>
+      <div class="desc">Every omni-channel event, with shared assets.</div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>ID</th><th>Event</th><th>Owner</th><th>Channels</th><th>Dates</th><th>Status</th><th>Assets Needed</th><th></th></tr></thead>
+          <tbody id="eventsTableBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="eventsEmpty" style="display:none;">
+        <h3>No events yet</h3>
+        <p>Create one above to start planning across channels.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- MASTER GANTT CHART -->
   <section class="section" id="section-master">
     <div class="card">
-      <h2>Master Gantt Chart</h2>
-      <div class="desc">Every campaign and every promotion, across every channel, in one view. Campaign rows sit on top; channel rows below. Click any bar for full details.</div>
+      <div class="gantt-card-head">
+        <h2>Master Gantt Chart</h2>
+        <button class="btn btn-mini fullscreen-btn" onclick="toggleGanttFullscreen(this)">⛶ Full Screen</button>
+      </div>
+      <div class="desc">Every campaign, event, and promotion, across every channel, in one view. Campaign and Event rows sit on top; channel rows below. Click any bar for full details.</div>
       <div id="masterGanttHost"></div>
       <div class="legend-row" id="masterGanttLegend"></div>
     </div>
@@ -462,10 +569,14 @@ tr:hover td { background: var(--bg-soft); }
 const MAX_ASSET_BYTES = 5 * 1024 * 1024; // matches the server's per-file cap
 let promos = [];
 let campaigns = [];
+let events = [];
 let editingId = null;
 let editingCampaignId = null;
 let draftCampaignId = null;
 let draftAssetsNeeded = [];
+let editingEventId = null;
+let draftEventId = null;
+let draftEventAssetsNeeded = [];
 
 const CHANNELS = [
   { key: 'Amazon',      color: '#F99420' },
@@ -499,7 +610,7 @@ function buildNav() {
   ).join('');
 }
 
-const PAGE_TITLES = { add: ['Add a Promotion', 'Fill in every field, then save. New promotions appear instantly across all views.'], campaigns: ['Campaigns', 'Tie promotions together across channels, with shared briefs and assets.'], master: ['Master Gantt Chart', 'Every campaign and every promotion, across every channel, in one place.'], howto: ['How It Works', 'A quick reference for using this tool.'] };
+const PAGE_TITLES = { add: ['Add a Promotion', 'Fill in every field, then save. New promotions appear instantly across all views.'], campaigns: ['Campaigns', 'Tie promotions together across channels, with shared briefs and assets.'], events: ['Events', 'Plan omni-channel events across channels, with shared briefs and assets.'], master: ['Master Gantt Chart', 'Every campaign and every promotion, across every channel, in one place.'], howto: ['How It Works', 'A quick reference for using this tool.'] };
 CHANNELS.forEach(c => { PAGE_TITLES['ch-' + c.key] = [c.key, 'Gantt Calendar, Promotions Table, and Analysis for ' + c.key + '.']; });
 
 function showSection(name) {
@@ -513,6 +624,7 @@ function showSection(name) {
   document.getElementById('pageSub').textContent = sub;
   if (name.startsWith('ch-')) renderChannel(name.slice(3));
   if (name === 'campaigns') { renderCampaignsTable(); renderCampaignsGantt(); }
+  if (name === 'events') { renderEventsTable(); renderEventsGantt(); }
   if (name === 'master') renderMasterGantt();
   if (window.innerWidth < 780) setNavCollapsed(true);
 }
@@ -523,7 +635,10 @@ function buildChannelSections() {
   host.innerHTML = CHANNELS.map(c => `
     <section class="section" id="section-ch-${c.key}">
       <div class="card" style="border-left:4px solid ${c.color};">
-        <div class="channel-head"><span class="channel-swatch" style="background:${c.color};"></span><h2 style="color:${darken(c.color)};">${c.key} — Gantt Calendar</h2></div>
+        <div class="gantt-card-head">
+          <div class="channel-head"><span class="channel-swatch" style="background:${c.color};"></span><h2 style="color:${darken(c.color)};">${c.key} — Gantt Calendar</h2></div>
+          <button class="btn btn-mini fullscreen-btn" onclick="toggleGanttFullscreen(this)">⛶ Full Screen</button>
+        </div>
         <div class="desc">Click any bar for full promotion details.</div>
         <div id="gantt-${c.key}"></div>
         <div class="legend-row" id="legend-${c.key}"></div>
@@ -898,30 +1013,52 @@ function renderCampaignsGantt() {
   legendHost.innerHTML = CHANNELS.map(c => `<div class="legend-item"><span class="legend-swatch" style="background:${c.color};"></span>${c.key}</div>`).join('');
 }
 
-/* ---------- Master Gantt Chart (campaigns + promotions combined) ---------- */
+/* ---------- Master Gantt Chart (campaigns + events + promotions combined) ---------- */
 function renderMasterGantt() {
   const host = document.getElementById('masterGanttHost');
   const legend = document.getElementById('masterGanttLegend');
   if (!host) return;
   host.innerHTML = ''; legend.innerHTML = '';
 
-  const combined = [...campaigns, ...promos];
+  const combined = [
+    ...campaigns.map(c => ({ ...c, _kind: 'campaign' })),
+    ...events.map(e => ({ ...e, _kind: 'event' })),
+    ...promos.map(p => ({ ...p, _kind: 'promo' })),
+  ];
   if (combined.length === 0) {
-    host.innerHTML = '<div class="empty"><h3>Nothing here yet</h3><p>Add a promotion or a campaign to see it on this calendar.</p></div>';
+    host.innerHTML = '<div class="empty"><h3>Nothing here yet</h3><p>Add a promotion, campaign, or event to see it on this calendar.</p></div>';
     return;
   }
 
   host.innerHTML = buildGanttHTML(combined, {
-    rowKeyFn: it => it.channels ? ('★ ' + it.name) : channelOf(it),
-    colorFn: it => it.channels ? ((it.channels[0] && CHANNEL_COLOR[it.channels[0]]) || '#1A1A1A') : CHANNEL_COLOR[channelOf(it)],
-    barLabelFn: it => it.channels ? (it.name + ' (' + it.status + ')') : (it.desc + ' (' + (it.retailer || channelOf(it)) + ')'),
-    onClickFn: it => it.channels ? `openCampaignDetail('${it.id}')` : `openDetail('${it.id}')`,
-    rowLabelHeader: 'Campaign / Channel',
-    rowLabelWidth: 180,
+    rowKeyFn: it => it._kind === 'campaign' ? ('★ ' + it.name) : it._kind === 'event' ? ('⚑ ' + it.name) : channelOf(it),
+    colorFn: it => it._kind === 'promo' ? CHANNEL_COLOR[channelOf(it)] : ((it.channels[0] && CHANNEL_COLOR[it.channels[0]]) || '#1A1A1A'),
+    barLabelFn: it => it._kind === 'promo' ? (it.desc + ' (' + (it.retailer || channelOf(it)) + ')') : (it.name + ' (' + it.status + ')'),
+    onClickFn: it => it._kind === 'campaign' ? `openCampaignDetail('${it.id}')` : it._kind === 'event' ? `openEventDetail('${it.id}')` : `openDetail('${it.id}')`,
+    rowLabelHeader: 'Campaign / Event / Channel',
+    rowLabelWidth: 190,
   });
   legend.innerHTML = '<div class="legend-item"><span class="legend-swatch" style="background:#1A1A1A;"></span>★ Campaign rows</div>'
+    + '<div class="legend-item"><span class="legend-swatch" style="background:#1A1A1A;"></span>⚑ Event rows</div>'
     + CHANNELS.map(c => `<div class="legend-item"><span class="legend-swatch" style="background:${c.color};"></span>${c.key}</div>`).join('');
 }
+
+/* ---------- Gantt fullscreen toggle ---------- */
+function toggleGanttFullscreen(btn) {
+  const card = btn.closest('.card');
+  if (!card) return;
+  if (document.fullscreenElement === card) {
+    document.exitFullscreen();
+  } else if (card.requestFullscreen) {
+    card.requestFullscreen().catch(() => {});
+  }
+}
+document.addEventListener('fullscreenchange', () => {
+  document.querySelectorAll('.fullscreen-btn').forEach(btn => {
+    const active = btn.closest('.card') === document.fullscreenElement;
+    btn.textContent = active ? '⤢ Exit Full Screen' : '⛶ Full Screen';
+  });
+});
 
 /* ---------- Analysis (per channel) ---------- */
 function renderChannelAnalysis(key) {
@@ -1321,6 +1458,296 @@ function openCampaignDetail(id) {
   document.getElementById('modalOverlay').classList.add('open');
 }
 
+/* ---------- Events: storage ---------- */
+async function loadEvents() {
+  try {
+    const res = await fetch('/api/marketing/events');
+    if (!res.ok) throw new Error('load failed');
+    const body = await res.json();
+    events = body.events.sort((a,b) => a.id.localeCompare(b.id));
+  } catch (e) {
+    events = [];
+  }
+  renderEventsTable();
+  renderEventsGantt();
+}
+async function saveEvent(ev) {
+  try {
+    const res = await fetch('/api/marketing/events', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ev),
+    });
+    return res.ok;
+  } catch (e) { return false; }
+}
+async function deleteEventStorage(id) {
+  try { await fetch('/api/marketing/events/' + encodeURIComponent(id), { method: 'DELETE' }); } catch (e) { /* ignore */ }
+}
+function nextEventId() {
+  let max = 0;
+  events.forEach(e => { const n = parseInt(e.id.replace('E','')); if (n > max) max = n; });
+  return 'E' + String(max + 1).padStart(2, '0');
+}
+
+/* ---------- Events: channel checkboxes ---------- */
+function buildEventChannelCheckboxes() {
+  const host = document.getElementById('e-channels');
+  host.innerHTML = CHANNELS.map(c =>
+    `<label class="checkbox-pill"><input type="checkbox" value="${c.key}" onchange="this.parentElement.classList.toggle('checked', this.checked)"><span class="dot" style="background:${c.color};"></span>${c.key}</label>`
+  ).join('');
+}
+function getSelectedEventChannels() {
+  return [...document.querySelectorAll('#e-channels input:checked')].map(cb => cb.value);
+}
+function setEventChannelCheckboxes(selected) {
+  document.querySelectorAll('#e-channels .checkbox-pill').forEach(pill => {
+    const cb = pill.querySelector('input');
+    const on = selected.includes(cb.value);
+    cb.checked = on;
+    pill.classList.toggle('checked', on);
+  });
+}
+
+/* ---------- Events: assets needed (line items) ---------- */
+function eventAssetUrl(eventId, filename) {
+  return '/api/marketing/events/' + encodeURIComponent(eventId) + '/assets/' + encodeURIComponent(filename);
+}
+// Assets attach to an event by id, but a brand-new event has no id until first
+// save — so the first file attached on a new event mints its id early.
+function draftEventAssetId() {
+  if (!draftEventId) draftEventId = editingEventId || nextEventId();
+  return draftEventId;
+}
+function addEventNeededRow() { draftEventAssetsNeeded.push({ name: '', asset: null }); renderEventNeededList(); }
+function removeEventNeededRow(i) { draftEventAssetsNeeded.splice(i, 1); renderEventNeededList(); }
+function updateEventNeededName(i, val) { if (draftEventAssetsNeeded[i]) draftEventAssetsNeeded[i].name = val; }
+function triggerEventNeededUpload(i) { document.getElementById('event-needed-file-' + i).click(); }
+async function removeEventNeededAsset(i) {
+  const asset = draftEventAssetsNeeded[i].asset;
+  draftEventAssetsNeeded[i].asset = null;
+  renderEventNeededList();
+  if (asset && draftEventId) {
+    try { await fetch(eventAssetUrl(draftEventId, asset.name), { method: 'DELETE' }); } catch (e) { /* ignore */ }
+  }
+}
+async function handleEventNeededFile(i, files) {
+  if (!files || !files.length) return;
+  const file = files[0];
+  const warnEl = document.getElementById('eventAssetSizeWarn');
+  if (file.size > MAX_ASSET_BYTES) {
+    warnEl.textContent = 'Skipped "' + file.name + '" — files must be 5MB or smaller. For large files (video, big decks), host it elsewhere and note the link in the item name instead.';
+    warnEl.style.display = 'block';
+    return;
+  }
+  warnEl.style.display = 'none';
+  const eventId = draftEventAssetId();
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch(eventAssetUrl(eventId, file.name), { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('upload failed');
+    draftEventAssetsNeeded[i].asset = { name: file.name, type: file.type || 'file', size: file.size };
+  } catch (e) {
+    warnEl.textContent = 'Upload failed for "' + file.name + '" — try again.';
+    warnEl.style.display = 'block';
+  }
+  renderEventNeededList();
+}
+function renderEventNeededList() {
+  const host = document.getElementById('e-needed-list');
+  if (!host) return;
+  host.innerHTML = draftEventAssetsNeeded.map((r, i) => `
+    <div class="needed-row">
+      <input type="text" placeholder="e.g. Booth signage" value="${escapeAttr(r.name)}" oninput="updateEventNeededName(${i}, this.value)">
+      <div class="needed-drop ${r.asset ? 'filled' : ''}"
+           onclick="${r.asset ? '' : `triggerEventNeededUpload(${i})`}"
+           ondragover="event.preventDefault(); event.stopPropagation(); this.classList.add('dragover');"
+           ondragleave="this.classList.remove('dragover');"
+           ondrop="event.preventDefault(); this.classList.remove('dragover'); handleEventNeededFile(${i}, event.dataTransfer.files);">
+        ${r.asset
+          ? `<span>${extOf(r.asset.name)} · ${r.asset.name} (${fmtBytes(r.asset.size)})</span><button class="btn-mini" onclick="event.stopPropagation(); removeEventNeededAsset(${i})">✕</button>`
+          : 'Drop file or click to attach'}
+      </div>
+      <span class="needed-status ${r.asset ? 'done' : 'pending'}">${r.asset ? 'Fulfilled' : 'Needed'}</span>
+      <input type="file" id="event-needed-file-${i}" style="display:none" onchange="handleEventNeededFile(${i}, this.files)">
+      <button class="btn-mini" onclick="removeEventNeededRow(${i})">✕</button>
+    </div>`).join('') + `<button class="btn btn-mini" style="margin-top:2px;" onclick="addEventNeededRow()">↑ Add Asset Needed</button>`;
+}
+
+/* ---------- Events: form ---------- */
+function startEditEvent(id) {
+  const e = events.find(x => x.id === id);
+  if (!e) return;
+  editingEventId = id;
+  draftEventId = id;
+  document.getElementById('e-name').value = e.name;
+  document.getElementById('e-start').value = e.start;
+  document.getElementById('e-end').value = e.end;
+  document.getElementById('e-status').value = e.status;
+  document.getElementById('e-owner').value = e.owner || '';
+  document.getElementById('e-brief').value = e.brief || '';
+  setEventChannelCheckboxes(e.channels || []);
+  draftEventAssetsNeeded = JSON.parse(JSON.stringify(e.assetsNeeded || []));
+  renderEventNeededList();
+  document.getElementById('eventFormTitle').textContent = 'Edit Event — ' + e.id;
+  document.getElementById('eventCancelBtn').style.display = 'inline-flex';
+  document.getElementById('eventSubmitBtn').textContent = 'Save Changes';
+  showSection('events');
+}
+function cancelEventEdit() {
+  editingEventId = null;
+  clearEventForm();
+  document.getElementById('eventFormTitle').textContent = 'New Event';
+  document.getElementById('eventCancelBtn').style.display = 'none';
+  document.getElementById('eventSubmitBtn').textContent = 'Save Event';
+}
+function clearEventForm() {
+  draftEventId = null;
+  document.getElementById('e-name').value = '';
+  document.getElementById('e-start').value = '';
+  document.getElementById('e-end').value = '';
+  document.getElementById('e-status').value = 'Identified';
+  document.getElementById('e-owner').value = '';
+  document.getElementById('e-brief').value = '';
+  setEventChannelCheckboxes([]);
+  draftEventAssetsNeeded = [];
+  renderEventNeededList();
+  document.getElementById('eventAssetSizeWarn').style.display = 'none';
+}
+async function deleteEvent(id) {
+  if (!confirm('Delete this event? This cannot be undone.')) return;
+  events = events.filter(e => e.id !== id);
+  await deleteEventStorage(id);
+  renderEventsTable();
+  renderEventsGantt();
+}
+async function submitEvent() {
+  const name = document.getElementById('e-name').value.trim();
+  const start = document.getElementById('e-start').value;
+  const end = document.getElementById('e-end').value;
+  const status = document.getElementById('e-status').value;
+  const owner = document.getElementById('e-owner').value.trim();
+  const brief = document.getElementById('e-brief').value.trim();
+  const channelsSel = getSelectedEventChannels();
+  const errEl = document.getElementById('eventErr');
+  const okEl = document.getElementById('eventOk');
+  okEl.style.display = 'none';
+
+  if (!name || !start || !end || channelsSel.length === 0) {
+    errEl.textContent = 'Fill in the event name, dates, and at least one participating channel.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (new Date(end) < new Date(start)) {
+    errEl.textContent = 'End date is before the start date.';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+  const cleanedNeeded = draftEventAssetsNeeded.filter(r => r.name.trim() !== '' || r.asset);
+
+  let ev;
+  if (editingEventId) {
+    ev = events.find(e => e.id === editingEventId);
+    Object.assign(ev, { name, start, end, status, owner, brief, channels: channelsSel, assetsNeeded: cleanedNeeded });
+  } else {
+    ev = { id: draftEventId || nextEventId(), name, start, end, status, owner, brief, channels: channelsSel, assetsNeeded: cleanedNeeded, createdAt: new Date().toISOString() };
+    events.push(ev);
+  }
+  const saved = await saveEvent(ev);
+  draftEventId = null;
+  okEl.textContent = saved ? ('Saved ' + ev.id + ' — ' + ev.name + '.') : 'Saved locally — sync failed, try again.';
+  okEl.style.display = 'block';
+  editingEventId = null;
+  document.getElementById('eventFormTitle').textContent = 'New Event';
+  document.getElementById('eventCancelBtn').style.display = 'none';
+  document.getElementById('eventSubmitBtn').textContent = 'Save Event';
+  clearEventForm();
+  renderEventsTable();
+  renderEventsGantt();
+}
+
+/* ---------- Events: table + detail ---------- */
+function renderEventsTable() {
+  const body = document.getElementById('eventsTableBody');
+  const empty = document.getElementById('eventsEmpty');
+  if (!body) return;
+  body.innerHTML = '';
+  if (events.length === 0) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  events.forEach(e => {
+    const statusClass = 'chip-status-' + e.status.replace(/\s+/g,'');
+    const needed = e.assetsNeeded || [];
+    const fulfilled = needed.filter(r => r.asset).length;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono">${e.id}</td>
+      <td><span class="event-link" onclick="openEventDetail('${e.id}')">${e.name}</span></td>
+      <td>${e.owner || '—'}</td>
+      <td>${channelChipsHTML(e.channels) || '—'}</td>
+      <td class="mono">${fmtDate(e.start)} – ${fmtDate(e.end)}</td>
+      <td><span class="chip ${statusClass}">${e.status}</span></td>
+      <td>${needed.length ? (fulfilled + ' / ' + needed.length) : '—'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn-mini" onclick="startEditEvent('${e.id}')">Edit</button>
+        <button class="btn-mini" style="color:#B0181D;" onclick="deleteEvent('${e.id}')">Delete</button>
+      </td>`;
+    body.appendChild(tr);
+  });
+}
+function openEventDetail(id) {
+  const e = events.find(x => x.id === id);
+  if (!e) return;
+  const needed = e.assetsNeeded || [];
+  const neededHtml = needed.length ? needed.map(r => `
+    <div class="asset-row">
+      <div class="asset-icon">${r.asset ? extOf(r.asset.name) : '—'}</div>
+      <div class="asset-name">${r.name || '(untitled)'}</div>
+      <span class="needed-status ${r.asset ? 'done' : 'pending'}" style="flex:0 0 auto;">${r.asset ? 'Fulfilled' : 'Needed'}</span>
+      ${r.asset ? `<a class="btn-mini" href="${eventAssetUrl(e.id, r.asset.name)}" download="${r.asset.name}">Download</a>` : ''}
+    </div>`).join('') : '<div style="color:var(--text-dimmer); font-size:13px;">Nothing listed yet.</div>';
+  const briefHtml = e.brief ? `<div style="margin-top:14px; font-weight:700; font-size:12px; color:var(--text-dim); letter-spacing:.04em;">BRIEF</div>
+    <div style="font-size:13px; color:var(--text); line-height:1.5; white-space:pre-wrap;">${e.brief}</div>` : '';
+  document.getElementById('modalBody').innerHTML = `
+    <h2>${e.name}</h2>
+    <div class="modal-sub">${e.id} · <span class="chip chip-status-${e.status.replace(/\s+/g,'')}">${e.status}</span></div>
+    <div class="modal-row"><span>Owner</span><span>${e.owner || '—'}</span></div>
+    <div class="modal-row"><span>Dates</span><span>${fmtDate(e.start)} – ${fmtDate(e.end)}</span></div>
+    <div class="modal-row"><span>Channels</span><span>${channelChipsHTML(e.channels)}</span></div>
+    ${briefHtml}
+    <div style="margin-top:14px; font-weight:700; font-size:12px; color:var(--text-dim); letter-spacing:.04em;">ASSETS NEEDED</div>
+    <div class="asset-list">${neededHtml}</div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeDetail(); startEditEvent('${e.id}');">Edit</button>
+      <button class="btn" onclick="closeDetail();">Close</button>
+    </div>
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+/* ---------- Events Gantt ---------- */
+function renderEventsGantt() {
+  const host = document.getElementById('eventGanttHost');
+  const legendHost = document.getElementById('eventGanttLegend');
+  if (!host) return;
+  host.innerHTML = '';
+  legendHost.innerHTML = '';
+  if (events.length === 0) {
+    host.innerHTML = '<div class="empty"><h3>No events yet</h3><p>Create one above to see it here.</p></div>';
+    return;
+  }
+  host.innerHTML = buildGanttHTML(events, {
+    rowKeyFn: e => e.name,
+    colorFn: e => (e.channels && e.channels[0]) ? CHANNEL_COLOR[e.channels[0]] : '#1A1A1A',
+    barLabelFn: e => e.name + ' (' + e.status + ')',
+    onClickFn: e => `openEventDetail('${e.id}')`,
+    rowLabelHeader: 'Event',
+    rowLabelWidth: 170,
+  });
+  legendHost.innerHTML = CHANNELS.map(c => `<div class="legend-item"><span class="legend-swatch" style="background:${c.color};"></span>${c.key}</div>`).join('');
+}
+
 /* ---------- Add / Edit / Delete ---------- */
 function populateChannelSelect() {
   const sel = document.getElementById('f-channel');
@@ -1417,10 +1844,13 @@ buildNav();
 buildChannelSections();
 populateChannelSelect();
 buildChannelCheckboxes();
+buildEventChannelCheckboxes();
 clearForm();
 clearCampaignForm();
+clearEventForm();
 loadPromos();
 loadCampaigns();
+loadEvents();
 </script>
 </body>
 </html>

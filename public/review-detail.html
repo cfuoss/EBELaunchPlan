@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Flagged review detail — LaunchPlan Hub." />
+    <title>Review Detail — LaunchPlan Hub</title>
+    <style>
+      :root {
+        --ink: #101114;
+        --muted: #6f7178;
+        --subtle: #9799a0;
+        --line: #e8e8ea;
+        --soft: #f6f6f7;
+        --white: #fff;
+        --orange: #f59e0b;
+        --orange-soft: #fff5df;
+        --blue: #3478f6;
+        --green-soft: #e9f9f0;
+        --radius: 16px;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--white);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a { color: inherit; }
+
+      .icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      main {
+        width: min(760px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 48px 0 80px;
+      }
+
+      .top-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 28px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+        text-decoration: none;
+      }
+      .top-link:hover { color: var(--ink); }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--soft);
+        color: #76787f;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+      }
+      .badge.severity-high { background: #fdecea; color: #b3261e; }
+      .badge.severity-medium { background: var(--orange-soft); color: #b66a00; }
+      .badge.severity-low { background: var(--soft); color: #76787f; }
+
+      .context-card {
+        margin-bottom: 32px;
+        padding: 22px 24px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--soft);
+      }
+      .context-card h1 { margin: 10px 0 0; font-size: 21px; letter-spacing: -.02em; }
+      .context-card .suggested-action { margin: 12px 0 0; color: #46474d; font-size: 13.5px; line-height: 1.6; }
+      .context-card .suggested-action strong { color: var(--ink); }
+
+      h2 { font-size: 14px; margin: 0 0 16px; }
+
+      .review-card {
+        margin-bottom: 14px;
+        padding: 18px 20px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+      }
+      .review-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .review-stars { color: #ffa41c; letter-spacing: 1px; font-size: 13px; }
+      .review-date { color: var(--muted); font-size: 11.5px; font-weight: 650; }
+      .review-title { margin: 0 0 4px; font-size: 15px; font-weight: 700; }
+      .review-meta { margin: 0 0 10px; color: var(--subtle); font-size: 11.5px; }
+      .review-meta .verified { color: #13834c; font-weight: 650; }
+      .review-content { margin: 0; color: #303136; font-size: 13.5px; line-height: 1.6; }
+
+      .empty-state { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="top-link" href="/">
+        <svg class="icon"><path d="m11 17-5-5 5-5" /><path d="M6 12h12" /></svg>
+        Back to LaunchPlan Hub
+      </a>
+
+      <div class="context-card" id="context-card"></div>
+
+      <h2>Reviews (<span id="review-count">0</span>)</h2>
+      <div id="reviews-list"><p class="empty-state">Loading…</p></div>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+      const ids = (params.get("ids") || "").split(",").map(s => s.trim()).filter(Boolean);
+      const issue = params.get("issue") || "";
+      const severity = params.get("severity") ? params.get("severity").toLowerCase() : null;
+      const action = params.get("action") || "";
+
+      if (issue) document.title = `${issue} — LaunchPlan Hub`;
+
+      function esc(str) {
+        return String(str ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      }
+
+      function formatDate(isoDate) {
+        if (!isoDate) return "";
+        const d = new Date(`${isoDate}T00:00:00Z`);
+        if (Number.isNaN(d.getTime())) return isoDate;
+        return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+      }
+
+      function renderContext() {
+        const card = document.getElementById("context-card");
+        if (!issue) { card.style.display = "none"; return; }
+        card.innerHTML = `
+          ${severity ? `<span class="badge severity-${esc(severity)}">${esc(severity)}</span>` : ""}
+          <h1>${esc(issue)}</h1>
+          ${action ? `<p class="suggested-action"><strong>Suggested action:</strong> ${esc(action)}</p>` : ""}
+        `;
+      }
+
+      function reviewCard(r) {
+        return `
+          <article class="review-card">
+            <div class="review-card-head">
+              <span class="review-stars">${"★".repeat(Math.round(r.rating || 0))}</span>
+              <span class="review-date">${formatDate(r.date)}</span>
+            </div>
+            <p class="review-title">${esc(r.title)}</p>
+            <p class="review-meta">${esc(r.author || "Amazon Customer")}${r.verified === "Yes" ? ' &middot; <span class="verified">Verified Purchase</span>' : ""}${r.flavor ? ` &middot; ${esc(r.flavor)}` : ""}${r.productGroup ? ` &middot; ${esc(r.productGroup)}` : ""}</p>
+            <p class="review-content">${esc(r.content)}</p>
+          </article>`;
+      }
+
+      async function load() {
+        renderContext();
+
+        if (!ids.length) {
+          document.getElementById("reviews-list").innerHTML = `<p class="empty-state">No reviews specified.</p>`;
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/reviews/by-ids?ids=${encodeURIComponent(ids.join(","))}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const reviews = data.reviews || [];
+
+          document.getElementById("review-count").textContent = reviews.length;
+          document.getElementById("reviews-list").innerHTML = reviews.length
+            ? reviews.map(reviewCard).join("")
+            : `<p class="empty-state">No matching reviews found.</p>`;
+        } catch (err) {
+          document.getElementById("reviews-list").innerHTML = `<p class="empty-state">Couldn't load reviews right now.</p>`;
+          console.error("Failed to load reviews", err);
+        }
+      }
+
+      load();
+    </script>
+  </body>
+</html>

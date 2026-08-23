@@ -30,6 +30,11 @@
 			"binding": "secure_cpg_marketing",
 			"database_name": "secure-cpg-marketing",
 			"database_id": "688432f7-5e21-46b6-bc72-4abe0b8119e1"
+		},
+		{
+			"binding": "secure_cpg_reviews",
+			"database_name": "secure-cpg-reviews",
+			"database_id": "2122fe8e-4676-4a95-bbe5-d32bc7de668d"
 		}
 	]
 }

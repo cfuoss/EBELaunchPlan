@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazon Product Table — Every Body Eat</title>
+<style>
+  :root {
+    --bg:#FFFFFF; --bg-soft:#F7F5EE; --card-border:#E8E4D6;
+    --text:#1A1A1A; --text-dim:#6B6B64;
+    --brand:#2878FF; --brand-light:rgba(40,120,255,0.08);
+    --pos:#00bf63; --neg:#ff3131;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-soft); color: var(--text); font-size: 14px; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 32px 24px 80px; }
+  a.back { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+  a.back:hover { color: var(--text); }
+  h1 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin: 10px 0 4px; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+  .card { background: #fff; border: 1px solid var(--card-border); border-radius: 10px; padding: 20px; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .btn { border: none; border-radius: 999px; padding: 9px 18px; font-weight: 700; font-size: 12.5px; cursor: pointer; }
+  .btn-dark { background: var(--text); color: #fff; }
+  .btn-dark:hover { background: var(--brand); }
+  .btn-brand { background: var(--brand); color: #fff; }
+  .btn-brand:disabled { background: #cbd5e1; cursor: not-allowed; }
+  .btn-outline { background: #fff; color: var(--text); border: 1px solid var(--card-border); }
+  .btn-outline:hover { border-color: var(--brand); color: var(--brand); }
+  .status { font-size: 12.5px; margin-left: 4px; }
+  .status.error { color: var(--neg); }
+  .status.ok { color: var(--pos); }
+  .table-wrap { max-height: 65vh; overflow: auto; border: 1px solid var(--card-border); border-radius: 8px; }
+  table { border-collapse: collapse; font-size: 12.5px; width: max-content; min-width: 100%; }
+  th { background: #f3f4f6; padding: 0; text-align: left; font-weight: 600; border-bottom: 2px solid var(--card-border); position: sticky; top: 0; white-space: nowrap; }
+  th .col-head { display: flex; align-items: center; gap: 4px; padding: 6px 8px; }
+  th input { border: none; background: transparent; font-weight: 600; font-size: 12.5px; width: 110px; padding: 2px; }
+  th input:focus { outline: 1px solid var(--brand); border-radius: 3px; }
+  .del-col { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px; }
+  .del-col:hover { color: var(--neg); }
+  td { padding: 0; border-bottom: 1px solid var(--card-border); border-right: 1px solid #f3f4f6; }
+  td input { border: none; background: transparent; font-size: 12.5px; padding: 6px 8px; width: 130px; font-family: inherit; }
+  td input:focus { outline: 1px solid var(--brand); background: var(--brand-light); }
+  .del-row { width: 30px; text-align: center; }
+  .del-row button { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; }
+  .del-row button:hover { color: var(--neg); }
+  .footer-row { margin-top: 14px; font-size: 12px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/amazon-review-sentiment.html">← Back to Review Sentiment Report</a>
+  <h1>Amazon Product Table</h1>
+  <p class="subtitle">Reference lookup for SKU / FNSKU / ASIN → Product Group, Flavor, Pack Size. Add or remove rows and columns directly in the grid, then save. This is used to auto-match ASINs on future platform-metrics uploads, and can be downloaded any time.</p>
+
+  <div class="card">
+    <div class="toolbar">
+      <button class="btn btn-outline" id="addRowBtn">+ Add Row</button>
+      <button class="btn btn-outline" id="addColBtn">+ Add Column</button>
+      <button class="btn btn-brand" id="saveBtn">Save Changes</button>
+      <button class="btn btn-dark" id="downloadBtn">Download CSV</button>
+      <span class="status" id="status"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+    </div>
+    <div class="footer-row" id="footer"></div>
+  </div>
+</div>
+
+<script>
+let columns = [];
+let rows = [];
+let updatedAt = null;
+
+const headRow = document.getElementById('headRow');
+const body = document.getElementById('body');
+const statusEl = document.getElementById('status');
+const footer = document.getElementById('footer');
+
+function setStatus(msg, cls) {
+  statusEl.textContent = msg || '';
+  statusEl.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+async function load() {
+  setStatus('Loading…');
+  try {
+    const res = await fetch('/api/product-table');
+    const doc = await res.json();
+    if (!res.ok) throw new Error(doc.error || `Request failed (${res.status})`);
+    columns = doc.columns;
+    rows = doc.rows;
+    updatedAt = doc.updatedAt;
+    render();
+    setStatus('');
+  } catch (err) {
+    setStatus('Error loading table: ' + err.message, 'error');
+  }
+}
+
+function render() {
+  headRow.innerHTML = columns.map((c, i) => `
+    <th>
+      <div class="col-head">
+        <input type="text" value="${escAttr(c)}" data-col-idx="${i}" class="col-name-input">
+        <button type="button" class="del-col" data-col-idx="${i}" title="Delete column">×</button>
+      </div>
+    </th>
+  `).join('') + '<th></th>';
+
+  body.innerHTML = rows.map((row, ri) => `
+    <tr data-row-idx="${ri}">
+      ${columns.map(c => `<td><input type="text" value="${escAttr(row[c] ?? '')}" data-col="${escAttr(c)}"></td>`).join('')}
+      <td class="del-row"><button type="button" title="Delete row">🗑</button></td>
+    </tr>
+  `).join('');
+
+  footer.textContent = `${rows.length} row(s), ${columns.length} column(s)` + (updatedAt ? ` · last saved ${new Date(updatedAt).toLocaleString()}` : ' · not yet saved');
+}
+
+function escAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+headRow.addEventListener('change', (e) => {
+  if (e.target.classList.contains('col-name-input')) {
+    const idx = Number(e.target.dataset.colIdx);
+    const oldName = columns[idx];
+    const newName = e.target.value.trim() || oldName;
+    columns[idx] = newName;
+    rows.forEach(r => { if (oldName !== newName) { r[newName] = r[oldName]; delete r[oldName]; } });
+  }
+});
+
+headRow.addEventListener('click', (e) => {
+  if (e.target.classList.contains('del-col')) {
+    const idx = Number(e.target.dataset.colIdx);
+    const name = columns[idx];
+    if (!confirm(`Delete column "${name}"? This removes it from every row.`)) return;
+    columns.splice(idx, 1);
+    rows.forEach(r => delete r[name]);
+    render();
+  }
+});
+
+body.addEventListener('change', (e) => {
+  if (e.target.tagName !== 'INPUT') return;
+  const tr = e.target.closest('tr');
+  const ri = Number(tr.dataset.rowIdx);
+  const col = e.target.dataset.col;
+  rows[ri][col] = e.target.value;
+});
+
+body.addEventListener('click', (e) => {
+  const btn = e.target.closest('.del-row button');
+  if (!btn) return;
+  const tr = btn.closest('tr');
+  const ri = Number(tr.dataset.rowIdx);
+  rows.splice(ri, 1);
+  render();
+});
+
+document.getElementById('addRowBtn').addEventListener('click', () => {
+  const blank = {};
+  columns.forEach(c => blank[c] = '');
+  rows.push(blank);
+  render();
+});
+
+document.getElementById('addColBtn').addEventListener('click', () => {
+  const name = prompt('New column name:');
+  if (!name || !name.trim()) return;
+  const trimmed = name.trim();
+  if (columns.includes(trimmed)) { alert('That column already exists.'); return; }
+  columns.push(trimmed);
+  rows.forEach(r => r[trimmed] = '');
+  render();
+});
+
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  setStatus('Saving…');
+  try {
+    const res = await fetch('/api/product-table', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ columns, rows }),
+    });
+    const doc = await res.json();
+    if (!res.ok) throw new Error(doc.error || `Request failed (${res.status})`);
+    updatedAt = doc.updatedAt;
+    render();
+    setStatus('Saved.', 'ok');
+  } catch (err) {
+    setStatus('Error: ' + err.message, 'error');
+  }
+});
+
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  window.location.href = '/api/product-table/download';
+});
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weekly Data Upload — LaunchPlan Hub</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --navy: #0f172a;
+        --blue: #2563eb;
+        --blue-light: #eff6ff;
+        --green: #15803d;
+        --green-light: #f0fdf4;
+        --red: #b91c1c;
+        --red-light: #fef2f2;
+        --border: #dbe3ee;
+        --muted: #64748b;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #f8fafc;
+        color: var(--navy);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(900px, calc(100% - 32px));
+        margin: 56px auto;
+      }
+
+      .top-link {
+        display: inline-block;
+        margin-bottom: 20px;
+        color: var(--blue);
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      h1 { margin: 0 0 10px; font-size: clamp(26px, 4vw, 36px); }
+      p { color: #475569; line-height: 1.6; }
+
+      .intro { margin-bottom: 28px; }
+
+      .privacy-note {
+        margin: 0 0 28px;
+        padding: 14px 16px;
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        background: var(--blue-light);
+        color: #1e3a8a;
+      }
+
+      .upload-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+
+      @media (max-width: 720px) {
+        .upload-grid { grid-template-columns: 1fr; }
+      }
+
+      .card {
+        padding: clamp(22px, 4vw, 32px);
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+      }
+
+      .card h2 { margin: 0 0 6px; font-size: 20px; }
+      .card .desc { margin: 0 0 16px; font-size: 14px; }
+
+      .status-line {
+        margin: 0 0 18px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #f1f5f9;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      label { display: block; margin-bottom: 8px; font-weight: 700; font-size: 14px; }
+
+      input[type="file"] {
+        width: 100%;
+        padding: 18px;
+        border: 2px dashed #94a3b8;
+        border-radius: 12px;
+        background: #f8fafc;
+        font-size: 13px;
+      }
+
+      .help { margin: 8px 0 18px; color: var(--muted); font-size: 13px; }
+
+      button {
+        width: 100%;
+        padding: 12px 18px;
+        border: 0;
+        border-radius: 10px;
+        background: var(--blue);
+        color: white;
+        font-size: 15px;
+        font-weight: 750;
+        cursor: pointer;
+      }
+
+      button:disabled { cursor: wait; opacity: 0.6; }
+
+      .result {
+        display: none;
+        margin-top: 18px;
+        padding: 14px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+      }
+
+      .result.success { display: block; color: #14532d; background: var(--green-light); border: 1px solid #bbf7d0; }
+      .result.error { display: block; color: #7f1d1d; background: var(--red-light); border: 1px solid #fecaca; }
+      .result strong { display: block; margin-bottom: 4px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="top-link" href="/#dashboards">← Return to LaunchPlan Hub</a>
+      <div class="intro">
+        <h1>Weekly Data Upload</h1>
+        <p>Replace the Demand Plan or the Issues/Opportunities workbook. The home page and Operations reports read these files live on every visit, so there's nothing else to update after a successful upload.</p>
+      </div>
+
+      <div class="privacy-note">
+        Files are stored privately in the hub's data bucket and are only used to power these reports — nothing is made public.
+      </div>
+
+      <div class="upload-grid">
+        <section class="card">
+          <h2>Demand Plan</h2>
+          <p class="desc">Drives Upcoming Shipments on the home page and the shipment detail view.</p>
+          <div class="status-line" id="plan-status">Checking current file…</div>
+          <form class="upload-form" data-type="plan">
+            <label for="plan-file">Demand Plan workbook (.xlsx)</label>
+            <input id="plan-file" name="file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required />
+            <div class="help">Accepted: .xlsx files up to 5 MB</div>
+            <button type="submit">Upload Demand Plan</button>
+          </form>
+          <section class="result" data-result="plan" aria-live="polite"></section>
+        </section>
+
+        <section class="card">
+          <h2>Issues &amp; Opportunities</h2>
+          <p class="desc">Drives Open Issues &amp; Opportunities by Department on the home page.</p>
+          <div class="status-line" id="issues-status">Checking current file…</div>
+          <form class="upload-form" data-type="issues">
+            <label for="issues-file">Issues/Opportunities workbook (.xlsx)</label>
+            <input id="issues-file" name="file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required />
+            <div class="help">Accepted: .xlsx files up to 5 MB</div>
+            <button type="submit">Upload Issues/Opportunities</button>
+          </form>
+          <section class="result" data-result="issues" aria-live="polite"></section>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      function escapeHtml(value) {
+        const element = document.createElement("div");
+        element.textContent = String(value ?? "");
+        return element.innerHTML;
+      }
+
+      function formatDate(value) {
+        if (!value) return null;
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return null;
+        return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      }
+
+      async function loadStatus() {
+        const planStatus = document.getElementById("plan-status");
+        const issuesStatus = document.getElementById("issues-status");
+
+        try {
+          const res = await fetch("/api/shipments/upcoming");
+          if (res.ok) {
+            const data = await res.json();
+            const when = formatDate(data.sourceFileUpdated);
+            planStatus.textContent = when ? `Current file last updated ${when}.` : "A file is on record, but its upload date isn't available.";
+          } else {
+            planStatus.textContent = "No Demand Plan file uploaded yet.";
+          }
+        } catch {
+          planStatus.textContent = "Couldn't check the current file's status.";
+        }
+
+        try {
+          const res = await fetch("/api/issues-opportunities");
+          if (res.ok) {
+            const data = await res.json();
+            const when = formatDate(data.sourceFileUpdated);
+            const tab = data.sourceTab ? ` (latest tab: "${escapeHtml(data.sourceTab)}")` : "";
+            issuesStatus.textContent = when ? `Current file last updated ${when}${tab}.` : `A file is on record${tab}, but its upload date isn't available.`;
+          } else {
+            issuesStatus.textContent = "No Issues/Opportunities file uploaded yet.";
+          }
+        } catch {
+          issuesStatus.textContent = "Couldn't check the current file's status.";
+        }
+      }
+
+      document.querySelectorAll(".upload-form").forEach((form) => {
+        const type = form.dataset.type;
+        const result = document.querySelector(`[data-result="${type}"]`);
+        const button = form.querySelector("button");
+
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          result.style.display = "none";
+          result.className = "result";
+          button.disabled = true;
+          button.textContent = "Uploading…";
+
+          try {
+            const formData = new FormData(form);
+            formData.set("type", type);
+
+            const response = await fetch("/api/weekly-data/upload", {
+              method: "POST",
+              body: formData,
+              credentials: "same-origin",
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.ok) {
+              throw new Error(data?.error || "The upload could not be processed.");
+            }
+
+            result.className = "result success";
+            result.innerHTML = `<strong>Uploaded successfully</strong>${escapeHtml(data.name)} (${(data.size / 1024).toFixed(0)} KB) is now the active file. The home page will reflect it on next load — no other steps needed.`;
+            form.reset();
+            loadStatus();
+          } catch (error) {
+            result.className = "result error";
+            result.innerHTML = `<strong>Upload not accepted</strong>${escapeHtml(error.message)}`;
+          } finally {
+            result.style.display = "block";
+            button.disabled = false;
+            button.textContent = type === "plan" ? "Upload Demand Plan" : "Upload Issues/Opportunities";
+          }
+        });
+      });
+
+      loadStatus();
+    </script>
+  </body>
+</html>

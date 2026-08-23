@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Upcoming shipments — full item-level detail — LaunchPlan Hub." />
+    <title>Upcoming Shipments — Full Detail — LaunchPlan Hub</title>
+    <style>
+      :root {
+        --ink: #101114;
+        --muted: #6f7178;
+        --subtle: #9799a0;
+        --line: #e8e8ea;
+        --soft: #f6f6f7;
+        --white: #fff;
+        --blue: #3478f6;
+        --radius: 16px;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--white);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a { color: inherit; }
+
+      .icon {
+        width: 16px;
+        height: 16px;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      main {
+        width: min(1100px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 48px 0 80px;
+      }
+
+      .top-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 28px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+        text-decoration: none;
+      }
+      .top-link:hover { color: var(--ink); }
+
+      h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: -.02em; }
+      .subtitle { margin: 0 0 28px; color: var(--muted); font-size: 13.5px; }
+      .subtitle strong { color: var(--ink); }
+
+      .table-wrap {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow-x: auto;
+      }
+
+      table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+      thead th {
+        position: sticky;
+        top: 0;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--soft);
+        color: var(--muted);
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        text-align: right;
+      }
+      thead th:nth-child(-n+3) { text-align: left; }
+      tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+      tbody td:nth-child(-n+3) { text-align: left; font-variant-numeric: normal; white-space: normal; }
+      tbody tr:last-child td { border-bottom: none; }
+      tbody tr:hover { background: var(--soft); }
+      .item-name { font-weight: 650; }
+      .item-meta { color: var(--subtle); font-size: 11px; }
+      tfoot td { padding: 12px 14px; border-top: 2px solid var(--line); font-weight: 760; text-align: right; }
+      tfoot td:nth-child(-n+3) { text-align: left; }
+
+      .empty-state { padding: 40px 20px; text-align: center; color: var(--muted); font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="top-link" href="/">
+        <svg class="icon"><path d="m11 17-5-5 5-5" /><path d="M6 12h12" /></svg>
+        Back to LaunchPlan Hub
+      </a>
+
+      <h1>Upcoming Shipments — Full Detail</h1>
+      <p class="subtitle" id="subtitle">Loading…</p>
+
+      <div class="table-wrap">
+        <table id="shipment-table" style="display:none;">
+          <thead>
+            <tr id="table-head-row"></tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+          <tfoot>
+            <tr id="table-foot-row"></tr>
+          </tfoot>
+        </table>
+        <div id="table-empty" class="empty-state">Loading…</div>
+      </div>
+    </main>
+
+    <script>
+      function esc(str) {
+        return String(str ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      }
+
+      function formatDate(isoDate) {
+        if (!isoDate) return "";
+        const d = new Date(`${isoDate}T00:00:00Z`);
+        if (Number.isNaN(d.getTime())) return isoDate;
+        return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+      }
+
+      function formatDateTime(isoString) {
+        if (!isoString) return "unknown";
+        const d = new Date(isoString);
+        if (Number.isNaN(d.getTime())) return isoString;
+        return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      }
+
+      async function load() {
+        try {
+          const res = await fetch("/api/shipments/upcoming");
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+
+          const weeks = data.weeks || [];
+          const items = data.items || [];
+
+          if (!weeks.length) {
+            document.getElementById("subtitle").textContent = "No shipment data available.";
+            document.getElementById("table-empty").textContent = "No shipment data available.";
+            return;
+          }
+
+          const firstWeek = formatDate(weeks[0].weekStart);
+          const lastWeek = formatDate(weeks[weeks.length - 1].weekStart);
+          document.getElementById("subtitle").innerHTML =
+            `Week of <strong>${firstWeek}</strong> through <strong>${lastWeek}</strong> &middot; Active-status case volume &middot; Source updated ${esc(formatDateTime(data.sourceFileUpdated))}`;
+
+          const headRow = document.getElementById("table-head-row");
+          headRow.innerHTML = `
+            <th>Item</th><th>Unit of Measure</th><th>Posting Group</th>
+            ${weeks.map(w => `<th>${formatDate(w.weekStart)}</th>`).join("")}
+            <th>Total</th>`;
+
+          const body = document.getElementById("table-body");
+          if (!items.length) {
+            document.getElementById("table-empty").textContent = "No active items with volume in this window.";
+          } else {
+            document.getElementById("table-empty").style.display = "none";
+            document.getElementById("shipment-table").style.display = "table";
+            body.innerHTML = items.map(item => `
+              <tr>
+                <td class="item-name">${esc(item.description)}</td>
+                <td class="item-meta">${esc(item.unit)}</td>
+                <td class="item-meta">${esc(item.postingGroup)}</td>
+                ${item.cases.map(c => `<td>${c.toLocaleString()}</td>`).join("")}
+                <td><strong>${item.total.toLocaleString()}</strong></td>
+              </tr>`).join("");
+          }
+
+          const footRow = document.getElementById("table-foot-row");
+          footRow.innerHTML = `
+            <td colspan="3">Total</td>
+            ${weeks.map(w => `<td>${w.cases.toLocaleString()}</td>`).join("")}
+            <td>${(data.total || 0).toLocaleString()}</td>`;
+        } catch (err) {
+          document.getElementById("subtitle").textContent = "Couldn't load shipment data right now.";
+          document.getElementById("table-empty").textContent = "Couldn't load shipment data right now.";
+          console.error("Failed to load shipment detail", err);
+        }
+      }
+
+      load();
+    </script>
+  </body>
+</html>
