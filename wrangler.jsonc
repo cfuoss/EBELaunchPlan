@@ -35,6 +35,16 @@
 			"binding": "secure_cpg_reviews",
 			"database_name": "secure-cpg-reviews",
 			"database_id": "2122fe8e-4676-4a95-bbe5-d32bc7de668d"
+		},
+		{
+			"binding": "instacart_data",
+			"database_name": "instacart-data",
+			"database_id": "6515182d-1072-4df0-b023-368fb722ac18"
+		},
+		{
+			"binding": "ebe_bc_database",
+			"database_name": "ebe-bc-database",
+			"database_id": "6614b57f-4df1-492c-86fe-b4f4f01dde1a"
 		}
 	]
 }

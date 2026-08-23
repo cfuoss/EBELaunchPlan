@@ -20,6 +20,8 @@
         --blue-soft: #eaf2ff;
         --green: #20a565;
         --green-soft: #e9f9f0;
+        --red: #d3342d;
+        --red-soft: #fdecea;
         --violet: #6d5ce7;
         --violet-soft: #f0edff;
         --sidebar: 252px;
@@ -489,6 +491,17 @@
       .stat-card-value { margin: 4px 0 0; font-size: 14px; font-weight: 650; line-height: 1.4; }
       .stat-card-value strong { font-weight: 760; }
 
+      .status-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 16px; }
+      .status-card { display: flex; align-items: center; gap: 12px; padding: 15px 16px; }
+      .status-dot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: var(--subtle); box-shadow: 0 0 0 4px var(--soft); }
+      .status-dot.green { background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); }
+      .status-dot.red { background: var(--red); box-shadow: 0 0 0 4px var(--red-soft); }
+      .status-card-body { min-width: 0; }
+      .status-card-label { margin: 0; font-size: 13px; font-weight: 650; color: var(--ink); }
+      .status-card-value { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+      @media (max-width: 860px) { .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @media (max-width: 560px) { .status-grid { grid-template-columns: 1fr; } }
+
       .dept-card { padding: 20px; }
       .dept-card h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-size: 15px; }
       .dept-list { display: flex; flex-direction: column; gap: 11px; margin: 0; padding: 0; list-style: none; }
@@ -745,6 +758,9 @@
         <p class="lede">Your secure home for CPG analytics, AI workflows, software, and connected data.</p>
 
         <div class="section-head"><div><h2>Today</h2><p>Computed live from the weekly source files — no manual snapshot to update.</p></div></div>
+        <div class="grid status-grid" id="data-status-grid">
+          <div class="card status-card"><span class="status-dot"></span><div class="status-card-body"><p class="status-card-label">Loading…</p><p class="status-card-value">&nbsp;</p></div></div>
+        </div>
         <div class="grid grid-2" id="today-grid">
           <a class="card stat-card" id="today-reviews-tile" target="_blank" rel="noopener"><div class="tool-icon orange"><svg class="icon"><use href="#i-chart" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Reviews</p><p class="stat-card-value">Loading…</p></div></a>
           <div class="card stat-card"><div class="tool-icon violet"><svg class="icon"><use href="#i-file" /></svg></div><div class="stat-card-body"><p class="stat-card-label">Latest SOP</p><p class="stat-card-value">Loading…</p></div></div>
@@ -961,6 +977,31 @@
         return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
       }
 
+      // Includes the time (unlike formatDateTime above) so a "green = within
+      // 24h" claim on the Instacart tile is actually checkable at a glance.
+      function formatStatusTimestamp(isoString) {
+        if (!isoString) return "no data yet";
+        const d = new Date(isoString);
+        if (Number.isNaN(d.getTime())) return isoString;
+        return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+      }
+
+      function renderDataStatus(tiles) {
+        const grid = document.getElementById("data-status-grid");
+        if (!tiles || !tiles.length) {
+          grid.innerHTML = `<div class="card status-card"><span class="status-dot"></span><div class="status-card-body"><p class="status-card-label">Unavailable</p><p class="status-card-value">Couldn't load status right now.</p></div></div>`;
+          return;
+        }
+        grid.innerHTML = tiles.map(t => `
+          <div class="card status-card">
+            <span class="status-dot ${t.status === "green" ? "green" : "red"}" title="${t.status === "green" ? "Up to date" : "Needs refresh"}"></span>
+            <div class="status-card-body">
+              <p class="status-card-label">${esc(t.label)}</p>
+              <p class="status-card-value">${esc(formatStatusTimestamp(t.lastUpdated))}</p>
+            </div>
+          </div>`).join("");
+      }
+
       function esc(str) {
         return String(str ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
       }
@@ -1060,8 +1101,10 @@
             : "No shipment plan file on file";
 
           renderReviewsCarousel(summary.reviewHighlights);
+          renderDataStatus(summary.dataStatus);
         } catch (err) {
           grid.querySelectorAll(".stat-card-value").forEach(el => { el.textContent = "Unavailable right now"; });
+          renderDataStatus(null);
           console.error("Failed to load Today summary", err);
         }
       }
