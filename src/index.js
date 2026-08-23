@@ -214,13 +214,17 @@ async function getReviewData(env, limit = null, source = null) {
 async function getReviewReportData(env, source = null) {
   const reviews = await getReviewData(env, null, source);
   if (reviews.length === 0) return null;
-  const report = buildFullReviewReport(null, reviews);
 
-  // Overlay live platform (Amazon listing) numbers from the separate
-  // platform-metrics D1 upload — independent of review source, since a
+  // Platform (Amazon listing) numbers are independent of review source — a
   // listing's review count/star rating describes the product, not which
-  // review-data source we're viewing.
+  // review-data source we're viewing — so they're fetched first and passed
+  // in, letting buildFullReviewReport include every platform-metric flavor
+  // in group_order/flavor_order even when the current source filter has no
+  // written reviews for it. Without that, a flavor with only Okendo reviews
+  // would silently drop out of (and out of the totals for) the Amazon view,
+  // and vice versa.
   const platformSummary = await getPlatformMetricsSummary(env);
+  const report = buildFullReviewReport(reviews, platformSummary);
   applyPlatformMetrics(report, platformSummary);
 
   return report;
@@ -1345,27 +1349,34 @@ function computeReviewThemeStats(reviews, polarity) {
 // report — they come from the separate platform-metrics D1 upload, not from
 // review data, and /api/reviews/report overlays live D1 numbers on top of
 // whatever is here anyway, so staleness here is harmless.
-function buildFullReviewReport(previousReport, allReviews) {
+function buildFullReviewReport(allReviews, platformSummary) {
   const overall_stats = computeReviewStats(allReviews);
   const overall_themes = computeReviewThemeStats(allReviews, null);
 
-  const group_order = [...new Set(allReviews.map((r) => r.product_group))].sort();
+  // Platform-metric (group, flavor) pairs must be represented in every
+  // source view even when the current filter has zero written reviews for
+  // them — otherwise total_platform_reviews (and the flavor rollup table)
+  // silently shrink depending on which source tab is selected, even though
+  // Amazon's own listing review counts have nothing to do with that filter.
+  const platformGroupFlavors = {};
+  for (const key of Object.keys(platformSummary || {})) {
+    const [pg, fl] = key.split("::");
+    (platformGroupFlavors[pg] ||= new Set()).add(fl);
+  }
+
+  const group_order = [...new Set([...allReviews.map((r) => r.product_group), ...Object.keys(platformGroupFlavors)])].sort();
   const groups = {};
 
   for (const pg of group_order) {
     const pgReviews = allReviews.filter((r) => r.product_group === pg);
-    const oldGroup = previousReport?.groups?.[pg] || {};
 
-    const flavorsWithReviews = [...new Set(pgReviews.map((r) => r.flavor))].sort();
-    const oldMetricOnlyFlavors = (oldGroup.flavor_order || []).filter(
-      (fl) => !flavorsWithReviews.includes(fl) && oldGroup.flavors?.[fl]?.metric_only,
-    );
-    const flavor_order = [...flavorsWithReviews, ...oldMetricOnlyFlavors];
+    const flavorsWithReviews = [...new Set(pgReviews.map((r) => r.flavor))];
+    const platformOnlyFlavors = [...(platformGroupFlavors[pg] || [])].filter((fl) => !flavorsWithReviews.includes(fl));
+    const flavor_order = [...new Set([...flavorsWithReviews, ...platformOnlyFlavors])].sort();
 
     const flavors = {};
     for (const fl of flavor_order) {
       const flReviews = pgReviews.filter((r) => r.flavor === fl);
-      const oldFlavor = oldGroup.flavors?.[fl] || {};
       const themesPos = computeReviewThemeStats(flReviews, "positive");
       const themesNeg = computeReviewThemeStats(flReviews, "negative");
       flavors[fl] = {
@@ -1374,8 +1385,8 @@ function buildFullReviewReport(previousReport, allReviews) {
         themes_neg: themesNeg.slice(0, 5),
         all_themes_pos: themesPos,
         all_themes_neg: themesNeg,
-        platform_reviews: oldFlavor.platform_reviews || 0,
-        platform_wtd_rating: oldFlavor.platform_wtd_rating || 0,
+        platform_reviews: 0,
+        platform_wtd_rating: 0,
         metric_only: flReviews.length === 0,
       };
     }
