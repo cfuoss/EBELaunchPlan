@@ -519,6 +519,15 @@
       .issue-update { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
       .issue-update-label { color: #85878e; font-weight: 650; }
 
+      .month-list-card { display: block; padding: 20px; text-decoration: none; }
+      .month-list-card h3 { margin: 0 0 14px; font-size: 15px; color: var(--ink); }
+      .month-list { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; max-height: 320px; overflow-y: auto; }
+      .month-list li { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+      .month-list li:last-child { border-bottom: none; padding-bottom: 0; }
+      .month-item-title { display: block; color: var(--ink); font-size: 13px; font-weight: 650; line-height: 1.45; }
+      .month-item-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; font-size: 12px; color: var(--muted); }
+      .month-item-chip { padding: 1px 8px; border-radius: 999px; background: var(--soft); font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #56585f; }
+
       .marquee-card { display: block; padding: 16px 0 16px 20px; overflow: hidden; text-decoration: none; color: inherit; cursor: pointer; }
       .marquee-card + .marquee-card { margin-top: 12px; }
       .marquee-label { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: #13834c; font-size: 11px; font-weight: 760; letter-spacing: .06em; text-transform: uppercase; }
@@ -826,6 +835,18 @@
           <p class="shipment-detail-hint">View full item-level detail →</p>
         </a>
 
+        <div class="section-head"><div><h2>This Month</h2><p>Promotions and campaigns running in <span id="this-month-label">this month</span>.</p></div><span class="badge" id="this-month-badge">Loading…</span></div>
+        <div class="grid grid-2">
+          <a class="card month-list-card" href="/ebe-promo-calendar.html" target="_blank" rel="noopener">
+            <h3>Promotions</h3>
+            <ul class="month-list" id="month-promotions-list"><li class="dept-empty">Loading…</li></ul>
+          </a>
+          <a class="card month-list-card" href="/ebe-promo-calendar.html" target="_blank" rel="noopener">
+            <h3>Campaigns</h3>
+            <ul class="month-list" id="month-campaigns-list"><li class="dept-empty">Loading…</li></ul>
+          </a>
+        </div>
+
         <div class="section-head"><div><h2>Explore your hub</h2><p>Everything your team needs in one protected workspace.</p></div></div>
         <div class="grid grid-3">
           <a class="card feature-card" href="#dashboards" data-page-link="dashboards">
@@ -986,6 +1007,54 @@
         return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
       }
 
+      function formatMonthLabel(isoDate) {
+        if (!isoDate) return "this month";
+        const d = new Date(`${isoDate}T00:00:00Z`);
+        if (Number.isNaN(d.getTime())) return "this month";
+        return d.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+      }
+
+      function renderThisMonthMarketing(data) {
+        const label = document.getElementById("this-month-label");
+        const badge = document.getElementById("this-month-badge");
+        const promoList = document.getElementById("month-promotions-list");
+        const campaignList = document.getElementById("month-campaigns-list");
+
+        if (!data) {
+          badge.textContent = "Unavailable";
+          promoList.innerHTML = `<li class="dept-empty">Couldn't load right now.</li>`;
+          campaignList.innerHTML = `<li class="dept-empty">Couldn't load right now.</li>`;
+          return;
+        }
+
+        label.textContent = formatMonthLabel(data.monthStart);
+        badge.textContent = `${data.promotions.length} promotion${data.promotions.length === 1 ? "" : "s"} · ${data.campaigns.length} campaign${data.campaigns.length === 1 ? "" : "s"}`;
+
+        promoList.innerHTML = data.promotions.length
+          ? data.promotions.map(p => `
+              <li>
+                <span class="month-item-title">${esc(p.desc || p.product)}</span>
+                <span class="month-item-meta">
+                  <span class="month-item-chip">${esc(p.channel)}</span>
+                  ${p.retailer ? `<span>${esc(p.retailer)}</span> · ` : ""}
+                  <span>${formatDate(p.start)} – ${formatDate(p.end)}</span>
+                </span>
+              </li>`).join("")
+          : `<li class="dept-empty">No promotions running this month.</li>`;
+
+        campaignList.innerHTML = data.campaigns.length
+          ? data.campaigns.map(c => `
+              <li>
+                <span class="month-item-title">${esc(c.name)}</span>
+                <span class="month-item-meta">
+                  ${(c.channels || []).map(ch => `<span class="month-item-chip">${esc(ch)}</span>`).join("")}
+                  ${c.status ? `<span>${esc(c.status)}</span> · ` : ""}
+                  <span>${formatDate(c.start)} – ${formatDate(c.end)}</span>
+                </span>
+              </li>`).join("")
+          : `<li class="dept-empty">No campaigns running this month.</li>`;
+      }
+
       function renderDataStatus(tiles) {
         const grid = document.getElementById("data-status-grid");
         if (!tiles || !tiles.length) {
@@ -1102,9 +1171,11 @@
 
           renderReviewsCarousel(summary.reviewHighlights);
           renderDataStatus(summary.dataStatus);
+          renderThisMonthMarketing(summary.thisMonthMarketing);
         } catch (err) {
           grid.querySelectorAll(".stat-card-value").forEach(el => { el.textContent = "Unavailable right now"; });
           renderDataStatus(null);
+          renderThisMonthMarketing(null);
           console.error("Failed to load Today summary", err);
         }
       }
