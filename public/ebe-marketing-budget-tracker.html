@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Every Body Eat — Monthly Channel Budget vs Actuals</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FFFFFF;
+  --bg-soft: #F7F5EE;
+  --card: #FFFFFF;
+  --card-border: #E8E4D6;
+  --text: #1A1A1A;
+  --text-dim: #6B6B64;
+  --text-dimmer: #78766E;
+  --ink: #1A1A1A;
+  --pretzel: #2878FF;
+  --pretzel-text: #1E5FDB;
+  --lime: #CADC30;
+  --lime-text: #5C6B0A;
+  --orange: #F99420;
+  --teal: #0099F3;
+  --sky: #87CCF4;
+  --magenta: #CC1F97;
+  --rose: #ED1C24;
+  --rose-text: #B0181D;
+  --grey: #878787;
+  --pos: #00bf63;
+  --neg: #ff3131;
+  --neu: #78766E;
+  --pos-bg: rgba(0,191,99,0.15);
+  --pos-light: rgba(0,191,99,0.07);
+  --neg-bg: rgba(255,49,49,0.12);
+  --neg-light: rgba(255,49,49,0.06);
+  --neu-bg: rgba(120,118,110,0.12);
+  --brand-light: rgba(40,120,255,0.08);
+  --focus: #2878FF;
+  --border: #E8E4D6;
+  --brand: #2878FF;
+  --brand-dark: #1A1A1A;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: 'Barlow Semi Condensed', sans-serif; color: var(--text);
+  background: var(--bg);
+}
+h1, h2, h3 { font-family: 'Anton', sans-serif; font-weight: 400; margin: 0 0 8px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+a { color: var(--pretzel-text); }
+
+/* Sidebar */
+.sidenav {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+  background: var(--bg-soft); border-right: 1px solid var(--card-border);
+  overflow-y: auto; z-index: 100; padding: 0 0 40px; transition: transform .2s;
+}
+.sidenav.collapsed { transform: translateX(-220px); }
+.hub-brand { display: flex; align-items: center; height: 52px; padding: 0 16px; border-bottom: 1px solid var(--card-border); text-decoration: none; color: inherit; transition: background .15s; }
+.hub-brand:hover { background: rgba(0,0,0,0.05); }
+.hub-brand-mark { display: grid; width: 28px; height: 28px; margin-right: 9px; place-items: center; border-radius: 8px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 850; letter-spacing: -.04em; flex: none; }
+.hub-brand-name { font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--ink); }
+.sidenav-logo { padding: 20px 16px 12px; border-bottom: 1px solid var(--card-border); }
+.sidenav-logo h1 { color: var(--ink); font-size: 16px; letter-spacing: 0.04em; }
+.sidenav-logo p { color: var(--text-dim); font-size: 11px; margin: 4px 0 0; }
+.nav-section { padding: 14px 8px 4px 16px; color: var(--text-dimmer); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.sidenav a { display: block; padding: 8px 16px; color: var(--ink); text-decoration: none; font-size: 14px; border-radius: 4px; margin: 1px 8px; transition: background .15s; cursor: pointer; border-left: 3px solid transparent; }
+.sidenav a:hover, .sidenav a.active { background: rgba(0,0,0,0.07); }
+.navtoggle {
+  position: fixed; top: 16px; left: 176px; z-index: 200;
+  width: 32px; height: 32px; border-radius: 999px; border: none; background: var(--ink);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px;
+  transition: left .2s;
+}
+.navtoggle.collapsed-state { left: 16px; }
+.navtoggle span { width: 16px; height: 2px; background: #fff; display: block; }
+.main { margin-left: 220px; padding: 32px 36px 80px; min-height: 100vh; transition: margin .2s; }
+.main.expanded { margin-left: 0; }
+
+/* Header */
+.pagehead { background: var(--bg); border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+.pagehead h1 { font-size: 30px; }
+.pagehead .sub { color: var(--text-dim); font-size: 14px; margin-top: 4px; }
+.savestate { font-size: 12px; color: var(--text-dimmer); font-family: 'IBM Plex Mono', monospace; }
+
+.versionbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; padding: 14px 16px; background: var(--bg-soft); border: 1px solid var(--card-border); border-radius: 12px; }
+.versionbar label { margin: 0; }
+.versionbar select { width: auto; min-width: 220px; }
+
+.section { display: none; }
+.section.active { display: block; }
+
+/* Cards */
+.card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; box-shadow: 0 1px 3px rgba(20,20,10,.05); padding: 20px; margin-bottom: 20px; }
+.card h2 { font-size: 20px; margin-bottom: 4px; }
+.card .desc { color: var(--text-dim); font-size: 13px; margin-bottom: 16px; }
+
+.banner { display: flex; gap: 10px; align-items: flex-start; background: var(--brand-light); border: 1px solid var(--card-border); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: var(--text-dim); }
+.banner strong { color: var(--text); }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border: 2px solid var(--ink); background: transparent; color: var(--ink); padding: 8px 18px; font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 600; font-size: 14px; cursor: pointer; transition: all .15s; }
+.btn:hover { background: rgba(0,0,0,0.05); }
+.btn-primary { background: var(--ink); color: #fff; }
+.btn-primary:hover { background: #333; }
+.btn-mini { border-radius: 999px; border: 1px solid var(--card-border); background: #fff; color: var(--text-dim); padding: 4px 12px; font-size: 12px; cursor: pointer; }
+.btn-mini:hover { border-color: var(--ink); color: var(--ink); }
+.btn-danger { border-color: var(--rose-text); color: var(--rose-text); }
+.btn-danger:hover { background: var(--neg-light); }
+.btn[disabled] { background: transparent; border-color: var(--card-border); color: var(--text-dimmer); cursor: not-allowed; }
+
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; font-weight: 600; }
+input, select, textarea { padding: 9px 11px; border: 1px solid var(--card-border); border-radius: 8px; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 14px; color: var(--text); background: #fff; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--brand-light); }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dimmer); border-bottom: 2px solid var(--ink); padding: 8px 10px; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+td { padding: 7px 10px; border-bottom: 1px solid var(--card-border); vertical-align: middle; }
+tbody tr.rowgroup-start td { border-top: 2px solid var(--card-border); }
+.numcell { font-family: 'IBM Plex Mono', monospace; text-align: right; }
+.rowlabel { font-weight: 600; white-space: nowrap; }
+.rowlabel.sub { font-weight: 400; color: var(--text-dim); padding-left: 18px; }
+.budget-input { width: 84px; padding: 4px 6px; font-size: 12px; text-align: right; font-family: 'IBM Plex Mono', monospace; }
+.dim { color: var(--text-dimmer); }
+.var-pos { color: var(--pos); font-weight: 600; }
+.var-neg { color: var(--neg); font-weight: 600; }
+.total-col { border-left: 2px solid var(--ink); font-weight: 700; }
+.channel-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; flex: none; }
+tr.group-header td { background: var(--bg-soft); font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dimmer); padding: 9px 10px 5px; border-bottom: 1px solid var(--card-border); }
+tr.group-subtotal td { font-weight: 700; border-top: 1px solid var(--card-border); border-bottom: 2px solid var(--ink); }
+
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.stat { background: var(--bg-soft); border: 1px solid var(--card-border); border-radius: 12px; padding: 14px 16px; }
+.stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dimmer); font-family: 'IBM Plex Mono', monospace; margin-bottom: 6px; }
+.stat .value { font-size: 22px; font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+
+.step { display: flex; gap: 14px; margin-bottom: 18px; }
+.step-num { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; }
+.step-body h3 { font-size: 16px; margin-bottom: 4px; }
+.step-body p { color: var(--text-dim); font-size: 14px; margin: 0; }
+</style>
+</head>
+<body>
+
+<button class="navtoggle" id="navtoggle" onclick="toggleNav()"><span></span><span></span><span></span></button>
+
+<nav class="sidenav" id="sidenav">
+  <a class="hub-brand" href="/" title="Back to LaunchPlan Hub">
+    <div class="hub-brand-mark">LP</div>
+    <div class="hub-brand-name">LaunchPlan Hub</div>
+  </a>
+  <div class="sidenav-logo">
+    <h1>EVERY BODY EAT</h1>
+    <p>Budget vs Actuals</p>
+  </div>
+  <a onclick="showSection('overview')" data-section="overview">Overview</a>
+  <div id="channelNavHost"></div>
+  <div class="nav-section">Reference</div>
+  <a onclick="showSection('howto')" data-section="howto">How It Works</a>
+</nav>
+
+<div class="main" id="main">
+  <div class="pagehead">
+    <div>
+      <h1 id="pageTitle">Overview</h1>
+      <div class="sub" id="pageSub">Sales and ad spend, budget vs actuals, by month and channel.</div>
+    </div>
+    <div class="savestate" id="savestate">Loading…</div>
+  </div>
+
+  <div class="versionbar">
+    <div>
+      <label>Budget Version</label>
+      <select id="versionSelect" onchange="onVersionSelect()"></select>
+    </div>
+    <div>
+      <label>Year</label>
+      <input type="number" id="yearDisplay" class="mono" style="width:80px;" disabled>
+    </div>
+    <div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="saveCurrentVersion()">Save</button>
+      <button class="btn" onclick="newVersion()">New Version</button>
+      <button class="btn" onclick="duplicateVersion()">Duplicate</button>
+      <button class="btn btn-danger" onclick="deleteVersion()">Delete</button>
+    </div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section class="section active" id="section-overview">
+    <div class="banner" id="actualsBanner"></div>
+
+    <div class="summary-grid" id="overviewStats"></div>
+
+    <div class="card">
+      <h2>All Channels — <span id="overviewYearLabel"></span></h2>
+      <div class="desc">Combined sales and ad spend across all channels.</div>
+      <div style="overflow-x:auto;">
+        <table id="overviewTable"></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Year-to-Date Totals by Channel</h2>
+      <div class="desc">Budget vs actual through the current month, grouped into E-Commerce (Amazon, Walmart, TikTok), DTC, and Retail (Whole Foods on Amazon, Instacart), with a subtotal per group.</div>
+      <div style="overflow-x:auto;">
+        <table id="overviewByChannelTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHANNEL SECTIONS injected here by JS -->
+  <div id="channelSectionsHost"></div>
+
+  <!-- HOW TO -->
+  <section class="section" id="section-howto">
+    <div class="card">
+      <h2>How This Tool Works</h2>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Budget Versions</h3>
+          <p>Every set of budget numbers is saved as a named version (e.g. "Original Budget", "Q3 Revised"). Use the version bar at the top to switch versions, create a new one, duplicate the current one as a starting point, or delete one you no longer need. "Save" writes whatever is currently on screen to the selected version.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Entering a Budget</h3>
+          <p>Open a channel tab and type monthly numbers into the Budget Sales and Budget Ad Spend rows. Actuals and variance update as you type, and nothing is saved until you click "Save" in the version bar.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Where Actuals Come From</h3>
+          <p>Actual sales and ad spend for Amazon, Walmart, TikTok, DTC, and Whole Foods on Amazon are pulled from Triple Whale and cached here — ask for a refresh any time you want that cache updated. Instacart is the exception: it reads live from its own auto-syncing data source on every page load, so it never needs a manual refresh. Walmart and TikTok ad spend, and TikTok sales, show as "—" until those sources are connected in Triple Whale — that's a data-availability gap, not a $0 result.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>Channel Mapping</h3>
+          <p>Amazon = Amazon Ads spend (Every Body Eat account only) vs Amazon marketplace sales. Whole Foods on Amazon = the separate "WFMOA" Amazon Ads account's spend vs its ad-attributed sales (no separate WFMOA marketplace order feed exists, so Actual Sales here is the ad platform's own attributed-sales number, not order revenue — same for Instacart below). Walmart = Walmart marketplace sales (no ad spend source connected yet). TikTok = reserved for TikTok Shop sales and TikTok Ads spend, once connected. DTC = Meta + Google ad spend vs Shopify storefront sales (excludes Amazon-, Walmart-, and WFMOA-sourced orders). Instacart = Instacart Ads (Sponsored Products + Sponsored Display) spend vs ad-attributed sales, live from its own data source.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const CHANNELS = [
+  { key: 'Amazon', color: '#F99420' },
+  { key: 'Walmart', color: '#0099F3' },
+  { key: 'TikTok', color: '#CADC30' },
+  { key: 'DTC', color: '#2878FF' },
+  { key: 'Whole Foods on Amazon', color: '#CC1F97' },
+  { key: 'Instacart', color: '#87CCF4' },
+];
+// Channels with no marketplace/order sales source: "Actual Sales" for these is
+// the ad platform's own attributed-sales metric, not order revenue.
+const AD_ATTRIBUTED_SALES_CHANNELS = ['Whole Foods on Amazon', 'Instacart'];
+const CHANNEL_COLOR = Object.fromEntries(CHANNELS.map(c => [c.key, c.color]));
+
+const CHANNEL_GROUPS = [
+  { name: 'E-Commerce', channels: ['Amazon', 'Walmart', 'TikTok'] },
+  { name: 'DTC', channels: ['DTC'] },
+  { name: 'Retail', channels: ['Whole Foods on Amazon', 'Instacart'] },
+];
+const MONTHS = [
+  ['01','Jan'], ['02','Feb'], ['03','Mar'], ['04','Apr'], ['05','May'], ['06','Jun'],
+  ['07','Jul'], ['08','Aug'], ['09','Sep'], ['10','Oct'], ['11','Nov'], ['12','Dec'],
+];
+// All 12 months still render (so future months can be budgeted ahead of
+// time), but Total columns only sum through the current month — a future
+// month with a budget number but no actual yet shouldn't drag YTD totals down.
+const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
+
+let versions = [];
+let activeVersionId = null;
+let currentVersion = null;   // { id, name, year, notes }
+let currentLineItems = {};   // `${channel}|${month}` -> { budgetSales, budgetSpend }
+let actuals = {};            // `${channel}|${month}` -> { actualSales, actualSpend, syncedAt }
+
+/* ---------- Nav ---------- */
+function setNavCollapsed(collapsed) {
+  document.getElementById('sidenav').classList.toggle('collapsed', collapsed);
+  document.getElementById('main').classList.toggle('expanded', collapsed);
+  document.getElementById('navtoggle').classList.toggle('collapsed-state', collapsed);
+}
+function toggleNav() {
+  const isCollapsed = document.getElementById('sidenav').classList.contains('collapsed');
+  setNavCollapsed(!isCollapsed);
+}
+if (window.innerWidth < 780) setNavCollapsed(true);
+
+function buildNav() {
+  const host = document.getElementById('channelNavHost');
+  host.innerHTML = CHANNEL_GROUPS.map(g => `
+    <div class="nav-section">${g.name}</div>
+    ${g.channels.map(key => {
+      const c = CHANNELS.find(ch => ch.key === key);
+      return `<a onclick="showSection('ch-${key}')" data-section="ch-${key}" style="border-left:3px solid ${c.color}; padding-left:13px;">${key}</a>`;
+    }).join('')}
+  `).join('');
+}
+
+const PAGE_TITLES = {
+  overview: ['Overview', 'Sales and ad spend, budget vs actuals, by month and channel.'],
+  howto: ['How It Works', 'A quick reference for using this tool.'],
+};
+CHANNELS.forEach(c => { PAGE_TITLES['ch-' + c.key] = [c.key, 'Monthly budget vs actual sales and ad spend for ' + c.key + '.']; });
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.querySelectorAll('.sidenav a').forEach(a => a.classList.remove('active'));
+  const active = document.querySelector('.sidenav a[data-section="' + name + '"]');
+  if (active) active.classList.add('active');
+  const [title, sub] = PAGE_TITLES[name] || [name, ''];
+  document.getElementById('pageTitle').textContent = title;
+  document.getElementById('pageSub').textContent = sub;
+  if (window.innerWidth < 780) setNavCollapsed(true);
+}
+
+/* ---------- Formatting ---------- */
+function money(n) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+function pct(n) {
+  if (n === null || n === undefined || Number.isNaN(n) || !Number.isFinite(n)) return '—';
+  return (n >= 0 ? '+' : '') + (n * 100).toFixed(0) + '%';
+}
+function varClass(n) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '';
+  return n > 0 ? 'var-pos' : (n < 0 ? 'var-neg' : '');
+}
+// Spend variance is inverted from sales variance: coming in under budget
+// (negative — spent less than planned) is good, over budget is bad.
+function varClassForGroup(groupKey, n) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '';
+  if (groupKey === 'spend') return n > 0 ? 'var-neg' : (n < 0 ? 'var-pos' : '');
+  return varClass(n);
+}
+function lik(channel, month) { return channel + '|' + month; }
+
+/* ---------- Storage ---------- */
+async function loadAll() {
+  const el = document.getElementById('savestate');
+  try {
+    const [vRes, aRes] = await Promise.all([
+      fetch('/api/marketing/budget/versions'),
+      fetch('/api/marketing/budget/actuals'),
+    ]);
+    if (!vRes.ok || !aRes.ok) throw new Error('load failed');
+    const vBody = await vRes.json();
+    const aBody = await aRes.json();
+    versions = vBody.versions;
+    activeVersionId = vBody.activeVersionId;
+    actuals = {};
+    for (const a of aBody.actuals) actuals[lik(a.channel, a.month)] = a;
+  } catch (e) {
+    el.textContent = 'Offline — could not load budget data';
+    return;
+  }
+
+  if (versions.length === 0) {
+    await createVersion('Original Budget', new Date().getFullYear(), true);
+  } else {
+    const toLoad = versions.find(v => v.id === activeVersionId) || versions[0];
+    await selectVersion(toLoad.id, false);
+  }
+  renderActualsBanner();
+}
+
+async function selectVersion(id, save) {
+  const res = await fetch('/api/marketing/budget/versions/' + encodeURIComponent(id));
+  if (!res.ok) return;
+  const detail = await res.json();
+  currentVersion = detail.version;
+  currentLineItems = {};
+  for (const li of detail.lineItems) currentLineItems[lik(li.channel, li.month)] = li;
+  activeVersionId = id;
+  if (save) {
+    try { await fetch('/api/marketing/budget/active', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ versionId: id }) }); } catch (e) { /* non-critical */ }
+  }
+  renderAll();
+}
+
+async function createVersion(name, year, makeActive) {
+  const id = 'V' + Date.now().toString(36).toUpperCase();
+  const lineItems = [];
+  for (const c of CHANNELS) for (const [mm] of MONTHS) lineItems.push({ channel: c.key, month: year + '-' + mm, budgetSales: null, budgetSpend: null });
+  const body = { name, year, notes: '', lineItems };
+  const el = document.getElementById('savestate');
+  try {
+    el.textContent = 'Saving…';
+    const res = await fetch('/api/marketing/budget/versions/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error('save failed');
+  } catch (e) {
+    el.textContent = 'Save failed — could not create version';
+    return;
+  }
+  const vRes = await fetch('/api/marketing/budget/versions');
+  const vBody = await vRes.json();
+  versions = vBody.versions;
+  await selectVersion(id, !!makeActive);
+}
+
+async function saveCurrentVersion() {
+  if (!currentVersion) return;
+  captureInputsIntoState();
+  const el = document.getElementById('savestate');
+  try {
+    el.textContent = 'Saving…';
+    const body = {
+      name: currentVersion.name,
+      year: currentVersion.year,
+      notes: currentVersion.notes,
+      lineItems: Object.values(currentLineItems),
+    };
+    const res = await fetch('/api/marketing/budget/versions/' + encodeURIComponent(currentVersion.id), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error('save failed');
+    el.textContent = 'Synced · ' + currentVersion.name;
+  } catch (e) {
+    el.textContent = 'Save failed — changes are local only until retried';
+  }
+}
+
+async function newVersion() {
+  const name = prompt('Name for the new budget version:', '');
+  if (!name || !name.trim()) return;
+  const year = Number(prompt('Year:', String(currentVersion ? currentVersion.year : new Date().getFullYear())));
+  if (!Number.isInteger(year)) return;
+  await createVersion(name.trim(), year, true);
+}
+
+async function duplicateVersion() {
+  if (!currentVersion) return;
+  const name = prompt('Name for the duplicate:', currentVersion.name + ' (copy)');
+  if (!name || !name.trim()) return;
+  captureInputsIntoState();
+  // Persist any unsaved edits to the source version first, so the duplicate carries them.
+  await saveCurrentVersion();
+  const el = document.getElementById('savestate');
+  try {
+    el.textContent = 'Duplicating…';
+    const res = await fetch('/api/marketing/budget/versions/' + encodeURIComponent(currentVersion.id) + '/duplicate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newName: name.trim() }),
+    });
+    if (!res.ok) throw new Error('duplicate failed');
+    const detail = await res.json();
+    const vRes = await fetch('/api/marketing/budget/versions');
+    versions = (await vRes.json()).versions;
+    await selectVersion(detail.version.id, true);
+  } catch (e) {
+    el.textContent = 'Duplicate failed';
+  }
+}
+
+async function deleteVersion() {
+  if (!currentVersion) return;
+  if (versions.length <= 1) { alert('At least one budget version has to exist.'); return; }
+  if (!confirm('Delete budget version "' + currentVersion.name + '"? This cannot be undone.')) return;
+  const idToDelete = currentVersion.id;
+  await fetch('/api/marketing/budget/versions/' + encodeURIComponent(idToDelete), { method: 'DELETE' });
+  const vRes = await fetch('/api/marketing/budget/versions');
+  versions = (await vRes.json()).versions;
+  await selectVersion(versions[0].id, true);
+}
+
+function onVersionSelect() {
+  const id = document.getElementById('versionSelect').value;
+  if (id === currentVersion?.id) return;
+  selectVersion(id, true);
+}
+
+/* ---------- Render ---------- */
+function renderVersionSelect() {
+  const sel = document.getElementById('versionSelect');
+  sel.innerHTML = versions.map(v => `<option value="${v.id}" ${currentVersion && v.id === currentVersion.id ? 'selected' : ''}>${v.name} (${v.year})</option>`).join('');
+  document.getElementById('yearDisplay').value = currentVersion ? currentVersion.year : '';
+}
+
+function renderActualsBanner() {
+  const syncedTimes = Object.values(actuals).map(a => a.syncedAt).filter(Boolean).sort();
+  const latest = syncedTimes.length ? syncedTimes[syncedTimes.length - 1] : null;
+  const el = document.getElementById('actualsBanner');
+  el.innerHTML = `<span>ℹ️</span><span><strong>Amazon/Walmart/TikTok/DTC/Whole Foods on Amazon actuals last synced from Triple Whale: ${latest ? latest + ' UTC' : 'never'}.</strong> Instacart pulls live on every page load, no sync needed. Walmart/TikTok ad spend and TikTok sales show as "—" — those sources aren't connected in Triple Whale yet, so it's a data gap, not a $0 result. Ask for a refresh any time.</span>`;
+}
+
+function captureInputsIntoState() {
+  document.querySelectorAll('[data-budget-input]').forEach(input => {
+    const [channel, month, field] = input.dataset.budgetInput.split('|');
+    const key = lik(channel, month);
+    if (!currentLineItems[key]) currentLineItems[key] = { channel, month, budgetSales: null, budgetSpend: null };
+    const digits = input.value.replace(/[^\d]/g, '');
+    currentLineItems[key][field] = digits === '' ? null : Number(digits);
+  });
+}
+
+// Adds thousands commas once the user leaves a budget field. Reformatting on
+// every keystroke instead (tracking cursor position through comma
+// insertions) turned out to corrupt the value under fast/automated typing,
+// so this only runs on blur, once the value is settled.
+function formatNumberInput(input) {
+  const digits = input.value.replace(/[^\d]/g, '');
+  input.value = digits === '' ? '' : Number(digits).toLocaleString('en-US');
+}
+
+function monthsOfYear(year) { return MONTHS.map(([mm, label]) => [year + '-' + mm, label]); }
+
+function buildChannelSections() {
+  const host = document.getElementById('channelSectionsHost');
+  host.innerHTML = CHANNELS.map(c => `
+    <section class="section" id="section-ch-${c.key}">
+      <div class="card">
+        <h2><span class="channel-dot" style="background:${c.color};"></span>${c.key}</h2>
+        <div class="desc">Type monthly Budget Sales / Budget Ad Spend below. Actuals and variance update live; click "Save" in the version bar to persist.</div>
+        <div style="overflow-x:auto;">
+          <table id="chTable-${c.key}"></table>
+        </div>
+      </div>
+    </section>
+  `).join('');
+}
+
+function renderChannelTable(channel) {
+  const year = currentVersion.year;
+  const months = monthsOfYear(year);
+  const table = document.getElementById('chTable-' + channel);
+
+  const head = `<thead><tr><th>${''}</th>${months.map(([, l]) => `<th>${l}</th>`).join('')}<th class="total-col">Total (YTD)</th></tr></thead>`;
+
+  function budgetRowHtml(field, label, groupKey) {
+    const cells = months.map(([m]) => {
+      const v = currentLineItems[lik(channel, m)]?.[field];
+      const display = v != null ? Number(v).toLocaleString('en-US') : '';
+      return `<td class="numcell"><input type="text" inputmode="numeric" class="budget-input" data-budget-input="${channel}|${m}|${field}" value="${display}" placeholder="0"></td>`;
+    }).join('');
+    return `<tr><td class="rowlabel">${label}</td>${cells}<td class="numcell total-col" id="tot-${channel}-${groupKey}-budget">$0</td></tr>`;
+  }
+
+  function actualRowHtml(field, label, groupKey) {
+    const cells = months.map(([m]) => {
+      const v = actuals[lik(channel, m)]?.[field];
+      return `<td class="numcell dim">${v !== null && v !== undefined ? money(v) : '—'}</td>`;
+    }).join('');
+    return `<tr><td class="rowlabel sub">${label}</td>${cells}<td class="numcell total-col dim" id="tot-${channel}-${groupKey}-actual">—</td></tr>`;
+  }
+
+  function varRowHtml(groupKey, budgetField, actualField) {
+    const cells = months.map(([m]) => {
+      const a = actuals[lik(channel, m)]?.[actualField];
+      if (a === null || a === undefined) return `<td class="numcell dim" id="var-${channel}-${groupKey}-${m}">—</td>`;
+      const b = currentLineItems[lik(channel, m)]?.[budgetField] || 0;
+      const diff = a - b;
+      return `<td class="numcell ${varClassForGroup(groupKey, diff)}" id="var-${channel}-${groupKey}-${m}">${money(diff)}</td>`;
+    }).join('');
+    return `<tr><td class="rowlabel sub">Variance</td>${cells}<td class="numcell total-col" id="vartot-${channel}-${groupKey}">—</td></tr>`;
+  }
+
+  const isAdAttributed = AD_ATTRIBUTED_SALES_CHANNELS.includes(channel);
+  const salesNote = isAdAttributed
+    ? `<tr><td colspan="${months.length + 2}" class="dim" style="font-size:12px; padding-top:0; padding-bottom:10px; border-bottom:none;">No marketplace order data for ${channel} — Actual Sales here is the ad platform's own attributed-sales metric, not order revenue.</td></tr>`
+    : '';
+
+  table.innerHTML = head + `<tbody>
+    <tr class="rowgroup-start"><td colspan="${months.length + 2}" class="mono dim" style="border-top:none; padding-top:14px; padding-bottom:2px; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Sales</td></tr>
+    ${budgetRowHtml('budgetSales', 'Budget Sales', 'sales')}
+    ${actualRowHtml('actualSales', isAdAttributed ? 'Actual Sales (ad-attributed)' : 'Actual Sales', 'sales')}
+    ${varRowHtml('sales', 'budgetSales', 'actualSales')}
+    ${salesNote}
+    <tr class="rowgroup-start"><td colspan="${months.length + 2}" class="mono dim" style="padding-top:14px; padding-bottom:2px; font-size:11px; text-transform:uppercase; letter-spacing:.04em;">Ad Spend</td></tr>
+    ${budgetRowHtml('budgetSpend', 'Budget Ad Spend', 'spend')}
+    ${actualRowHtml('actualSpend', 'Actual Ad Spend', 'spend')}
+    ${varRowHtml('spend', 'budgetSpend', 'actualSpend')}
+  </tbody>`;
+
+  table.querySelectorAll('[data-budget-input]').forEach(input => {
+    input.addEventListener('input', () => { updateChannelTotals(channel); renderOverview(); });
+    input.addEventListener('blur', () => formatNumberInput(input));
+  });
+
+  updateChannelTotals(channel);
+}
+
+// Recomputes Total (YTD) columns and per-month Variance cells for one
+// channel's table directly via the DOM (never touches the <input> elements),
+// so it can run on every keystroke without kicking focus out of the field
+// the user is typing in — a full table re-render would do that.
+function updateChannelTotals(channel) {
+  const year = currentVersion.year;
+  const months = monthsOfYear(year);
+  const cappedMonths = months.filter(([m]) => m <= CURRENT_MONTH);
+
+  function updateGroup(groupKey, budgetField, actualField) {
+    for (const [m] of months) {
+      const cell = document.getElementById(`var-${channel}-${groupKey}-${m}`);
+      if (!cell) continue;
+      const a = actuals[lik(channel, m)]?.[actualField];
+      if (a === null || a === undefined) {
+        cell.textContent = '—';
+        cell.className = 'numcell dim';
+        continue;
+      }
+      const b = currentLineItems[lik(channel, m)]?.[budgetField] || 0;
+      const diff = a - b;
+      cell.textContent = money(diff);
+      cell.className = `numcell ${varClassForGroup(groupKey, diff)}`;
+    }
+
+    let budgetTotal = 0;
+    for (const [m] of cappedMonths) {
+      const v = currentLineItems[lik(channel, m)]?.[budgetField];
+      if (v !== null && v !== undefined) budgetTotal += v;
+    }
+    let actualTotal = 0, actualHas = false;
+    for (const [m] of cappedMonths) {
+      const v = actuals[lik(channel, m)]?.[actualField];
+      if (v !== null && v !== undefined) { actualTotal += v; actualHas = true; }
+    }
+
+    const budgetTotalCell = document.getElementById(`tot-${channel}-${groupKey}-budget`);
+    if (budgetTotalCell) budgetTotalCell.textContent = money(budgetTotal);
+
+    const actualTotalCell = document.getElementById(`tot-${channel}-${groupKey}-actual`);
+    if (actualTotalCell) actualTotalCell.textContent = actualHas ? money(actualTotal) : '—';
+
+    const varTotalCell = document.getElementById(`vartot-${channel}-${groupKey}`);
+    if (varTotalCell) {
+      const totalDiff = actualHas ? actualTotal - budgetTotal : null;
+      varTotalCell.textContent = totalDiff === null ? '—' : money(totalDiff);
+      varTotalCell.className = `numcell total-col ${varClassForGroup(groupKey, totalDiff)}`;
+    }
+  }
+
+  updateGroup('sales', 'budgetSales', 'actualSales');
+  updateGroup('spend', 'budgetSpend', 'actualSpend');
+}
+
+function renderOverview() {
+  captureInputsIntoState();
+  const year = currentVersion.year;
+  const months = monthsOfYear(year);
+  document.getElementById('overviewYearLabel').textContent = year;
+
+  const cappedMonths = months.filter(([m]) => m <= CURRENT_MONTH);
+
+  const perChannel = CHANNELS.map(c => {
+    let budgetSales = 0, actualSales = 0, hasSales = false, budgetSpend = 0, actualSpend = 0, hasSpend = false;
+    for (const [m] of cappedMonths) {
+      const li = currentLineItems[lik(c.key, m)];
+      const a = actuals[lik(c.key, m)];
+      if (li?.budgetSales != null) budgetSales += li.budgetSales;
+      if (li?.budgetSpend != null) budgetSpend += li.budgetSpend;
+      if (a?.actualSales != null) { actualSales += a.actualSales; hasSales = true; }
+      if (a?.actualSpend != null) { actualSpend += a.actualSpend; hasSpend = true; }
+    }
+    return { key: c.key, color: c.color, budgetSales, actualSales: hasSales ? actualSales : null, budgetSpend, actualSpend: hasSpend ? actualSpend : null };
+  });
+
+  const totalBudgetSales = perChannel.reduce((s, c) => s + c.budgetSales, 0);
+  const totalActualSales = perChannel.some(c => c.actualSales !== null) ? perChannel.reduce((s, c) => s + (c.actualSales || 0), 0) : null;
+  const totalBudgetSpend = perChannel.reduce((s, c) => s + c.budgetSpend, 0);
+  const totalActualSpend = perChannel.some(c => c.actualSpend !== null) ? perChannel.reduce((s, c) => s + (c.actualSpend || 0), 0) : null;
+
+  document.getElementById('overviewStats').innerHTML = `
+    <div class="stat"><div class="label">Budget Sales (YTD)</div><div class="value">${money(totalBudgetSales)}</div></div>
+    <div class="stat"><div class="label">Actual Sales (YTD)</div><div class="value">${totalActualSales === null ? '—' : money(totalActualSales)}</div></div>
+    <div class="stat"><div class="label">Budget Ad Spend (YTD)</div><div class="value">${money(totalBudgetSpend)}</div></div>
+    <div class="stat"><div class="label">Actual Ad Spend (YTD)</div><div class="value">${totalActualSpend === null ? '—' : money(totalActualSpend)}</div></div>
+  `;
+
+  // Month-by-month combined table (all 12 months shown; Total column is YTD-capped)
+  const oHead = `<thead><tr><th>${''}</th>${months.map(([, l]) => `<th>${l}</th>`).join('')}<th class="total-col">Total (YTD)</th></tr></thead>`;
+  function combinedRow(label, budgetGetter, actualGetter, cls) {
+    let bt = 0, at = 0, hasAt = false;
+    const cells = months.map(([m]) => {
+      const b = budgetGetter(m);
+      const a = actualGetter(m);
+      if (m <= CURRENT_MONTH) {
+        bt += b || 0;
+        if (a !== null && a !== undefined) { at += a; hasAt = true; }
+      }
+      return `<td class="numcell ${cls || ''}">${a === null || a === undefined ? (cls ? money(b) : '—') : money(a)}</td>`;
+    }).join('');
+    const totalVal = cls ? bt : (hasAt ? at : null);
+    return `<tr><td class="rowlabel">${label}</td>${cells}<td class="numcell total-col">${totalVal === null ? '—' : money(totalVal)}</td></tr>`;
+  }
+  function sumBudget(field, m) { return CHANNELS.reduce((s, c) => s + (currentLineItems[lik(c.key, m)]?.[field] || 0), 0); }
+  function sumActual(field, m) {
+    let total = 0, has = false;
+    for (const c of CHANNELS) { const v = actuals[lik(c.key, m)]?.[field]; if (v !== null && v !== undefined) { total += v; has = true; } }
+    return has ? total : null;
+  }
+  document.getElementById('overviewTable').innerHTML = oHead + `<tbody>
+    ${combinedRow('Budget Sales', (m) => sumBudget('budgetSales', m), () => null, 'total-col-none')}
+    ${combinedRow('Actual Sales', () => 0, (m) => sumActual('actualSales', m))}
+    ${combinedRow('Budget Ad Spend', (m) => sumBudget('budgetSpend', m), () => null, 'total-col-none')}
+    ${combinedRow('Actual Ad Spend', () => 0, (m) => sumActual('actualSpend', m))}
+  </tbody>`;
+
+  // Year-to-date totals by channel, grouped into E-Commerce / DTC / Retail
+  const cHead = `<thead><tr><th>Channel</th><th>Budget Sales</th><th>Actual Sales</th><th>Sales Var</th><th>Budget Spend</th><th>Actual Spend</th><th>Spend Var</th></tr></thead>`;
+  const perChannelByKey = Object.fromEntries(perChannel.map(c => [c.key, c]));
+
+  function channelRow(c) {
+    const salesVar = c.actualSales === null ? null : c.actualSales - c.budgetSales;
+    const spendVar = c.actualSpend === null ? null : c.actualSpend - c.budgetSpend;
+    return `<tr>
+      <td class="rowlabel"><span class="channel-dot" style="background:${c.color};"></span>${c.key}</td>
+      <td class="numcell">${money(c.budgetSales)}</td>
+      <td class="numcell">${c.actualSales === null ? '—' : money(c.actualSales)}</td>
+      <td class="numcell ${varClass(salesVar)}">${salesVar === null ? '—' : money(salesVar)}</td>
+      <td class="numcell">${money(c.budgetSpend)}</td>
+      <td class="numcell">${c.actualSpend === null ? '—' : money(c.actualSpend)}</td>
+      <td class="numcell ${varClassForGroup('spend', spendVar)}">${spendVar === null ? '—' : money(spendVar)}</td>
+    </tr>`;
+  }
+
+  function groupSubtotalRow(group) {
+    const rows = group.channels.map(k => perChannelByKey[k]);
+    const budgetSales = rows.reduce((s, c) => s + c.budgetSales, 0);
+    const salesRows = rows.filter(c => c.actualSales !== null);
+    const actualSales = salesRows.length ? salesRows.reduce((s, c) => s + c.actualSales, 0) : null;
+    const budgetSpend = rows.reduce((s, c) => s + c.budgetSpend, 0);
+    const spendRows = rows.filter(c => c.actualSpend !== null);
+    const actualSpend = spendRows.length ? spendRows.reduce((s, c) => s + c.actualSpend, 0) : null;
+    const salesVar = actualSales === null ? null : actualSales - budgetSales;
+    const spendVar = actualSpend === null ? null : actualSpend - budgetSpend;
+    return `<tr class="group-subtotal">
+      <td class="rowlabel">${group.name} Subtotal</td>
+      <td class="numcell">${money(budgetSales)}</td>
+      <td class="numcell">${actualSales === null ? '—' : money(actualSales)}</td>
+      <td class="numcell ${varClass(salesVar)}">${salesVar === null ? '—' : money(salesVar)}</td>
+      <td class="numcell">${money(budgetSpend)}</td>
+      <td class="numcell">${actualSpend === null ? '—' : money(actualSpend)}</td>
+      <td class="numcell ${varClassForGroup('spend', spendVar)}">${spendVar === null ? '—' : money(spendVar)}</td>
+    </tr>`;
+  }
+
+  const cRows = CHANNEL_GROUPS.map(g => `
+    <tr class="group-header"><td colspan="7">${g.name}</td></tr>
+    ${g.channels.map(k => channelRow(perChannelByKey[k])).join('')}
+    ${groupSubtotalRow(g)}
+  `).join('');
+  document.getElementById('overviewByChannelTable').innerHTML = cHead + `<tbody>${cRows}</tbody>`;
+}
+
+function renderAll() {
+  renderVersionSelect();
+  for (const c of CHANNELS) renderChannelTable(c.key);
+  renderOverview();
+  document.getElementById('savestate').textContent = 'Synced · ' + currentVersion.name;
+}
+
+buildNav();
+buildChannelSections();
+loadAll();
+</script>
+</body>
+</html>

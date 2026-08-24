@@ -544,13 +544,14 @@
       .cal-daynum.today { color: var(--blue); }
 
       .cal-event-bar {
-        margin: 1px 3px; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 650;
-        line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: default;
+        margin: 1px 3px; padding: 3px 8px 3px 6px; border-radius: 6px; border-left: 3px solid transparent;
+        font-size: 11px; font-weight: 650; line-height: 1.5; white-space: nowrap; overflow: hidden;
+        text-overflow: ellipsis; cursor: default;
       }
-      .cal-event-bar.status-active { background: var(--green-soft); color: #0e7a44; }
-      .cal-event-bar.status-scheduled { background: var(--orange-soft); color: #b66a00; }
-      .cal-event-bar.status-completed { background: var(--soft); color: #76787f; }
-      .cal-event-bar.type-campaign { border: 1px dashed currentColor; }
+      .cal-event-bar.status-active { border-left-color: var(--green); }
+      .cal-event-bar.status-scheduled { border-left-color: var(--orange); }
+      .cal-event-bar.status-completed { border-left-color: var(--subtle); opacity: .7; }
+      .cal-event-channel { opacity: .85; }
 
       .cal-more-toggle { grid-column: 1 / -1; margin: 2px 6px 6px; padding: 3px 8px; border: none; border-radius: 6px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; text-align: left; cursor: pointer; }
       .cal-more-toggle:hover { background: var(--soft); color: var(--ink); }
@@ -565,8 +566,9 @@
       .calendar-status-chip.status-completed { background: var(--soft); color: #76787f; }
 
       .calendar-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+      .calendar-legend + .calendar-legend { margin-top: 8px; padding-top: 0; border-top: none; }
       .calendar-legend-item { display: flex; align-items: center; gap: 6px; }
-      .calendar-legend-swatch { width: 11px; height: 11px; border-radius: 3px; }
+      .calendar-legend-swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: middle; }
       .calendar-legend-swatch.status-active { background: var(--green); }
       .calendar-legend-swatch.status-scheduled { background: var(--orange); }
       .calendar-legend-swatch.status-completed { background: var(--subtle); }
@@ -898,11 +900,22 @@
           </div>
 
           <div class="calendar-legend">
-            <span>Status:</span>
+            <span>Channel:</span>
+            <span class="calendar-legend-item"><span class="calendar-legend-swatch" style="background:#F99420"></span>Amazon</span>
+            <span class="calendar-legend-item"><span class="calendar-legend-swatch" style="background:#0099F3"></span>Walmart</span>
+            <span class="calendar-legend-item"><span class="calendar-legend-swatch" style="background:#CADC30"></span>TikTok</span>
+            <span class="calendar-legend-item"><span class="calendar-legend-swatch" style="background:#2878FF"></span>DTC</span>
+            <span class="calendar-legend-item"><span class="calendar-legend-swatch" style="background:#CC1F97"></span>Retail</span>
+            <span class="calendar-legend-item"><span class="calendar-legend-swatch" style="background:#87CCF4"></span>Distributor</span>
+            <span class="calendar-legend-item"><span class="calendar-legend-swatch" style="background:#878787"></span>Other</span>
+            <a class="calendar-legend-link" href="/ebe-promo-calendar.html" target="_blank" rel="noopener">Open full calendar tool →</a>
+          </div>
+          <div class="calendar-legend">
+            <span>Status (left edge):</span>
             <span class="calendar-legend-item"><span class="calendar-legend-swatch status-active"></span>Active</span>
             <span class="calendar-legend-item"><span class="calendar-legend-swatch status-scheduled"></span>Scheduled</span>
             <span class="calendar-legend-item"><span class="calendar-legend-swatch status-completed"></span>Completed</span>
-            <a class="calendar-legend-link" href="/ebe-promo-calendar.html" target="_blank" rel="noopener">Open full calendar tool →</a>
+            <span class="calendar-legend-item">★ = Campaign</span>
           </div>
         </div>
 
@@ -983,7 +996,7 @@
       const dashboardCategories = [
         { name: "Company Analytics", icon: "i-building", tone: "violet", description: "Company-wide KPIs, financial health, and cross-functional performance.", count: 0 },
         { name: "Executive Summaries", icon: "i-file", tone: "orange", description: "Leadership-ready weekly, monthly, and quarterly decision summaries.", count: 0 },
-        { name: "Marketing Analytics", icon: "i-megaphone", tone: "orange", description: "Customer voice, campaigns, content, retail media, and acquisition.", count: 3 },
+        { name: "Marketing Analytics", icon: "i-megaphone", tone: "orange", description: "Customer voice, campaigns, content, retail media, and acquisition.", count: 4 },
         { name: "Sales Analytics", icon: "i-dollar", tone: "green", description: "Retailer, channel, SKU, velocity, and distribution performance.", count: 0 },
         { name: "Marketing/Sales Summaries", icon: "i-merge", tone: "violet", description: "One shared narrative connecting marketing activity to commercial results.", count: 0 },
         { name: "Operations Analytics", icon: "i-gear", tone: "green", description: "Inventory, demand planning, fulfillment, and supply chain visibility.", count: 4 }
@@ -1060,6 +1073,23 @@
       const calendarExpandedWeeks = new Set(); // weekStart ISO strings currently showing all lanes
       const CAL_VISIBLE_LANES = 2;
 
+      // Same channel palette as ebe-promo-calendar.html's CHANNELS array, so
+      // a channel's color reads the same on the home page and in the full tool.
+      const CAL_CHANNEL_COLORS = {
+        Amazon: "#F99420", Walmart: "#0099F3", TikTok: "#CADC30", DTC: "#2878FF",
+        Retail: "#CC1F97", Distributor: "#87CCF4", Other: "#878787",
+      };
+      const CAL_CHANNEL_TEXT = {
+        "#F99420": "#A35A00", "#0099F3": "#00629C", "#CADC30": "#5C6B0A", "#2878FF": "#1E5FDB",
+        "#CC1F97": "#9A1874", "#87CCF4": "#00629C", "#878787": "#5A5A5A",
+      };
+      function calChannelColor(channel) {
+        return CAL_CHANNEL_COLORS[channel] || CAL_CHANNEL_COLORS.Other;
+      }
+      function calChannelTextColor(bgColor) {
+        return CAL_CHANNEL_TEXT[bgColor] || bgColor;
+      }
+
       function calendarStatusOf(startIso, endIso, today) {
         const s = new Date(`${startIso}T00:00:00`);
         const e = new Date(`${endIso}T00:00:00`);
@@ -1083,17 +1113,24 @@
             type: "promotion",
             title: p.desc || p.product,
             meta: [p.channel, p.retailer].filter(Boolean).join(" · "),
+            channelLabel: p.channel || "Other",
+            color: calChannelColor(p.channel),
             start: p.start,
             end: p.end,
           }));
-          const campaigns = (campaignBody.campaigns || []).filter(c => c.start && c.end).map(c => ({
-            id: "campaign-" + c.id,
-            type: "campaign",
-            title: c.name,
-            meta: (c.channels || []).join(", "),
-            start: c.start,
-            end: c.end,
-          }));
+          const campaigns = (campaignBody.campaigns || []).filter(c => c.start && c.end).map(c => {
+            const channels = c.channels || [];
+            return {
+              id: "campaign-" + c.id,
+              type: "campaign",
+              title: c.name,
+              meta: channels.join(", "),
+              channelLabel: channels.length ? channels.join(", ") : "Other",
+              color: calChannelColor(channels[0]),
+              start: c.start,
+              end: c.end,
+            };
+          });
 
           calendarItems = promos.concat(campaigns);
         } catch (err) {
@@ -1186,7 +1223,9 @@
             .map(it => {
               const status = calendarStatusOf(it.start, it.end, today);
               const title = `${it.title}${it.meta ? " — " + it.meta : ""} (${formatDate(it.start)} – ${formatDate(it.end)})`;
-              return `<div class="cal-event-bar status-${status} type-${it.type}" style="grid-column:${it.startCol + 1} / ${it.endCol + 2}; grid-row:${it.lane + 2};" title="${esc(title)}">${esc(it.title)}</div>`;
+              const textColor = calChannelTextColor(it.color);
+              const prefix = it.type === "campaign" ? "★ " : "";
+              return `<div class="cal-event-bar status-${status} type-${it.type}" style="grid-column:${it.startCol + 1} / ${it.endCol + 2}; grid-row:${it.lane + 2}; background:${it.color}22; color:${textColor};" title="${esc(title)}">${prefix}<span class="cal-event-channel">${esc(it.channelLabel)}</span> — ${esc(it.title)}</div>`;
             }).join("");
 
           const moreBtn = hiddenCount > 0
@@ -1229,9 +1268,9 @@
               const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
               return `
                 <tr>
-                  <td>${esc(it.title)}</td>
+                  <td>${it.type === "campaign" ? "★ " : ""}${esc(it.title)}</td>
                   <td>${it.type === "campaign" ? "Campaign" : "Promotion"}</td>
-                  <td>${esc(it.meta || "—")}</td>
+                  <td><span class="calendar-legend-swatch" style="background:${it.color}; margin-right:6px;"></span>${esc(it.meta || "—")}</td>
                   <td>${formatDate(it.start)} – ${formatDate(it.end)}</td>
                   <td><span class="calendar-status-chip status-${status}">${statusLabel}</span></td>
                 </tr>`;
@@ -1629,6 +1668,14 @@
             <p>Plan and track promotions and omni-channel campaigns across Amazon, Walmart, TikTok, DTC, Retail, Distributor, and Other, with a shared Gantt and per-channel analysis.</p>
             <div class="actions">
               <a class="button primary" href="/ebe-promo-calendar.html">${icon("i-eye")}Open tool</a>
+            </div>
+          </article>
+          <article class="card tool-card">
+            <div class="tool-top"><div class="tool-icon orange">${icon("i-chart")}</div><span class="badge live">Ready</span></div>
+            <h3>Monthly Channel Budget vs Actuals</h3>
+            <p>Sales and ad spend, budget vs actual, by month across Amazon, Walmart, TikTok, and DTC — actuals synced from Triple Whale, budgets saved as loadable versions.</p>
+            <div class="actions">
+              <a class="button primary" href="/ebe-marketing-budget-tracker.html">${icon("i-eye")}Open tool</a>
             </div>
           </article>` : "";
 
