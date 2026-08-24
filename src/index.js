@@ -1911,6 +1911,175 @@ async function deleteCampaignRow(env, id) {
   await env.secure_cpg_marketing.prepare("DELETE FROM campaigns WHERE id = ?").bind(id).run();
 }
 
+/* ---------- Marketing: Monthly Channel Budget vs Actuals ---------- */
+
+const BUDGET_CHANNELS = ["Amazon", "Walmart", "TikTok", "DTC", "Whole Foods on Amazon", "Instacart"];
+const BUDGET_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+function rowToBudgetVersion(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    year: row.year,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function getBudgetVersions(env) {
+  const { results } = await env.secure_cpg_marketing.prepare("SELECT * FROM budget_versions ORDER BY created_at").all();
+  return results.map(rowToBudgetVersion);
+}
+
+async function getBudgetVersionDetail(env, id) {
+  const version = await env.secure_cpg_marketing.prepare("SELECT * FROM budget_versions WHERE id = ?").bind(id).first();
+  if (!version) return null;
+  const { results } = await env.secure_cpg_marketing
+    .prepare("SELECT channel, month, budget_sales, budget_spend FROM budget_line_items WHERE version_id = ?")
+    .bind(id)
+    .all();
+  return {
+    version: rowToBudgetVersion(version),
+    lineItems: results.map((r) => ({
+      channel: r.channel,
+      month: r.month,
+      budgetSales: r.budget_sales,
+      budgetSpend: r.budget_spend,
+    })),
+  };
+}
+
+// Versions are always edited as a full in-memory grid client-side, so a save
+// replaces all of that version's line items in one batch (same model as
+// promotions' replacePromotions).
+async function saveBudgetVersion(env, id, body) {
+  const db = env.secure_cpg_marketing;
+  const statements = [
+    db
+      .prepare(
+        `INSERT INTO budget_versions (id, name, year, notes, updated_at)
+         VALUES (?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET
+           name=excluded.name, year=excluded.year, notes=excluded.notes, updated_at=datetime('now')`,
+      )
+      .bind(id, body.name, body.year, body.notes ?? null),
+    db.prepare("DELETE FROM budget_line_items WHERE version_id = ?").bind(id),
+  ];
+  for (const li of body.lineItems || []) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO budget_line_items (version_id, channel, month, budget_sales, budget_spend) VALUES (?, ?, ?, ?, ?)`,
+        )
+        .bind(id, li.channel, li.month, li.budgetSales ?? null, li.budgetSpend ?? null),
+    );
+  }
+  await db.batch(statements);
+}
+
+async function deleteBudgetVersionRow(env, id) {
+  await env.secure_cpg_marketing.prepare("DELETE FROM budget_versions WHERE id = ?").bind(id).run();
+}
+
+async function duplicateBudgetVersion(env, sourceId, newId, newName) {
+  const source = await getBudgetVersionDetail(env, sourceId);
+  if (!source) return null;
+  await saveBudgetVersion(env, newId, {
+    name: newName,
+    year: source.version.year,
+    notes: source.version.notes,
+    lineItems: source.lineItems,
+  });
+  return getBudgetVersionDetail(env, newId);
+}
+
+async function getActiveBudgetVersionId(env) {
+  const row = await env.secure_cpg_marketing
+    .prepare("SELECT value FROM budget_settings WHERE key = 'active_version_id'")
+    .first();
+  return row ? row.value : null;
+}
+
+async function setActiveBudgetVersionId(env, id) {
+  await env.secure_cpg_marketing
+    .prepare(
+      `INSERT INTO budget_settings (key, value) VALUES ('active_version_id', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    )
+    .bind(id)
+    .run();
+}
+
+// Instacart has its own live-syncing D1 (instacart_data, kept fresh by a
+// separate existing pipeline) with real spend and ad-attributed sales, so its
+// actuals are queried live here rather than cached in channel_actuals like
+// the Triple-Whale-sourced channels — no manual refresh ever needed for it.
+async function getInstacartActuals(env) {
+  const { results } = await env.instacart_data
+    .prepare(
+      `SELECT month, SUM(spend) AS spend, SUM(sales) AS sales FROM (
+         SELECT substr(date,1,7) AS month, spend, attributed_sales AS sales FROM sp_events
+         UNION ALL
+         SELECT substr(date,1,7) AS month, spend, (direct_sales + halo_sales) AS sales FROM sd_events
+       ) GROUP BY month ORDER BY month`,
+    )
+    .all();
+  return results.map((r) => ({
+    channel: "Instacart",
+    month: r.month,
+    actualSales: r.sales,
+    actualSpend: r.spend,
+    syncedAt: null,
+  }));
+}
+
+async function getChannelActuals(env) {
+  const { results } = await env.secure_cpg_marketing
+    .prepare("SELECT channel, month, actual_sales, actual_spend, synced_at FROM channel_actuals WHERE channel != 'Instacart' ORDER BY month")
+    .all();
+  const cached = results.map((r) => ({
+    channel: r.channel,
+    month: r.month,
+    actualSales: r.actual_sales,
+    actualSpend: r.actual_spend,
+    syncedAt: r.synced_at,
+  }));
+  const instacart = await getInstacartActuals(env);
+  return [...cached, ...instacart];
+}
+
+// Actuals are upserted per (channel, month) rather than replaced wholesale,
+// since a sync only ever covers a subset of channels/months (e.g. refreshing
+// just the current month) and shouldn't blow away older cached data.
+async function putChannelActuals(env, rows) {
+  const db = env.secure_cpg_marketing;
+  const statements = rows.map((r) =>
+    db
+      .prepare(
+        `INSERT INTO channel_actuals (channel, month, actual_sales, actual_spend, synced_at) VALUES (?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(channel, month) DO UPDATE SET
+           actual_sales=excluded.actual_sales, actual_spend=excluded.actual_spend, synced_at=datetime('now')`,
+      )
+      .bind(r.channel, r.month, r.actualSales ?? null, r.actualSpend ?? null),
+  );
+  await db.batch(statements);
+}
+
+function validBudgetVersionBody(b) {
+  return (
+    b &&
+    typeof b.name === "string" &&
+    b.name.trim().length > 0 &&
+    Number.isInteger(b.year) &&
+    Array.isArray(b.lineItems || [])
+  );
+}
+
+function validActualsRow(r) {
+  return r && BUDGET_CHANNELS.includes(r.channel) && BUDGET_MONTH_PATTERN.test(r.month || "");
+}
+
 function campaignAssetKey(campaignId, filename) {
   return `${MARKETING_ASSET_PREFIX}${campaignId}/${filename}`;
 }
@@ -3019,6 +3188,73 @@ export default {
         await deleteEventAsset(env, eventId, filename);
         return jsonResponse({ ok: true });
       }
+    }
+
+    if (url.pathname === "/api/marketing/budget/versions" && request.method === "GET") {
+      const versions = await getBudgetVersions(env);
+      const activeVersionId = await getActiveBudgetVersionId(env);
+      return jsonResponse({ versions, activeVersionId });
+    }
+
+    const budgetVersionMatch = url.pathname.match(/^\/api\/marketing\/budget\/versions\/([A-Za-z0-9_-]+)$/);
+    if (budgetVersionMatch && request.method === "GET") {
+      const detail = await getBudgetVersionDetail(env, budgetVersionMatch[1]);
+      if (!detail) return jsonResponse({ error: "Version not found." }, 404);
+      return jsonResponse(detail);
+    }
+
+    if (budgetVersionMatch && request.method === "PUT") {
+      const body = await request.json().catch(() => null);
+      if (!validBudgetVersionBody(body)) {
+        return jsonResponse({ error: "Version needs a name, a year, and a lineItems array." }, 422);
+      }
+      await saveBudgetVersion(env, budgetVersionMatch[1], body);
+      return jsonResponse({ ok: true });
+    }
+
+    if (budgetVersionMatch && request.method === "DELETE") {
+      await deleteBudgetVersionRow(env, budgetVersionMatch[1]);
+      return jsonResponse({ ok: true });
+    }
+
+    const budgetDuplicateMatch = url.pathname.match(/^\/api\/marketing\/budget\/versions\/([A-Za-z0-9_-]+)\/duplicate$/);
+    if (budgetDuplicateMatch && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const newId =
+        typeof body.newId === "string" && CAMPAIGN_ID_PATTERN.test(body.newId) ? body.newId : `BV${Date.now()}`;
+      const newName = typeof body.newName === "string" && body.newName.trim() ? body.newName : "Copy";
+      const detail = await duplicateBudgetVersion(env, budgetDuplicateMatch[1], newId, newName);
+      if (!detail) return jsonResponse({ error: "Source version not found." }, 404);
+      return jsonResponse(detail);
+    }
+
+    if (url.pathname === "/api/marketing/budget/active" && request.method === "PUT") {
+      const body = await request.json().catch(() => null);
+      if (!body || typeof body.versionId !== "string") {
+        return jsonResponse({ error: "Body needs a versionId." }, 422);
+      }
+      await setActiveBudgetVersionId(env, body.versionId);
+      return jsonResponse({ ok: true });
+    }
+
+    if (url.pathname === "/api/marketing/budget/actuals" && request.method === "GET") {
+      const actuals = await getChannelActuals(env);
+      return jsonResponse({ actuals });
+    }
+
+    if (url.pathname === "/api/marketing/budget/actuals" && request.method === "PUT") {
+      const body = await request.json().catch(() => null);
+      if (!Array.isArray(body) || !body.every(validActualsRow)) {
+        return jsonResponse(
+          {
+            error:
+              "Body must be a JSON array of {channel, month, actualSales, actualSpend} with channel in Amazon/Walmart/TikTok/DTC and month as YYYY-MM.",
+          },
+          422,
+        );
+      }
+      await putChannelActuals(env, body);
+      return jsonResponse({ ok: true, count: body.length });
     }
 
     return env.ASSETS.fetch(request);
