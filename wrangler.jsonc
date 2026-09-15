@@ -24,6 +24,9 @@
 	"observability": {
 		"enabled": true
 	},
+	"triggers": {
+		"crons": ["0 11 * * *"]
+	},
 	"upload_source_maps": true,
 	"d1_databases": [
 		{
@@ -45,6 +48,16 @@
 			"binding": "ebe_bc_database",
 			"database_name": "ebe-bc-database",
 			"database_id": "6614b57f-4df1-492c-86fe-b4f4f01dde1a"
+		},
+		{
+			"binding": "secure_cpg_walmart",
+			"database_name": "secure-cpg-walmart",
+			"database_id": "7d55d66d-28cf-4578-84eb-a15f500ceabe"
+		},
+		{
+			"binding": "secure_cpg_wholefoods",
+			"database_name": "secure-cpg-wholefoods",
+			"database_id": "50e5baf9-22b9-408b-b7d3-a7455eea9237"
 		}
 	]
 }
