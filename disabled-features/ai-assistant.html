@@ -1,0 +1,1062 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="AI Assistant — chat with LaunchPlan Hub data, or start from a saved prompt." />
+    <title>AI Assistant — LaunchPlan Hub</title>
+    <style>
+      :root {
+        --ink: #101114;
+        --muted: #6f7178;
+        --subtle: #9799a0;
+        --line: #e8e8ea;
+        --soft: #f6f6f7;
+        --active: #d9d9db;
+        --white: #fff;
+        --orange: #f59e0b;
+        --orange-soft: #fff5df;
+        --blue: #3478f6;
+        --blue-soft: #eaf2ff;
+        --sidebar: 252px;
+        --radius: 16px;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body { height: 100%; }
+
+      body {
+        margin: 0;
+        background: var(--white);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button, a, input, textarea { font: inherit; }
+      button { color: inherit; }
+      a { color: inherit; }
+
+      .icon {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 auto;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.7;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      /* Sidebar (matches LaunchPlan Hub) */
+      .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 40;
+        display: flex;
+        width: var(--sidebar);
+        flex-direction: column;
+        background: rgba(255,255,255,.97);
+        border-right: 1px solid var(--line);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        height: 62px;
+        padding: 0 18px;
+        border-bottom: 1px solid var(--line);
+        text-decoration: none;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        margin-right: 10px;
+        place-items: center;
+        border-radius: 9px;
+        background: var(--ink);
+        color: white;
+        font-size: 12px;
+        font-weight: 850;
+        letter-spacing: -.04em;
+      }
+
+      .brand-name { font-size: 15px; font-weight: 760; letter-spacing: -.02em; color: var(--ink); }
+      .brand-collapse { margin-left: auto; color: #777; }
+
+      .nav {
+        flex: 1;
+        padding: 18px 11px;
+        overflow-y: auto;
+      }
+
+      .nav-item,
+      .nav-parent,
+      .subnav-item {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 11px;
+        border: 0;
+        text-align: left;
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .nav-item,
+      .nav-parent {
+        min-height: 42px;
+        margin: 2px 0;
+        padding: 0 12px;
+        border-radius: 9px;
+        background: transparent;
+        color: #62636a;
+        font-size: 14px;
+        font-weight: 530;
+      }
+
+      .nav-item:hover,
+      .nav-parent:hover,
+      .subnav-item:hover { background: var(--soft); color: var(--ink); }
+
+      .nav-item.active,
+      .nav-parent.active { background: var(--active); color: var(--ink); }
+
+      .nav-chevron { width: 16px; height: 16px; margin-left: auto; transform: rotate(90deg); }
+
+      .subnav { padding: 3px 0 8px 30px; }
+
+      .subnav-item {
+        min-height: 35px;
+        padding: 7px 10px;
+        border-radius: 8px;
+        background: transparent;
+        color: #777980;
+        font-size: 12.5px;
+        line-height: 1.25;
+      }
+
+      .profile {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 68px;
+        padding: 12px 14px;
+        border-top: 1px solid var(--line);
+      }
+
+      .avatar {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 50%;
+        background: #eeeeef;
+        color: #44464c;
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .profile-name { font-size: 13px; font-weight: 700; }
+      .profile-role { margin-top: 2px; color: var(--muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+
+      /* Main app shell */
+      .main {
+        height: 100vh;
+        overflow: hidden;
+        margin-left: var(--sidebar);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .mobile-bar { display: none; }
+      .overlay { display: none; }
+
+      .page-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 26px 32px 14px;
+      }
+
+      .eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 8px;
+        color: #85878e;
+        font-size: 11px;
+        font-weight: 720;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); }
+
+      .page-head h1 {
+        margin: 0;
+        font-size: 24px;
+        letter-spacing: -.03em;
+      }
+
+      .new-chat-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        padding: 0 14px;
+        border: 1px solid #dedee1;
+        border-radius: 9px;
+        background: white;
+        font-size: 12.5px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .new-chat-btn:hover { background: var(--soft); }
+
+      .chat-shell {
+        flex: 1;
+        display: flex;
+        gap: 20px;
+        min-height: 0;
+        padding: 0 32px 28px;
+      }
+
+      /* Chat column */
+      .chat-col {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: var(--white);
+      }
+
+      .messages {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .empty-state {
+        margin: auto;
+        max-width: 480px;
+        text-align: center;
+        padding: 24px;
+      }
+      .empty-state .tool-icon {
+        display: grid;
+        width: 48px;
+        height: 48px;
+        margin: 0 auto 16px;
+        place-items: center;
+        border-radius: 14px;
+        background: var(--orange-soft);
+        color: #c97900;
+      }
+      .empty-state h2 { margin: 0 0 8px; font-size: 19px; letter-spacing: -.02em; }
+      .empty-state p { margin: 0 0 22px; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+
+      .try-asking { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); text-align: left; }
+      .try-chip {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 44px;
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: white;
+        font-size: 12.5px;
+        font-weight: 560;
+        text-align: left;
+        cursor: pointer;
+      }
+      .try-chip:hover { background: var(--soft); border-color: #d9d9dc; }
+      .try-chip .icon { color: var(--subtle); }
+
+      .msg { display: flex; flex-direction: column; max-width: 78%; }
+      .msg-user { align-self: flex-end; align-items: flex-end; }
+      .msg-assistant { align-self: flex-start; align-items: flex-start; }
+
+      .bubble {
+        padding: 11px 15px;
+        border-radius: 14px;
+        font-size: 13.5px;
+        line-height: 1.55;
+      }
+      .msg-user .bubble { background: var(--ink); color: white; border-bottom-right-radius: 4px; }
+      .msg-assistant .bubble { background: var(--soft); color: var(--ink); border-bottom-left-radius: 4px; }
+      .bubble p { margin: 0 0 8px; }
+      .bubble p:last-child { margin-bottom: 0; }
+      .bubble ul { margin: 0 0 8px; padding-left: 18px; }
+      .bubble ul:last-child { margin-bottom: 0; }
+      .bubble li { margin: 2px 0; }
+      .bubble .md-heading { margin: 12px 0 4px; font-weight: 750; }
+      .bubble .md-heading:first-child { margin-top: 0; }
+      .bubble hr { border: 0; border-top: 1px solid rgba(0,0,0,.1); margin: 10px 0; }
+      .msg-user .bubble hr { border-top-color: rgba(255,255,255,.22); }
+      .bubble code {
+        padding: 1px 5px;
+        border-radius: 5px;
+        background: rgba(0,0,0,.08);
+        font-size: 12px;
+      }
+      .msg-user .bubble code { background: rgba(255,255,255,.16); }
+
+      .msg-tools {
+        margin-top: 6px;
+        padding: 0 2px;
+        color: var(--subtle);
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: .02em;
+      }
+
+      .bubble.typing { display: flex; align-items: center; gap: 9px; padding: 12px 16px; }
+      .typing-dots { display: inline-flex; flex: 0 0 auto; gap: 4px; }
+      .typing-dots span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--subtle);
+        animation: typing-bounce 1.1s infinite ease-in-out;
+      }
+      .typing-dots span:nth-child(2) { animation-delay: .15s; }
+      .typing-dots span:nth-child(3) { animation-delay: .3s; }
+      @keyframes typing-bounce {
+        0%, 60%, 100% { transform: translateY(0); opacity: .5; }
+        30% { transform: translateY(-4px); opacity: 1; }
+      }
+      .typing-status { color: var(--muted); font-size: 12.5px; font-weight: 560; }
+
+      .composer {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        padding: 14px 16px;
+        border-top: 1px solid var(--line);
+        background: rgba(255,255,255,.98);
+      }
+
+      #chat-input {
+        flex: 1;
+        resize: none;
+        max-height: 140px;
+        padding: 11px 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        color: var(--ink);
+        background: var(--soft);
+        outline: 0;
+      }
+      #chat-input:focus { border-color: #c7c8cc; background: white; }
+
+      .send-btn {
+        display: grid;
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        place-items: center;
+        border: 0;
+        border-radius: 11px;
+        background: var(--ink);
+        color: white;
+        cursor: pointer;
+      }
+      .send-btn:disabled { background: var(--active); color: #9a9ba0; cursor: not-allowed; }
+      .send-btn:not(:disabled):hover { background: #2a2b2f; }
+
+      .disclaimer {
+        padding: 0 16px 12px;
+        color: var(--subtle);
+        font-size: 10.5px;
+        text-align: center;
+      }
+
+      /* Prompt Gallery column */
+      .gallery-col {
+        width: 340px;
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: var(--white);
+      }
+
+      .gallery-head { padding: 16px 16px 12px; border-bottom: 1px solid var(--line); }
+      .gallery-head h2 { margin: 0 0 10px; font-size: 14px; letter-spacing: -.01em; }
+
+      .gallery-search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        padding: 0 12px;
+        margin-bottom: 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--subtle);
+      }
+      .gallery-search input { width: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 12.5px; }
+      .gallery-search input::placeholder { color: #9b9ca2; }
+
+      .gallery-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+      .filter-chip {
+        min-height: 26px;
+        padding: 0 11px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: white;
+        color: #62636a;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .filter-chip:hover { background: var(--soft); }
+      .filter-chip.active { background: var(--ink); border-color: var(--ink); color: white; }
+
+      .gallery-list {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+      }
+
+      .prompt-card {
+        display: block;
+        width: 100%;
+        padding: 12px 13px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: white;
+        text-align: left;
+        cursor: pointer;
+      }
+      .prompt-card:hover { background: var(--soft); border-color: #d9d9dc; }
+      .prompt-card h4 { margin: 0 0 4px; font-size: 13px; letter-spacing: -.01em; }
+      .prompt-card p { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+
+      .card-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 20px;
+        margin-top: 9px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-size: 9.5px;
+        font-weight: 750;
+        letter-spacing: .03em;
+        text-transform: uppercase;
+      }
+      .prompt-card[data-category="Reviews"] .card-badge { background: var(--orange-soft); color: #c97900; }
+      .prompt-card[data-category="SOPs"] .card-badge { background: #f0edff; color: #6d5ce7; }
+      .prompt-card[data-category="General"] .card-badge { background: var(--soft); color: #62636a; }
+
+      .gallery-empty {
+        margin: auto;
+        padding: 30px 16px;
+        color: var(--subtle);
+        font-size: 12px;
+        text-align: center;
+      }
+
+      @media (max-width: 1180px) {
+        .gallery-col { width: 300px; }
+      }
+
+      @media (max-width: 980px) {
+        .chat-shell { flex-direction: column; }
+        .gallery-col { width: 100%; max-height: 320px; }
+        .try-asking { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 760px) {
+        .sidebar { transform: translateX(-100%); transition: transform .22s ease; box-shadow: 18px 0 50px rgba(0,0,0,.08); }
+        .sidebar.open { transform: translateX(0); }
+        .overlay { position: fixed; inset: 0; z-index: 30; display: none; background: rgba(15,15,18,.2); }
+        .overlay.open { display: block; }
+        .main { margin-left: 0; }
+        .mobile-bar {
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          display: flex;
+          height: 58px;
+          align-items: center;
+          gap: 10px;
+          padding: 0 16px;
+          border-bottom: 1px solid var(--line);
+          background: rgba(255,255,255,.94);
+          backdrop-filter: blur(10px);
+        }
+        .menu-button { display: grid; width: 34px; height: 34px; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: white; }
+        .mobile-title { font-size: 14px; font-weight: 760; }
+        .page-head { padding: 18px 16px 10px; }
+        .chat-shell { padding: 0 16px 16px; }
+        .msg { max-width: 92%; }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+      <symbol id="i-software" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M7 6.5h.01M10 6.5h.01"/></symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3Z"/><path d="m19 15 .7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7L19 15Z"/></symbol>
+      <symbol id="i-plug" viewBox="0 0 24 24"><path d="m8 12 8-8"/><path d="m14 3 7 7"/><path d="m5 11 8 8"/><path d="m3 14 7 7"/><path d="m10 16-4 4"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2h9l4 4v16H6z" /><path d="M15 2v5h5M9 12h7M9 16h7" /></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="m3 11 18-8-8 18-2-8-8-2Z"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    </svg>
+
+    <div class="overlay" id="overlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="/">
+        <div class="brand-mark">LP</div>
+        <div class="brand-name">LaunchPlan Hub</div>
+        <svg class="icon brand-collapse"><use href="#i-chevron" /></svg>
+      </a>
+
+      <nav class="nav" aria-label="Primary navigation">
+        <a class="nav-item" href="/">
+          <svg class="icon"><use href="#i-home" /></svg><span>Home</span>
+        </a>
+        <a class="nav-item active" href="/ai-assistant.html">
+          <svg class="icon"><use href="#i-chat" /></svg><span>AI Assistant</span>
+        </a>
+        <a class="nav-item" href="/#software">
+          <svg class="icon"><use href="#i-software" /></svg><span>Software</span>
+        </a>
+        <a class="nav-parent" href="/#dashboards">
+          <svg class="icon"><use href="#i-grid" /></svg><span>Dashboards</span>
+          <svg class="icon nav-chevron"><use href="#i-chevron" /></svg>
+        </a>
+        <div class="subnav">
+          <a class="subnav-item" href="/#dashboards">Company Analytics</a>
+          <a class="subnav-item" href="/#dashboards">Executive Summaries</a>
+          <a class="subnav-item" href="/#dashboards">Marketing Analytics</a>
+          <a class="subnav-item" href="/#dashboards">Sales Analytics</a>
+          <a class="subnav-item" href="/#dashboards">Marketing/Sales Summaries</a>
+          <a class="subnav-item" href="/#dashboards">Operations Analytics</a>
+        </div>
+        <a class="nav-item" href="/#skills">
+          <svg class="icon"><use href="#i-spark" /></svg><span>Claude Skills</span>
+        </a>
+        <a class="nav-item" href="/#integrations">
+          <svg class="icon"><use href="#i-plug" /></svg><span>Integrations</span>
+        </a>
+        <a class="nav-item" href="/sops.html">
+          <svg class="icon"><use href="#i-file" /></svg><span>SOPs</span>
+        </a>
+      </nav>
+
+      <div class="profile">
+        <div class="avatar">CF</div>
+        <div><div class="profile-name">Chris Fuoss</div><div class="profile-role">Administrator</div></div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="mobile-bar">
+        <button class="menu-button" id="menu-button" aria-label="Open navigation"><svg class="icon"><use href="#i-menu" /></svg></button>
+        <div class="mobile-title">AI Assistant</div>
+      </div>
+
+      <div class="page-head">
+        <div>
+          <div class="eyebrow"><span class="eyebrow-dot"></span>AI Assistant</div>
+          <h1>Ask your hub data anything.</h1>
+        </div>
+        <button class="new-chat-btn" id="new-chat-btn" type="button">
+          <svg class="icon"><use href="#i-plus" /></svg>New chat
+        </button>
+      </div>
+
+      <div class="chat-shell">
+        <section class="chat-col">
+          <div class="messages" id="messages">
+            <div class="empty-state" id="empty-state">
+              <div class="tool-icon"><svg class="icon"><use href="#i-chat" /></svg></div>
+              <h2>What do you want to know?</h2>
+              <p>I can look up real customer reviews, marketing/ad performance, and internal SOPs — pick a prompt from the gallery or try one of these.</p>
+              <div class="try-asking" id="try-asking"></div>
+            </div>
+          </div>
+
+          <form class="composer" id="composer">
+            <textarea id="chat-input" rows="1" placeholder="Ask anything…" aria-label="Message"></textarea>
+            <button class="send-btn" id="send-btn" type="submit" aria-label="Send">
+              <svg class="icon"><use href="#i-send" /></svg>
+            </button>
+          </form>
+          <div class="disclaimer">AI-generated answers are grounded in your hub's data via tool calls, but can still make mistakes. Verify anything critical.</div>
+        </section>
+
+        <aside class="gallery-col">
+          <div class="gallery-head">
+            <h2>Prompt Gallery</h2>
+            <label class="gallery-search">
+              <svg class="icon"><use href="#i-search" /></svg>
+              <input id="gallery-search" type="search" placeholder="Search prompts…" aria-label="Search prompts" />
+            </label>
+            <div class="gallery-filters" id="gallery-filters"></div>
+          </div>
+          <div class="gallery-list" id="gallery-list"></div>
+        </aside>
+      </div>
+    </div>
+
+    <script>
+      const icon = (id) => `<svg class="icon"><use href="#${id}"></use></svg>`;
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+        })[ch]);
+      }
+
+      function inlineFormat(s) {
+        return s
+          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+          .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, "<em>$1</em>")
+          .replace(/`([^`]+)`/g, "<code>$1</code>");
+      }
+
+      // Minimal markdown: paragraphs, "#"-headings, "---" rules, "- " bullet
+      // lists, **bold**, *italic*, `code`. The chat model's replies are short
+      // prose/lists, not full documents, so a full markdown parser would be
+      // more weight than value here.
+      function renderMarkdownLite(text) {
+        const lines = escapeHtml(text).split(/\n/);
+        let html = "";
+        let inList = false;
+        const closeList = () => {
+          if (inList) { html += "</ul>"; inList = false; }
+        };
+        for (const raw of lines) {
+          const line = raw.trim();
+          if (!line) { closeList(); continue; }
+          if (/^-{3,}$/.test(line)) { closeList(); html += "<hr>"; continue; }
+          const headingMatch = line.match(/^#{1,4}\s+(.*)$/);
+          if (headingMatch) {
+            closeList();
+            html += `<p class="md-heading">${inlineFormat(headingMatch[1])}</p>`;
+            continue;
+          }
+          const bulletMatch = line.match(/^[-*]\s+(.*)$/);
+          if (bulletMatch) {
+            if (!inList) { html += "<ul>"; inList = true; }
+            html += `<li>${inlineFormat(bulletMatch[1])}</li>`;
+            continue;
+          }
+          closeList();
+          html += `<p>${inlineFormat(line)}</p>`;
+        }
+        closeList();
+        return html || `<p>${inlineFormat(escapeHtml(text))}</p>`;
+      }
+
+      // --- Prompt Gallery ---
+      const PROMPT_GALLERY = [
+        {
+          id: "review-sentiment",
+          category: "Reviews",
+          title: "Review Sentiment Snapshot",
+          desc: "Rating distribution, overall sentiment, and top recurring themes across all reviews.",
+          prompt: "Give me a sentiment snapshot across all our customer reviews — rating distribution, overall sentiment, and the top recurring themes.",
+        },
+        {
+          id: "flavor-feedback",
+          category: "Reviews",
+          title: "Flavor Feedback Deep-Dive",
+          desc: "Real review quotes and sentiment for one flavor or product group.",
+          prompt: "What are customers saying about our Fiery Chile Lime flavor? Pull real review quotes and summarize the sentiment.",
+        },
+        {
+          id: "critical-reviews",
+          category: "Reviews",
+          title: "Critical Review Watch",
+          desc: "Surface reviews mentioning quality issues, damage, or complaints.",
+          prompt: "Are there any reviews mentioning quality issues, damage, or complaints? Summarize what customers are saying.",
+        },
+        {
+          id: "ad-performance",
+          category: "Marketing",
+          title: "Weekly Ad Performance",
+          desc: "Spend, ROAS, and performance across ad platforms.",
+          prompt: "How did our ad spend and ROAS perform over the last 7 days across platforms?",
+        },
+        {
+          id: "campaign-compare",
+          category: "Marketing",
+          title: "Campaign Comparison",
+          desc: "Which active campaigns are over- or under-performing on ROAS.",
+          prompt: "Compare performance across our active ad campaigns this month — which are over- or under-performing on ROAS?",
+        },
+        {
+          id: "blended-roas-summary",
+          category: "Marketing",
+          title: "Blended ROAS & Net Profit",
+          desc: "Revenue, blended ROAS, and net profit from our own store data.",
+          prompt: "What was our total revenue, blended ROAS, and net profit over the last 30 days?",
+        },
+        {
+          id: "order-trend",
+          category: "Marketing",
+          title: "Order & Revenue Trend",
+          desc: "Daily order volume and revenue trend — spot spikes or dips.",
+          prompt: "Show me our order count and revenue by day over the last 2 weeks — which days stood out?",
+        },
+        {
+          id: "attribution-by-channel",
+          category: "Marketing",
+          title: "Attribution by Channel",
+          desc: "Attributed revenue and ROAS by channel under our attribution model.",
+          prompt: "Break down attributed revenue and ROAS by channel over the last 30 days.",
+        },
+        {
+          id: "roas-change-explain",
+          category: "Marketing",
+          title: "Why Did ROAS Change?",
+          desc: "Root-cause analysis on a metric move, not a guess.",
+          prompt: "Why did our blended ROAS change over the last week? What's driving it?",
+        },
+        {
+          id: "new-vs-returning",
+          category: "Marketing",
+          title: "New vs. Returning Customers",
+          desc: "Revenue split and new-customer CPA from our own order data.",
+          prompt: "How much of our revenue over the last 30 days came from new customers vs. returning customers, and what's our new-customer CPA?",
+        },
+        {
+          id: "instacart-weekly-performance",
+          category: "Marketing",
+          title: "Instacart Weekly Ad Performance",
+          desc: "Spend, ROAS, attributed sales, and new-to-brand metrics.",
+          prompt:
+            "Give me our Instacart ad performance for the last 7 days — spend, ROAS, attributed sales, attributed units, clicks, CTR, avg CPC, new-to-brand sales, and new-to-brand sales %.",
+        },
+        {
+          id: "instacart-active-campaigns",
+          category: "Marketing",
+          title: "Active Campaign Performance",
+          desc: "Performance for currently active Instacart campaigns.",
+          prompt:
+            "How are our active Instacart campaigns performing? Ask me what timeframe I want before pulling the data, unless I've already told you.",
+        },
+        {
+          id: "instacart-campaign-by-type",
+          category: "Marketing",
+          title: "Campaign Performance By Type",
+          desc: "Breakdown by campaign type — Acquire, Max Sales, and Sponsored Display.",
+          prompt: "Break down our Instacart ad performance by campaign type — Acquire, Max Sales, and Sponsored Display.",
+        },
+        {
+          id: "sop-lookup",
+          category: "SOPs",
+          title: "Find the Right SOP",
+          desc: "Search the SOP library for a process by keyword.",
+          prompt: "Which SOP covers how to trace a lot in Business Central?",
+        },
+        {
+          id: "onboarding",
+          category: "General",
+          title: "What Can You Help With?",
+          desc: "A quick tour of the data and tools this assistant can use.",
+          prompt: "What data and tools do you have access to? Give me a few examples of questions I could ask.",
+        },
+      ];
+
+      const CATEGORIES = ["All", "Reviews", "Marketing", "SOPs", "General"];
+      let activeCategory = "All";
+      let gallerySearchTerm = "";
+
+      function renderFilters() {
+        const el = document.getElementById("gallery-filters");
+        el.innerHTML = CATEGORIES.map(
+          (c) => `<button type="button" class="filter-chip${c === activeCategory ? " active" : ""}" data-category="${escapeHtml(c)}">${escapeHtml(c)}</button>`,
+        ).join("");
+        el.querySelectorAll(".filter-chip").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            activeCategory = btn.dataset.category;
+            renderFilters();
+            renderGallery();
+          });
+        });
+      }
+
+      function renderGallery() {
+        const list = document.getElementById("gallery-list");
+        const term = gallerySearchTerm.trim().toLowerCase();
+        const filtered = PROMPT_GALLERY.filter((p) => {
+          const categoryOk = activeCategory === "All" || p.category === activeCategory;
+          const searchOk = !term || p.title.toLowerCase().includes(term) || p.desc.toLowerCase().includes(term);
+          return categoryOk && searchOk;
+        });
+
+        if (filtered.length === 0) {
+          list.innerHTML = `<div class="gallery-empty">No prompts match. Try a different search or category.</div>`;
+          return;
+        }
+
+        list.innerHTML = filtered
+          .map(
+            (p) => `
+          <button type="button" class="prompt-card" data-category="${escapeHtml(p.category)}" data-prompt-id="${escapeHtml(p.id)}">
+            <h4>${escapeHtml(p.title)}</h4>
+            <p>${escapeHtml(p.desc)}</p>
+            <span class="card-badge">${escapeHtml(p.category)}</span>
+          </button>`,
+          )
+          .join("");
+
+        list.querySelectorAll(".prompt-card").forEach((card) => {
+          card.addEventListener("click", () => {
+            const item = PROMPT_GALLERY.find((p) => p.id === card.dataset.promptId);
+            if (item) sendMessage(item.prompt);
+          });
+        });
+      }
+
+      function renderTryAsking() {
+        const ids = ["review-sentiment", "ad-performance", "sop-lookup", "onboarding"];
+        const el = document.getElementById("try-asking");
+        el.innerHTML = ids
+          .map((id) => PROMPT_GALLERY.find((p) => p.id === id))
+          .filter(Boolean)
+          .map(
+            (p) => `<button type="button" class="try-chip" data-prompt-id="${escapeHtml(p.id)}">${escapeHtml(p.title)}${icon("i-send")}</button>`,
+          )
+          .join("");
+        el.querySelectorAll(".try-chip").forEach((chip) => {
+          chip.addEventListener("click", () => {
+            const item = PROMPT_GALLERY.find((p) => p.id === chip.dataset.promptId);
+            if (item) sendMessage(item.prompt);
+          });
+        });
+      }
+
+      let searchTimer = null;
+      document.getElementById("gallery-search").addEventListener("input", (event) => {
+        clearTimeout(searchTimer);
+        const value = event.target.value;
+        searchTimer = setTimeout(() => {
+          gallerySearchTerm = value;
+          renderGallery();
+        }, 150);
+      });
+
+      // --- Chat ---
+      let history = [];
+      let sending = false;
+
+      function addMessage(role, text, opts = {}) {
+        const messages = document.getElementById("messages");
+        const row = document.createElement("div");
+        row.className = `msg msg-${role}`;
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.innerHTML = role === "assistant" ? renderMarkdownLite(text) : `<p>${escapeHtml(text)}</p>`;
+        row.appendChild(bubble);
+
+        if (opts.tools && opts.tools.length) {
+          const toolsEl = document.createElement("div");
+          toolsEl.className = "msg-tools";
+          toolsEl.textContent = "Checked: " + opts.tools.join(", ");
+          row.appendChild(toolsEl);
+        }
+
+        messages.appendChild(row);
+        messages.scrollTop = messages.scrollHeight;
+        return row;
+      }
+
+      function showTyping(initialStatus) {
+        const messages = document.getElementById("messages");
+        const row = document.createElement("div");
+        row.className = "msg msg-assistant";
+        row.id = "typing-row";
+        row.innerHTML = `
+          <div class="bubble typing">
+            <span class="typing-dots"><span></span><span></span><span></span></span>
+            <span class="typing-status" id="typing-status">${escapeHtml(initialStatus)}</span>
+          </div>`;
+        messages.appendChild(row);
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      function updateTyping(status) {
+        const el = document.getElementById("typing-status");
+        if (!el) return;
+        el.textContent = status;
+        const messages = document.getElementById("messages");
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      function hideTyping() {
+        document.getElementById("typing-row")?.remove();
+      }
+
+      function setComposerDisabled(disabled) {
+        document.getElementById("chat-input").disabled = disabled;
+        document.getElementById("send-btn").disabled = disabled;
+      }
+
+      function autoResizeInput() {
+        const el = document.getElementById("chat-input");
+        el.style.height = "auto";
+        el.style.height = Math.min(el.scrollHeight, 140) + "px";
+      }
+
+      async function sendMessage(text) {
+        const trimmed = String(text || "").trim();
+        if (!trimmed || sending) return;
+
+        document.getElementById("empty-state")?.remove();
+
+        sending = true;
+        setComposerDisabled(true);
+
+        const input = document.getElementById("chat-input");
+        input.value = "";
+        autoResizeInput();
+
+        addMessage("user", trimmed);
+        const priorHistory = history.slice();
+        history.push({ role: "user", content: trimmed });
+
+        showTyping("Thinking…");
+        try {
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: trimmed, history: priorHistory }),
+          });
+
+          if (!res.ok || !res.body) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || res.statusText || "Request failed.");
+          }
+
+          // The server streams newline-delimited JSON: {"type":"status",...}
+          // events as the tool loop runs, then one {"type":"final",...} (or
+          // {"type":"error",...}) event before closing the stream.
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let finalPayload = null;
+          let streamError = null;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let newlineIndex;
+            while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+              const line = buffer.slice(0, newlineIndex).trim();
+              buffer = buffer.slice(newlineIndex + 1);
+              if (!line) continue;
+
+              const event = JSON.parse(line);
+              if (event.type === "status") {
+                updateTyping(event.message);
+              } else if (event.type === "final") {
+                finalPayload = event;
+              } else if (event.type === "error") {
+                streamError = event.error;
+              }
+            }
+          }
+
+          hideTyping();
+
+          if (streamError) throw new Error(streamError);
+          if (!finalPayload) throw new Error("No response received.");
+
+          const toolNames = Array.from(
+            new Set((finalPayload.toolCalls || []).map((t) => (t.server ? `${t.tool} (${t.server})` : t.tool))),
+          );
+          addMessage("assistant", finalPayload.response || "No response.", { tools: toolNames });
+          history.push({ role: "assistant", content: finalPayload.response || "" });
+        } catch (err) {
+          hideTyping();
+          addMessage("assistant", `Sorry — ${err.message || "I couldn't reach the assistant. Please try again."}`);
+          history.pop();
+        } finally {
+          setComposerDisabled(false);
+          sending = false;
+          input.focus();
+        }
+      }
+
+      document.getElementById("composer").addEventListener("submit", (event) => {
+        event.preventDefault();
+        sendMessage(document.getElementById("chat-input").value);
+      });
+
+      document.getElementById("chat-input").addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          sendMessage(document.getElementById("chat-input").value);
+        }
+      });
+
+      document.getElementById("chat-input").addEventListener("input", autoResizeInput);
+
+      document.getElementById("new-chat-btn").addEventListener("click", () => {
+        history = [];
+        const messages = document.getElementById("messages");
+        messages.innerHTML = `
+          <div class="empty-state" id="empty-state">
+            <div class="tool-icon">${icon("i-chat")}</div>
+            <h2>What do you want to know?</h2>
+            <p>I can look up real customer reviews, marketing/ad performance, and internal SOPs — pick a prompt from the gallery or try one of these.</p>
+            <div class="try-asking" id="try-asking"></div>
+          </div>`;
+        renderTryAsking();
+      });
+
+      function closeMobileNav() {
+        document.getElementById("sidebar").classList.remove("open");
+        document.getElementById("overlay").classList.remove("open");
+      }
+
+      document.getElementById("menu-button").addEventListener("click", () => {
+        document.getElementById("sidebar").classList.add("open");
+        document.getElementById("overlay").classList.add("open");
+      });
+      document.getElementById("overlay").addEventListener("click", closeMobileNav);
+
+      renderFilters();
+      renderGallery();
+      renderTryAsking();
+    </script>
+  </body>
+</html>

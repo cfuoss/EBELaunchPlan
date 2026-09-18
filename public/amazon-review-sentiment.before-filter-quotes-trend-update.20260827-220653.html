@@ -275,16 +275,6 @@
     <button type="button" class="source-pill" data-source="okendo">Okendo</button>
   </div>
   <p class="subtitle" id="exec-subtitle"></p>
-
-  <div class="filter-row" style="align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:20px">
-    <label style="font-size:12px;color:var(--text2);font-weight:700;white-space:nowrap">📅 Date range</label>
-    <input type="date" id="exec-date-from" onchange="applyExecDateFilter()">
-    <span style="font-size:12px;color:var(--gray)">to</span>
-    <input type="date" id="exec-date-to" onchange="applyExecDateFilter()">
-    <button type="button" class="review-expand-btn" onclick="clearExecDateFilter()">Clear</button>
-    <span style="font-size:11.5px;color:var(--gray);font-style:italic">Filters this Executive Summary only — product group sections and the review browser below are unaffected.</span>
-  </div>
-
   <div id="exec-summary-body"></div>
 </div>
 
@@ -648,11 +638,8 @@ const SOURCE_LABELS = { all: 'All Sources', amazon: 'Amazon', okendo: 'Okendo' }
 function renderExecSummary(report, themeIndex) {
   const meta = report.meta || {};
   const os = report.overall_stats || {};
-  const dateNote = (EXEC_DATE_FROM || EXEC_DATE_TO)
-    ? ` · Date filter: ${EXEC_DATE_FROM || 'earliest'} to ${EXEC_DATE_TO || 'latest'}`
-    : '';
   document.getElementById('exec-subtitle').textContent =
-    `Every Body Eat · Live data · ${SOURCE_LABELS[CURRENT_SOURCE]} · Written reviews analyzed: ${fmtNum(meta.total_written_reviews ?? os.count ?? 0)} · Platform review totals from metric-data${dateNote}`;
+    `Every Body Eat · Live data · ${SOURCE_LABELS[CURRENT_SOURCE]} · Written reviews analyzed: ${fmtNum(meta.total_written_reviews ?? os.count ?? 0)} · Platform review totals from metric-data`;
 
   const groupOrder = report.group_order || [];
   const groupsByCount = groupOrder.slice().sort((a,b) => (report.groups[b].stats.count||0) - (report.groups[a].stats.count||0));
@@ -731,21 +718,6 @@ function renderExecSummary(report, themeIndex) {
     </div>
   </div>`;
 
-  html += `<div class="card" style="margin-top:20px">
-    <h4 class="sub-title">Theme Trends by Month</h4>
-    <div style="font-size:11px;color:var(--gray);margin-bottom:14px">Monthly mention counts per theme, stacked by polarity — shows the full history regardless of the date filter above, so trends stay comparable month to month.</div>
-    <div class="card-grid card-grid-2">
-      <div>
-        <h5 style="font-size:12px;font-weight:700;color:var(--pos);margin-bottom:8px">Positive Themes</h5>
-        ${stackedMonthlyChartHtml(REVIEWS, 'positive')}
-      </div>
-      <div>
-        <h5 style="font-size:12px;font-weight:700;color:var(--neg);margin-bottom:8px">Negative Themes</h5>
-        ${stackedMonthlyChartHtml(REVIEWS, 'negative')}
-      </div>
-    </div>
-  </div>`;
-
   document.getElementById('exec-summary-body').innerHTML = html;
 }
 
@@ -771,37 +743,13 @@ function sentimentByFlavorRow(flavor, flavorData) {
     </div></div>`;
 }
 
-const QUOTE_PREVIEW_LEN = 140;
-let quoteIdCounter = 0;
-
 function renderThemeTable(themes) {
   if (!themes || themes.length === 0) {
     return `<div style="font-size:12px;color:var(--gray);padding:8px 0">No themes detected.</div>`;
   }
-  const rows = themes.map(t => {
-    const quote = t.top_quote || '';
-    const attribution = [t.quote_author, t.quote_rating ? `${t.quote_rating}★` : ''].filter(Boolean).join(', ');
-    const full = attribution ? `${quote} — ${attribution}` : quote;
-    const needsExpand = quote.length > QUOTE_PREVIEW_LEN;
-    const preview = needsExpand ? quote.slice(0, QUOTE_PREVIEW_LEN).trim() + '…' : quote;
-    const qid = `quote-${quoteIdCounter++}`;
-    const quoteCell = quote
-      ? `<span id="${qid}" data-preview="${escHtml(preview)}" data-full="${escHtml(full)}" data-expanded="0">${escHtml(preview)}</span>` +
-        (needsExpand ? ` <button type="button" class="review-expand-btn" onclick="toggleQuoteCell('${qid}')">See more</button>` : '')
-      : '';
-    return `<tr><td><span class="theme-tag ${t.polarity === 'negative' ? 'theme-neg' : 'theme-pos'}">${escHtml(t.display)}</span></td><td>${t.count}</td><td>${quoteCell}</td></tr>`;
-  }).join('');
+  const cls = themes[0] && themes[0].polarity === 'negative' ? 'theme-neg' : 'theme-pos';
+  const rows = themes.map(t => `<tr><td><span class="theme-tag ${t.polarity === 'negative' ? 'theme-neg' : 'theme-pos'}">${escHtml(t.display)}</span></td><td>${t.count}</td><td>${escHtml(t.top_quote || '')}</td></tr>`).join('');
   return `<table><thead><tr><th>Theme</th><th>Mentions</th><th>Example Quote</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-
-function toggleQuoteCell(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const btn = el.nextElementSibling;
-  const expanded = el.dataset.expanded === '1';
-  el.textContent = expanded ? el.dataset.preview : el.dataset.full;
-  el.dataset.expanded = expanded ? '0' : '1';
-  if (btn) btn.textContent = expanded ? 'See more' : 'See less';
 }
 
 const CRITICAL_THEME_KEYS = {
@@ -1110,10 +1058,7 @@ function computeThemeStats(reviews, polarity) {
       if ((polarity === 'positive') !== isPos) continue;
       if (!counts[key]) counts[key] = { count: 0, best: null };
       counts[key].count++;
-      // Full text kept here (not truncated) so the report can show the
-      // complete quote on demand; renderThemeTable does the truncating for
-      // the table preview and expands to this full text on click.
-      const snippet = (r.title ? r.title + ' — ' : '') + (r.content || '');
+      const snippet = (r.title ? r.title + ' — ' : '') + (r.content || '').slice(0, 180);
       if (!counts[key].best || snippet.length > counts[key].best.text.length) {
         counts[key].best = { text: snippet, author: r.author, rating: r.rating };
       }
@@ -1146,160 +1091,6 @@ function buildThemeIndex(report) {
     }
   }
   return { overall: buildThemeBucket(reviews), flavors };
-}
-
-// ═══ EXECUTIVE SUMMARY DATE-RANGE FILTER ═══
-// Scoped to the Executive Summary only: recomputes written-review stats
-// (counts/ratings/sentiment/top-theme) from the filtered review subset, but
-// keeps platform_reviews / platform_wtd_rating from the base report as-is,
-// since those come from metric-data and aren't tied to individual review
-// dates. Product group sections and the All Reviews browser read from the
-// unfiltered REPORT/REVIEWS and never call this.
-let EXEC_DATE_FROM = '';
-let EXEC_DATE_TO = '';
-
-function computeReviewStats(reviews) {
-  const n = reviews.length;
-  const stars = {1:0,2:0,3:0,4:0,5:0};
-  let positive = 0, neutral = 0, negative = 0, ratingSum = 0;
-  reviews.forEach(r => {
-    stars[r.rating] = (stars[r.rating] || 0) + 1;
-    ratingSum += (r.rating || 0);
-    if (r.sentiment === 'positive') positive++;
-    else if (r.sentiment === 'negative') negative++;
-    else neutral++;
-  });
-  return {
-    count: n, positive, neutral, negative,
-    pos_pct: n ? positive/n*100 : 0, neu_pct: n ? neutral/n*100 : 0, neg_pct: n ? negative/n*100 : 0,
-    avg_rating: n ? ratingSum/n : 0, stars,
-  };
-}
-
-function buildExecReport(reviews) {
-  const base = REPORT;
-  const groupOrder = base.group_order || [];
-  const groups = {};
-  // Only stats + flavor_order are needed here: the exec summary charts read
-  // group-level stats directly, and buildThemeIndex() only needs flavor_order
-  // to know which flavors to scope theme buckets to (per-flavor stats aren't
-  // read by anything in the exec summary, unlike the product group sections).
-  groupOrder.forEach(g => {
-    const baseGroup = base.groups[g];
-    const groupReviews = reviews.filter(r => r.product_group === g);
-    groups[g] = {
-      stats: computeReviewStats(groupReviews),
-      platform_reviews: baseGroup.platform_reviews,
-      platform_wtd_rating: baseGroup.platform_wtd_rating,
-      flavor_order: baseGroup.flavor_order || [],
-    };
-  });
-
-  const flavorSummary = (base.flavor_summary || []).map(row => {
-    const scoped = reviews.filter(r => r.product_group === row.product_group && r.flavor === row.flavor);
-    const st = computeReviewStats(scoped);
-    return {
-      ...row,
-      written_reviews: st.count, written_avg_rating: st.avg_rating,
-      positive: st.positive, neutral: st.neutral, negative: st.negative,
-      pos_pct: st.pos_pct, neu_pct: st.neu_pct, neg_pct: st.neg_pct,
-    };
-  });
-
-  return {
-    meta: { ...base.meta, total_written_reviews: reviews.length },
-    overall_stats: computeReviewStats(reviews),
-    group_order: groupOrder,
-    groups,
-    flavor_summary: flavorSummary,
-    reviews,
-  };
-}
-
-function rerenderExecSummary() {
-  if (!REPORT) return;
-  const reviews = REVIEWS.filter(r => {
-    if (EXEC_DATE_FROM && r.date < EXEC_DATE_FROM) return false;
-    if (EXEC_DATE_TO && r.date > EXEC_DATE_TO) return false;
-    return true;
-  });
-  const execReport = buildExecReport(reviews);
-  const execThemeIndex = buildThemeIndex(execReport);
-  renderExecSummary(execReport, execThemeIndex);
-  wireThemeTags();
-}
-
-function applyExecDateFilter() {
-  EXEC_DATE_FROM = document.getElementById('exec-date-from').value;
-  EXEC_DATE_TO = document.getElementById('exec-date-to').value;
-  rerenderExecSummary();
-}
-
-function clearExecDateFilter() {
-  document.getElementById('exec-date-from').value = '';
-  document.getElementById('exec-date-to').value = '';
-  EXEC_DATE_FROM = '';
-  EXEC_DATE_TO = '';
-  rerenderExecSummary();
-}
-
-// ═══ THEME TRENDS BY MONTH — stacked bar chart, one per polarity ═══
-const TREND_MONTH_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', year: '2-digit' });
-const THEME_TREND_COLORS = ['#2878FF','#00bf63','#F99420','#CC1F97','#0099F3','#CADC30',
-  '#ED1C24','#7A3D00','#6d28d9','#0e7490','#65a30d','#be185d'];
-
-function monthlyThemeCounts(reviews, polarity) {
-  const byMonth = {};
-  for (const r of reviews) {
-    if (!r.date || r.sentiment !== polarity) continue;
-    const month = r.date.slice(0, 7); // YYYY-MM
-    if (!byMonth[month]) byMonth[month] = {};
-    for (const key of (r.themes || [])) {
-      const isPos = POS_THEMES.has(key);
-      if ((polarity === 'positive') !== isPos) continue;
-      byMonth[month][key] = (byMonth[month][key] || 0) + 1;
-    }
-  }
-  const months = Object.keys(byMonth).sort();
-  return months.map(m => ({ month: m, counts: byMonth[m] }));
-}
-
-function stackedMonthlyChartHtml(reviews, polarity) {
-  const perMonth = monthlyThemeCounts(reviews, polarity);
-  if (perMonth.length === 0) {
-    return `<div style="font-size:12px;color:var(--gray)">Not enough dated reviews to chart a trend.</div>`;
-  }
-
-  const totals = {};
-  perMonth.forEach(m => Object.entries(m.counts).forEach(([k,c]) => { totals[k] = (totals[k]||0) + c; }));
-  const topKeys = Object.entries(totals).sort((a,b) => b[1]-a[1]).slice(0, 8).map(([k]) => k);
-  const palette = {};
-  topKeys.forEach((k,i) => { palette[k] = THEME_TREND_COLORS[i % THEME_TREND_COLORS.length]; });
-
-  const maxTotal = Math.max(1, ...perMonth.map(m => topKeys.reduce((s,k) => s + (m.counts[k]||0), 0)));
-
-  const bars = perMonth.map(m => {
-    const total = topKeys.reduce((s,k) => s + (m.counts[k]||0), 0);
-    const barHeightPct = (total / maxTotal * 100).toFixed(1);
-    const segs = topKeys.filter(k => m.counts[k]).map(k => {
-      const segPct = (m.counts[k] / total * 100).toFixed(1);
-      const label = THEME_DISPLAY_MAP[k] || k.replace(/_/g,' ');
-      return `<div title="${escHtml(label)}: ${m.counts[k]} mention${m.counts[k]===1?'':'s'}" style="height:${segPct}%;background:${palette[k]}"></div>`;
-    }).join('');
-    const [y, mo] = m.month.split('-');
-    const label = TREND_MONTH_FMT.format(new Date(Number(y), Number(mo)-1, 1));
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;min-width:20px">
-      <div style="display:flex;flex-direction:column-reverse;width:100%;max-width:32px;height:${barHeightPct}%;border-radius:3px 3px 0 0;overflow:hidden;background:#f3f4f6">${segs}</div>
-      <div style="font-size:10px;color:var(--gray);white-space:nowrap" title="${total} mention${total===1?'':'s'}">${label}</div>
-    </div>`;
-  }).join('');
-
-  const legend = topKeys.map(k => `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);margin:0 12px 4px 0">
-    <span style="width:10px;height:10px;border-radius:2px;background:${palette[k]};display:inline-block"></span>${escHtml(THEME_DISPLAY_MAP[k] || k.replace(/_/g,' '))}
-  </span>`).join('');
-
-  return `<div style="display:flex;align-items:flex-end;gap:6px;height:160px;padding:8px 4px 0;border-bottom:1px solid var(--border)">${bars}</div>
-    <div style="margin-top:10px">${legend}</div>`;
 }
 
 function openThemeModal(themeKey) {
@@ -1512,21 +1303,11 @@ async function loadReport(source) {
     REPORT = report;
     REVIEWS = report.reviews || [];
 
-    // Reset the Executive Summary date filter on every (re)load — it's a
-    // view-only control on top of whichever source/report just loaded, not
-    // something that should silently persist across a source switch.
-    EXEC_DATE_FROM = '';
-    EXEC_DATE_TO = '';
-    const execFromEl = document.getElementById('exec-date-from');
-    const execToEl = document.getElementById('exec-date-to');
-    if (execFromEl) execFromEl.value = '';
-    if (execToEl) execToEl.value = '';
-
     renderNav(report);
-    const themeIndex = buildThemeIndex(report); // unfiltered — drives product group sections only
+    const themeIndex = buildThemeIndex(report);
+    renderExecSummary(report, themeIndex);
     renderGroupSections(report, themeIndex);
     populateFilterDropdowns(report);
-    rerenderExecSummary(); // builds its own (currently unfiltered) view from REVIEWS
 
     document.getElementById('report-loading').style.display = 'none';
     document.getElementById('report-content').style.display = '';

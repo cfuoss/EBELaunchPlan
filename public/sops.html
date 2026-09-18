@@ -206,7 +206,7 @@
         line-height: 1.6;
       }
 
-      .search-row { display: flex; gap: 10px; margin: 30px 0 26px; }
+      .search-row { display: flex; gap: 10px; margin: 30px 0 26px; align-items: center; }
       .search {
         display: flex;
         min-height: 45px;
@@ -221,6 +221,69 @@
 
       .search input { width: 100%; border: 0; outline: 0; color: var(--ink); background: transparent; }
       .search input::placeholder { color: #9b9ca2; }
+
+      .link-button {
+        border: 0;
+        padding: 0;
+        background: none;
+        color: var(--ink);
+        font-weight: 700;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+
+      .dropzone {
+        margin-bottom: 26px;
+        padding: 30px 24px;
+        border: 1.5px dashed #d7d7da;
+        border-radius: var(--radius);
+        background: var(--soft);
+        text-align: center;
+        transition: border-color .15s ease, background .15s ease;
+      }
+
+      .dropzone.dragover { border-color: var(--orange); background: var(--orange-soft); }
+
+      .dropzone-prompt .tool-icon { margin: 0 auto 4px; background: white; }
+      .dropzone-prompt h3 { margin: 4px 0 4px; font-size: 15px; }
+      .dropzone-prompt p { margin: 0; color: var(--muted); font-size: 13px; }
+
+      .upload-form { display: flex; flex-direction: column; gap: 12px; max-width: 480px; margin: 0 auto; text-align: left; }
+      .upload-form[hidden] { display: none; }
+
+      .upload-file-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: white;
+        font-size: 13px;
+      }
+
+      .upload-file-row span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+      .upload-file-row .link-button { flex: 0 0 auto; font-size: 12px; font-weight: 700; }
+
+      .field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+      .field input, .field textarea {
+        padding: 9px 12px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: white;
+        color: var(--ink);
+        font-size: 13px;
+        font-family: inherit;
+        resize: vertical;
+      }
+      .field input:focus, .field textarea:focus { outline: 2px solid var(--orange); outline-offset: 1px; }
+
+      .field-row { display: flex; gap: 12px; }
+      .field-row .field { flex: 1; }
+
+      .upload-error { margin: 0; color: #c2410c; font-size: 12.5px; font-weight: 600; }
+
+      .upload-form .actions { margin-top: 0; }
 
       .grid { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
@@ -331,6 +394,8 @@
         main.page { width: min(100% - 32px, 700px); padding: 42px 0 70px; }
         .grid { grid-template-columns: 1fr; }
         .search { max-width: none; }
+        .search-row { flex-wrap: wrap; }
+        .field-row { flex-direction: column; }
       }
     </style>
   </head>
@@ -345,6 +410,7 @@
       <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></symbol>
       <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
       <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></symbol>
     </svg>
 
     <div class="overlay" id="overlay"></div>
@@ -410,6 +476,46 @@
           </label>
         </div>
 
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="sop-file-input" accept="application/pdf,.pdf" hidden />
+          <div class="dropzone-prompt" id="dropzone-prompt">
+            <div class="tool-icon"><svg class="icon"><use href="#i-file" /></svg></div>
+            <h3>Drag &amp; drop a SOP PDF here</h3>
+            <p>or <button class="link-button" id="browse-button" type="button">browse your files</button> — 5&nbsp;MB max.</p>
+          </div>
+
+          <form class="upload-form" id="upload-form" hidden>
+            <div class="upload-file-row">
+              <svg class="icon"><use href="#i-file" /></svg>
+              <span id="upload-filename"></span>
+              <button class="link-button" id="upload-change" type="button">change file</button>
+            </div>
+            <label class="field">
+              <span>Title</span>
+              <input type="text" id="upload-title" required />
+            </label>
+            <label class="field">
+              <span>Description</span>
+              <textarea id="upload-description" rows="2"></textarea>
+            </label>
+            <div class="field-row">
+              <label class="field">
+                <span>Category</span>
+                <input type="text" id="upload-category" placeholder="General" />
+              </label>
+              <label class="field">
+                <span>Tags</span>
+                <input type="text" id="upload-tags" placeholder="Comma-separated" />
+              </label>
+            </div>
+            <p class="upload-error" id="upload-error" hidden></p>
+            <div class="actions">
+              <button class="button primary" id="upload-submit" type="submit">Upload SOP</button>
+              <button class="button" id="upload-cancel" type="button">Cancel</button>
+            </div>
+          </form>
+        </div>
+
         <div class="grid" id="sop-grid"></div>
 
         <div class="empty-state" id="empty-state">
@@ -460,6 +566,108 @@
         const data = await res.json();
         render(data.sops);
       }
+
+      // --- Upload / drag-and-drop ---
+      const dropzone = document.getElementById("dropzone");
+      const dropzonePrompt = document.getElementById("dropzone-prompt");
+      const uploadForm = document.getElementById("upload-form");
+      const fileInput = document.getElementById("sop-file-input");
+      const uploadFilename = document.getElementById("upload-filename");
+      const uploadError = document.getElementById("upload-error");
+      const uploadTitle = document.getElementById("upload-title");
+      let pendingFile = null;
+
+      function titleFromFilename(name) {
+        return name.replace(/\.pdf$/i, "").replace(/[_-]+/g, " ").trim();
+      }
+
+      function showUploadError(message) {
+        uploadError.textContent = message;
+        uploadError.hidden = false;
+      }
+
+      function resetUploadForm() {
+        pendingFile = null;
+        fileInput.value = "";
+        uploadForm.hidden = true;
+        dropzonePrompt.hidden = false;
+        uploadError.hidden = true;
+        uploadForm.reset();
+        dropzone.classList.remove("dragover");
+      }
+
+      function selectFile(file) {
+        if (!file) return;
+        const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+        if (!isPdf) {
+          showUploadError("SOPs must be a PDF file.");
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          showUploadError("That file is larger than 5 MB.");
+          return;
+        }
+        pendingFile = file;
+        uploadError.hidden = true;
+        uploadFilename.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+        uploadTitle.value = titleFromFilename(file.name);
+        dropzonePrompt.hidden = true;
+        uploadForm.hidden = false;
+      }
+
+      document.getElementById("browse-button").addEventListener("click", () => fileInput.click());
+      document.getElementById("upload-change").addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", () => selectFile(fileInput.files[0]));
+
+      ["dragenter", "dragover"].forEach((evt) =>
+        dropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          dropzone.classList.add("dragover");
+        }),
+      );
+      ["dragleave", "drop"].forEach((evt) =>
+        dropzone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          dropzone.classList.remove("dragover");
+        }),
+      );
+      dropzone.addEventListener("drop", (e) => {
+        const file = e.dataTransfer?.files?.[0];
+        if (file) selectFile(file);
+      });
+
+      document.getElementById("upload-cancel").addEventListener("click", resetUploadForm);
+
+      uploadForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!pendingFile) return;
+
+        const submitBtn = document.getElementById("upload-submit");
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Uploading…";
+
+        const body = new FormData();
+        body.set("file", pendingFile);
+        body.set("title", uploadTitle.value.trim());
+        body.set("description", document.getElementById("upload-description").value);
+        body.set("category", document.getElementById("upload-category").value);
+        body.set("tags", document.getElementById("upload-tags").value);
+
+        try {
+          const res = await fetch("/api/sops", { method: "POST", body });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || "Upload failed.");
+
+          resetUploadForm();
+          document.getElementById("sop-search").value = "";
+          loadAll();
+        } catch (err) {
+          showUploadError(err.message || "Upload failed.");
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Upload SOP";
+        }
+      });
 
       async function search(query) {
         if (!query.trim()) return loadAll();

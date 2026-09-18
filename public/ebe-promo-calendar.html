@@ -663,11 +663,13 @@ function buildChannelSections() {
         <div class="formula-box">
           Promo Lift % = (Promo $ − Baseline $) / Baseline $<br>
           Incremental Revenue = (Promo $ − Baseline $) − MAX(0, Baseline $ − Post Promo $)<br>
+          Manufacturer Chargeback = Cost per Redemption × Promo Units (Redemptions)<br>
+          True Cost = Manufacturer Chargeback + Other Costs<br>
           ROI = Incremental Revenue / True Cost
         </div>
         <div style="overflow-x:auto; margin-top:14px;">
           <table>
-            <thead><tr><th>Promotion</th><th>Baseline $</th><th>Promo $</th><th>Post $</th><th>True Cost</th><th>Lift %</th><th>Incr. Rev</th><th>ROI</th></tr></thead>
+            <thead><tr><th>Promotion</th><th>Baseline Units</th><th>Baseline $</th><th>Promo Units</th><th>Promo $</th><th>Post Units</th><th>Post $</th><th>Cost/Redemption</th><th>Mfr. Chargeback</th><th>Other Costs</th><th>True Cost</th><th>Lift %</th><th>Incr. Rev</th><th>ROI</th></tr></thead>
             <tbody id="analysis-${c.key}"></tbody>
           </table>
         </div>
@@ -1070,10 +1072,16 @@ function renderChannelAnalysis(key) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${p.desc}</strong><br><span style="color:var(--text-dimmer); font-size:11px;">${p.product}</span></td>
+      <td><input type="number" class="editable-input wide" value="${p.baselineUnits ?? ''}" onchange="updateAnalysisField('${p.id}', 'baselineUnits', this.value)"></td>
       <td><input type="number" class="editable-input wide" value="${p.baseline ?? ''}" onchange="updateAnalysisField('${p.id}', 'baseline', this.value)"></td>
+      <td><input type="number" class="editable-input wide" value="${p.promoUnits ?? ''}" onchange="updateAnalysisField('${p.id}', 'promoUnits', this.value)"></td>
       <td><input type="number" class="editable-input wide" value="${p.promoRev ?? ''}" onchange="updateAnalysisField('${p.id}', 'promoRev', this.value)"></td>
+      <td><input type="number" class="editable-input wide" value="${p.postUnits ?? ''}" onchange="updateAnalysisField('${p.id}', 'postUnits', this.value)"></td>
       <td><input type="number" class="editable-input wide" value="${p.postRev ?? ''}" onchange="updateAnalysisField('${p.id}', 'postRev', this.value)"></td>
-      <td><input type="number" class="editable-input wide" value="${p.trueCost ?? ''}" onchange="updateAnalysisField('${p.id}', 'trueCost', this.value)"></td>
+      <td><input type="number" class="editable-input wide" value="${p.costPerRedemption ?? ''}" onchange="updateAnalysisField('${p.id}', 'costPerRedemption', this.value)"></td>
+      <td class="numcell" id="chg-${p.id}"></td>
+      <td><input type="number" class="editable-input wide" value="${p.otherCosts ?? ''}" onchange="updateAnalysisField('${p.id}', 'otherCosts', this.value)"></td>
+      <td class="numcell" id="truecost-${p.id}"></td>
       <td class="numcell" id="lift-${p.id}"></td>
       <td class="numcell" id="incr-${p.id}"></td>
       <td class="numcell" id="roi-${p.id}"></td>
@@ -1083,11 +1091,17 @@ function renderChannelAnalysis(key) {
   });
 }
 function updateMetricCells(p) {
+  const chg = calcChargeback(p);
+  p.trueCost = calcTrueCost(p, chg);
   const lift = calcLift(p), incr = calcIncr(p), roi = calcRoi(p);
   const liftEl = document.getElementById('lift-' + p.id);
   const incrEl = document.getElementById('incr-' + p.id);
   const roiEl = document.getElementById('roi-' + p.id);
+  const chgEl = document.getElementById('chg-' + p.id);
+  const trueCostEl = document.getElementById('truecost-' + p.id);
   if (!liftEl) return;
+  chgEl.textContent = chg === null ? '—' : '$' + chg.toLocaleString(undefined,{maximumFractionDigits:0});
+  trueCostEl.textContent = p.trueCost === null ? '—' : '$' + p.trueCost.toLocaleString(undefined,{maximumFractionDigits:0});
   liftEl.textContent = lift === null ? '—' : (lift*100).toFixed(1) + '%';
   liftEl.className = 'numcell ' + (lift === null ? 'metric-neutral' : (lift >= 0 ? 'metric-good' : 'metric-bad'));
   incrEl.textContent = incr === null ? '—' : '$' + incr.toLocaleString(undefined,{maximumFractionDigits:0});
@@ -1103,6 +1117,16 @@ function calcIncr(p) {
   if (p.baseline == null || p.promoRev == null) return null;
   const dip = (p.postRev != null) ? Math.max(0, p.baseline - p.postRev) : 0;
   return (p.promoRev - p.baseline) - dip;
+}
+// Redemptions = units sold during the promo period (Promo Units).
+function calcChargeback(p) {
+  if (p.costPerRedemption == null || p.promoUnits == null) return null;
+  return p.costPerRedemption * p.promoUnits;
+}
+function calcTrueCost(p, chg) {
+  chg = chg === undefined ? calcChargeback(p) : chg;
+  if (chg === null && p.otherCosts == null) return null;
+  return (chg ?? 0) + (p.otherCosts ?? 0);
 }
 function calcRoi(p) {
   const incr = calcIncr(p);
@@ -1125,11 +1149,14 @@ function openDetail(id) {
   const lift = calcLift(p), incr = calcIncr(p), roi = calcRoi(p);
   const key = channelOf(p);
   const camp = campaigns.find(c => c.id === p.campaignId);
+  const chg = calcChargeback(p);
   let analysisRows = '';
-  if (lift !== null || incr !== null || roi !== null) {
+  if (lift !== null || incr !== null || roi !== null || chg !== null || p.trueCost != null) {
     analysisRows = `
       <div class="modal-row"><span>Promo Lift</span><span>${lift === null ? '—' : (lift*100).toFixed(1) + '%'}</span></div>
       <div class="modal-row"><span>Incremental Revenue</span><span>${incr === null ? '—' : '$' + incr.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
+      <div class="modal-row"><span>Mfr. Chargeback</span><span>${chg === null ? '—' : '$' + chg.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
+      <div class="modal-row"><span>True Cost</span><span>${p.trueCost == null ? '—' : '$' + p.trueCost.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div>
       <div class="modal-row"><span>ROI</span><span>${roi === null ? '—' : roi.toFixed(2) + 'x'}</span></div>`;
   }
   document.getElementById('modalBody').innerHTML = `

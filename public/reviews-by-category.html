@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Every Body Eat — Reviews by Category &amp; Product Group</title>
+<style>
+  :root {
+  --bg:#FFFFFF; --bg-soft:#F7F5EE; --card:#FFFFFF; --card-border:#E8E4D6;
+  --text:#1A1A1A; --text-dim:#6B6B64; --text-dimmer:#78766E; --ink:#1A1A1A;
+  --pretzel:#2878FF; --pretzel-text:#1E5FDB;
+  --lime:#CADC30; --lime-text:#5C6B0A;
+  --orange:#F99420; --teal:#0099F3; --sky:#87CCF4; --magenta:#CC1F97;
+  --rose:#ED1C24; --rose-text:#B0181D; --grey:#878787; --focus:#2878FF;
+  --brand:#2878FF; --brand-dark:#1A1A1A; --border:#E8E4D6;
+  --gray:#6B6B64; --pos:#00bf63; --neu:#78766E; --neg:#ff3131;
+  --pos-bg:rgba(0,191,99,0.15); --pos-light:rgba(0,191,99,0.07);
+  --neg-bg:rgba(255,49,49,0.12); --neg-light:rgba(255,49,49,0.06);
+  --neu-bg:rgba(120,118,110,0.12); --brand-light:rgba(40,120,255,0.08);
+}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* NAV (shared shell) */
+  .sidenav { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #fff; border-right: 1px solid #E8E4D6; overflow-y: auto; z-index: 100; display: flex; flex-direction: column; transition: transform 0.2s ease; }
+  .nav-collapsed .sidenav { transform: translateX(-220px); }
+  .nav-collapsed .main { margin-left: 0 !important; }
+  #nav-toggle { position: fixed; top: 20px; left: 204px; z-index: 200; background: var(--ink); border: none; border-radius: 999px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.18); transition: left 0.2s ease, background 0.2s ease, color 0.2s ease; }
+  #nav-toggle svg { width: 16px; height: 16px; transition: transform 0.2s ease; }
+  .nav-collapsed #nav-toggle { left: 12px; background: var(--lime); color: #1A1A1A; }
+  .nav-collapsed #nav-toggle svg { transform: rotate(180deg); }
+  .main { transition: margin-left 0.2s ease; }
+  .hub-brand { display: flex; align-items: center; height: 62px; padding: 0 18px; border-bottom: 1px solid #E8E4D6; text-decoration: none; color: inherit; transition: background 0.15s; }
+  .hub-brand:hover { background: #f6f6f7; }
+  .hub-brand-mark { display: grid; width: 32px; height: 32px; margin-right: 10px; place-items: center; border-radius: 9px; background: #1A1A1A; color: #fff; font-size: 12px; font-weight: 850; letter-spacing: -.04em; }
+  .hub-brand-name { font-size: 15px; font-weight: 760; letter-spacing: -.02em; color: #1A1A1A; }
+  .nav-section { padding: 12px 8px 4px 16px; color: #78766E; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .sidenav-footer { margin-top: auto; padding: 14px 16px; border-top: 1px solid #E8E4D6; color: #6B6B64; font-size: 11px; }
+  .sidenav a { display: block; padding: 9px 16px; color: #62636a; text-decoration: none; font-size: 14px; font-weight: 530; border-radius: 9px; margin: 2px 8px; transition: background 0.15s, color 0.15s; }
+  .sidenav a:hover { background: #f6f6f7; color: #1A1A1A; }
+  .sidenav a.active { background: #d9d9db; color: #1A1A1A; }
+
+  /* MAIN */
+  .main { margin-left: 220px; min-height: 100vh; }
+  .section { padding: 28px 36px; border-bottom: 1px solid var(--card-border); background: var(--bg); }
+  .section:last-child { border-bottom: none; }
+  h2.page-title { font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin-bottom: 4px; }
+  h3.section-title { font-weight: 700; font-size: 15px; color: var(--text); margin-bottom: 14px; }
+  .subtitle { color: var(--gray); font-size: 13px; margin-bottom: 20px; }
+  .loading-spinner { display: inline-block; width: 22px; height: 22px; border: 3px solid #e5e7eb; border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* FILTER BAR */
+  .filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; align-items: center; }
+  .filter-row select { padding: 8px 14px; border: 1px solid var(--card-border); border-radius: 999px; font-size: 13px; background: white; color: var(--text); font-family: inherit; outline: none; font-weight: 650; }
+  .filter-row select:focus { border-color: var(--brand); }
+  .filter-note { font-size: 12px; color: var(--gray); margin-top: 6px; margin-bottom: 20px; }
+
+  /* CARDS / KPI — matches the reference mockup exactly: tinted card, colored
+     left border + label, plain dark value, gray "vs goal" line, a solid
+     pill badge, and a green/red delta line with "improved"/"declined". */
+  .card-grid { display: grid; gap: 14px; }
+  .card-grid-4 { grid-template-columns: repeat(4,1fr); }
+  .card-grid-2 { grid-template-columns: repeat(2,1fr); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .card-kpi { text-align: left; border-left: 4px solid var(--kpi-accent, var(--brand)); }
+  .card-kpi.tint-blue { background: #eaf2ff; border-color: #bfdbfe; border-left-color: var(--kpi-accent); }
+  .card-kpi.tint-green { background: #eaf7ee; border-color: #bfe3c9; border-left-color: var(--kpi-accent); }
+  .card-kpi.tint-yellow { background: #fdf6e3; border-color: #eeddab; border-left-color: var(--kpi-accent); }
+  .card-kpi.tint-red { background: #fdecea; border-color: #f3c6c1; border-left-color: var(--kpi-accent); }
+  .kpi-label { font-size: 11px; color: var(--kpi-accent, var(--gray)); margin-bottom: 8px; font-weight: 750; text-transform: uppercase; letter-spacing: 0.04em; }
+  .kpi-val { font-size: 30px; font-weight: 800; color: #16181c; line-height: 1; }
+  .kpi-sub { font-size: 11.5px; color: var(--gray); margin-top: 6px; }
+  .kpi-stars { color: #f5a524; font-size: 13px; letter-spacing: 1px; margin-top: 4px; }
+  .kpi-pill { display: inline-block; margin-top: 8px; padding: 3px 12px; border-radius: 999px; font-size: 11px; font-weight: 750; color: white; background: var(--kpi-accent, var(--brand)); }
+  .kpi-delta { font-size: 11.5px; margin-top: 8px; font-weight: 600; }
+  .kpi-delta.up { color: #1a8a4a; }
+  .kpi-delta.down { color: #1a8a4a; } /* a decrease can still be the "good" direction (e.g. negative %) — caller decides which class to use */
+  .kpi-delta.bad { color: var(--neg); }
+  .kpi-bullet { font-size: 11.5px; color: var(--gray); margin-top: 6px; }
+  .kpi-footnote { font-size: 10px; color: var(--gray); font-style: italic; margin-top: 8px; line-height: 1.5; }
+  @media (max-width: 1100px) { .card-grid-4 { grid-template-columns: repeat(2,1fr); } }
+
+  .context-banner { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; font-size: 12.5px; color: var(--text-dim); line-height: 1.6; }
+  .context-banner strong { color: var(--text); }
+
+  .split-section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+  @media (max-width: 900px) { .split-section-grid { grid-template-columns: 1fr; } }
+  .month-summary-card { border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; background: var(--bg-soft); }
+  .month-summary-lede { font-size: 13.5px; color: var(--text-dim); line-height: 1.7; margin-bottom: 14px; }
+  .month-summary-lede strong { color: var(--text); }
+
+  /* CHART HEADER (title + legend + total line) */
+  .chart-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+  .chart-legend { display: flex; gap: 16px; margin: 8px 0 18px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-dim); font-weight: 650; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .chart-total-line { font-size: 12px; color: var(--gray); font-weight: 650; white-space: nowrap; }
+
+  /* CHART AXIS (shared by monthly + mini charts) */
+  .chart-frame { position: relative; }
+  .chart-axis { position: absolute; left: 0; right: 0; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+  .axis-row { display: flex; align-items: center; gap: 6px; }
+  .axis-label { width: 26px; font-size: 9px; color: var(--gray); text-align: right; transform: translateY(-5px); flex: 0 0 26px; }
+  .axis-line { flex: 1; border-top: 1px solid #eef0f2; }
+
+  /* MONTHLY STACKED BAR (vertical) */
+  .month-chart-scroll { overflow-x: auto; padding: 2px 2px 0; }
+  /* flex:1 on the columns + width:100% on the bar (capped) is what makes the
+     bars stretch to fill the chart's actual width instead of clustering at
+     fixed 30px each on the left with dead space to the right — the old
+     min-width:max-content on .month-chart prevented it from ever growing
+     past its content size. Falls back to a scrollable min-width per column
+     only once there are too many months to fit comfortably. */
+  .month-chart { display: flex; align-items: flex-end; gap: 14px; padding-left: 32px; }
+  .month-col { display: flex; flex-direction: column; align-items: center; gap: 6px; text-decoration: none; color: inherit; flex: 1 1 0; min-width: 34px; }
+  .month-total { font-size: 11px; font-weight: 700; color: var(--text-dim); height: 14px; line-height: 14px; }
+  .month-bar { width: 100%; max-width: 72px; display: flex; flex-direction: column; justify-content: flex-end; position: relative; z-index: 1; transition: outline 0.1s; }
+  .month-col:hover .month-bar { outline: 2px solid var(--brand); }
+  .month-seg { width: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .month-seg.seg-pos { background: var(--pos); }
+  .month-seg.seg-neu { background: var(--neu); }
+  .month-seg.seg-neg { background: var(--neg); }
+  .seg-pct-label { font-size: 8.5px; font-weight: 800; color: white; }
+  .month-label { font-size: 10.5px; color: var(--gray); font-weight: 650; white-space: nowrap; height: 14px; line-height: 14px; }
+
+  /* MINI PANEL GRID (category bar-charts) */
+  .mini-chart-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 1100px) { .mini-chart-grid { grid-template-columns: repeat(2, 1fr); } }
+  .mini-panel { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; border-top: 3px solid var(--cat-color, var(--brand)); }
+  .mini-panel-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .mini-panel-title { font-size: 12.5px; font-weight: 700; color: var(--text); }
+  .mini-panel-rank { font-size: 10px; color: var(--gray); font-weight: 700; }
+  .mini-panel-total { font-size: 11px; color: var(--gray); }
+  .mini-bars { display: flex; align-items: flex-end; gap: 4px; height: 70px; padding-left: 32px; }
+  .mini-bar-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; text-decoration: none; position: relative; z-index: 1; }
+  .mini-bar-fill { width: 100%; background: var(--cat-color, var(--brand)); border-radius: 2px 2px 0 0; min-height: 1px; transition: opacity 0.1s; }
+  .mini-bar-col:hover .mini-bar-fill { opacity: 0.7; }
+  .mini-panel-empty { color: var(--gray); font-size: 12px; padding: 20px 0; text-align: center; }
+  .mini-axis-label { width: 16px; font-size: 8.5px; }
+  .mini-bar-val { position: absolute; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 800; white-space: nowrap; color: var(--cat-color, var(--brand)); }
+  .mini-month-labels { display: flex; gap: 4px; padding-left: 32px; margin-top: 4px; }
+  .mini-month-label { flex: 1; text-align: center; font-size: 8.5px; color: var(--gray); font-weight: 650; white-space: nowrap; }
+
+  /* HORIZONTAL BAR (per-group category breakdown) */
+  .horiz-bar-chart { display: flex; flex-direction: column; gap: 8px; }
+  .hbar-row { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+  .hbar-label { width: 160px; font-size: 12px; color: var(--text-dim); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hbar-bg { flex: 1; background: #f3f4f6; border-radius: 4px; height: 18px; position: relative; }
+  .hbar-fill { height: 18px; border-radius: 4px; background: var(--brand); }
+  .hbar-row:hover .hbar-fill { opacity: 0.8; }
+  .hbar-val { font-size: 11px; color: var(--text-dim); width: 70px; text-align: left; padding-left: 6px; }
+
+  /* SENTIMENT BAR */
+  .sent-bar-wrap { display: flex; height: 20px; border-radius: 6px; overflow: hidden; gap: 2px; }
+  .sent-bar-seg { display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: white; min-width: 20px; }
+  .seg-pos { background: var(--pos); }
+  .seg-neu { background: var(--neu); }
+  .seg-neg { background: var(--neg); }
+
+  /* GROUP SECTIONS */
+  .group-card { border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin-bottom: 16px; border-left: 4px solid var(--brand); }
+  .group-card-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; gap: 8px; }
+  .group-card-head h4 { font-size: 16px; font-weight: 800; }
+  .group-card-meta { font-size: 12px; color: var(--gray); margin-bottom: 16px; }
+  .group-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 1100px) { .group-card-grid { grid-template-columns: 1fr; } }
+  .group-card-sub-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray); margin-bottom: 10px; }
+
+  /* PRIORITY ACTIONS */
+  .priority-card { border: 1px solid var(--border); border-radius: 12px; padding: 22px 24px; background: linear-gradient(180deg, var(--brand-light), transparent 60%); }
+  .priority-brief { font-size: 13.5px; color: var(--text-dim); line-height: 1.65; margin-bottom: 18px; }
+  .action-item { border: 1px solid var(--border); background: white; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+  .action-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .action-item-num { font-size: 13px; font-weight: 800; color: var(--brand); }
+  .action-item-issue { font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .severity-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; }
+  .severity-high { background: var(--neg-bg); color: var(--rose-text); }
+  .severity-medium { background: #fff5df; color: #b66a00; }
+  .severity-low { background: #f3f4f6; color: #4b5563; }
+  .owner-badge { font-size: 10.5px; font-weight: 700; background: var(--brand-light); color: var(--brand); padding: 2px 9px; border-radius: 999px; }
+  .action-item-body { font-size: 13px; color: var(--text-dim); line-height: 1.6; margin-bottom: 8px; }
+  .action-item-link { font-size: 12px; font-weight: 700; color: var(--brand); text-decoration: none; }
+  .action-item-link:hover { text-decoration: underline; }
+  .priority-meta { font-size: 11px; color: var(--gray); margin-top: 14px; }
+  .empty-state { color: var(--gray); font-size: 13px; padding: 20px 0; text-align: center; }
+
+  .group-mini-title { font-size: 10.5px; color: var(--gray); font-weight: 700; margin-bottom: 6px; }
+  .group-mini-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .page-footer-note { padding: 18px 36px 36px; font-size: 11px; color: var(--gray); line-height: 1.7; background: var(--bg-soft); }
+</style>
+</head>
+<body>
+
+<button id="nav-toggle" onclick="document.body.classList.toggle('nav-collapsed')" title="Toggle sidebar" aria-label="Toggle sidebar">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6" /></svg>
+</button>
+
+<nav class="sidenav">
+  <a class="hub-brand" href="/">
+    <div class="hub-brand-mark">LP</div>
+    <div class="hub-brand-name">LaunchPlan Hub</div>
+  </a>
+  <div class="nav-section">Reviews</div>
+  <a class="active" href="/reviews-by-category.html">📊 Reviews by Category</a>
+  <a href="/reviews-browse.html">🔍 Browse All Reviews</a>
+  <div class="sidenav-footer" id="sidenav-footer">Loading live data…</div>
+</nav>
+
+<div class="main">
+
+  <div id="loading-state" class="section">
+    <h2 class="page-title">Reviews by Category &amp; Product Group</h2>
+    <p class="subtitle"><span class="loading-spinner"></span>Loading live review data…</p>
+  </div>
+
+  <div id="error-state" class="section" style="display:none">
+    <h2 class="page-title">Reviews by Category &amp; Product Group</h2>
+    <p class="subtitle" style="color:var(--neg)" id="error-text"></p>
+  </div>
+
+  <div id="content" style="display:none">
+
+    <div class="section">
+      <h2 class="page-title">Reviews by Category &amp; Product Group</h2>
+      <p class="subtitle" id="page-subtitle"></p>
+
+      <div class="filter-row">
+        <select id="f-group" onchange="rerender()">
+          <option value="">All Products</option>
+        </select>
+        <select id="f-source" onchange="rerender()">
+          <option value="">All Reviews</option>
+          <option value="amazon">Amazon Reviews</option>
+          <option value="okendo">Okendo Reviews</option>
+        </select>
+        <a id="browse-all-link" href="/reviews-browse.html" style="font-size:12.5px;color:var(--brand);font-weight:700;text-decoration:none;margin-left:4px">🔍 Browse every review matching this filter →</a>
+      </div>
+      <div class="context-banner" id="context-banner"></div>
+
+      <div class="card-grid card-grid-4" id="kpi-grid" style="margin-bottom:26px"></div>
+    </div>
+
+    <div class="section">
+      <div class="split-section-grid">
+        <div>
+          <div class="chart-header">
+            <div>
+              <h3 class="section-title" style="margin-bottom:2px">Positive / Neutral / Negative — Monthly Mix</h3>
+              <p class="subtitle" style="margin-bottom:0">Stacked count of written reviews per month for the current filter.</p>
+            </div>
+            <div class="chart-total-line" id="monthly-mix-total"></div>
+          </div>
+          <div class="chart-legend">
+            <span class="legend-item"><span class="legend-swatch" style="background:var(--pos)"></span>Positive</span>
+            <span class="legend-item"><span class="legend-swatch" style="background:var(--neu)"></span>Neutral</span>
+            <span class="legend-item"><span class="legend-swatch" style="background:var(--neg)"></span>Negative</span>
+          </div>
+          <div class="month-chart-scroll">
+            <div class="chart-frame" id="monthly-mix-chart" style="height:220px"></div>
+          </div>
+        </div>
+        <div>
+          <h3 class="section-title" style="margin-bottom:2px">Current Month Review Summary</h3>
+          <p class="subtitle" style="margin-bottom:14px">What's actually in this month's reviews, for the current filter.</p>
+          <div id="current-month-summary"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">Negative / Neutral Reviews, by Category</h3>
+      <p class="subtitle" style="margin-bottom:14px">Category mentions per month, from reviews rated 1–3★ only. Ranked by total mentions for the current filter — this reorders as you change filters.</p>
+      <div class="mini-chart-grid" id="primary-category-grid"></div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">Other Themes in Negative / Neutral Reviews</h3>
+      <p class="subtitle" style="margin-bottom:14px">Secondary patterns that don't fit the six buckets above — including reviews that are otherwise mixed (a real complaint, but with a genuine compliment too).</p>
+      <div class="mini-chart-grid" id="secondary-category-grid" style="grid-template-columns:repeat(2,1fr)"></div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">Review Brief</h3>
+      <p class="subtitle">A read of the last 30 days of negative/neutral reviews, how that compares to the 30 days before it, and what to focus on next — by product line. Written from the live review data below; not yet wired to auto-refresh (see note at the bottom).</p>
+      <div class="priority-card" id="review-brief-body"></div>
+    </div>
+
+    <div class="page-footer-note" id="footer-note"></div>
+
+  </div>
+</div>
+
+<script>
+// ---- shared category taxonomy (mirrors src/index.js REVIEW_THEME_DEFS,
+// grouped into 6 primary + 2 secondary issue buckets — kept identical to the
+// copy in reviews-browse.html so drill-down links classify consistently).
+// Computed client-side from title+content, not the stored `themes` column,
+// since many imported rows have themes:[] (see plan notes). Only applied to
+// rating<=3 reviews. ----
+const POSITIVE_PATTERNS = [
+  /delici|tasty|yummy|yum\b|love.{0,15}flavor|amazing.{0,10}taste|so good|great taste|wonderful flavor|wonderful taste/i,
+  /crisp|crunch|crunchy|texture/i,
+  /gluten.?free|gluten free/i,
+  /dairy.?free|dairy free|vegan/i,
+  /nut.?free|nut free|allergy|allerg|school safe|allergen/i,
+  /alternative|replacement|instead of|substitute|swap/i,
+  /buy again|will order|reorder|repurchase|keep buying|stock up/i,
+  /clean ingredient|simple ingredient|real ingredient|minimal ingredient|whole food/i,
+  /can.t stop|addictive|addicted|one more|hard to stop/i,
+  /worth.{0,10}(price|money|it)|great value|good price|affordable/i,
+];
+
+const CATEGORY_DEFS = [
+  ["damaged_broken", "Damaged / Broken", [/broken|crumbs|crumbled|crushed|shattered|in pieces/i, /arriv.{0,10}(damaged|broken|crushed|smashed)|damaged.{0,10}shipping|shipping damage/i]],
+  ["packaging", "Packaging", [/packag|reseal|seal|bag.{0,15}(broke|open|problem)|zip/i]],
+  ["flavor", "Flavor", [/bland|dry\b|flavorless|tasteless|no flavor|boring|watery|not much flavor/i, /too spicy|too hot|very spicy|burn.{0,15}mouth|spice.{0,10}too much/i, /too salt|very salt|overly salt|way too salt/i, /not.{0,10}pretzel|nothing like.{0,10}pretzel|doesn.t taste like.{0,10}pretzel|not a (real )?pretzel/i]],
+  ["texture", "Texture", [/mushy|soggy|too (hard|tough|dense)|chip.{0,10}tooth|rock hard/i]],
+  ["value_price", "Value / Price", [/not enough|small amount|tiny.{0,10}(portion|amount|serving)|overpriced|too expensive|not worth.{0,10}(price|money)/i]],
+  ["freshness", "Freshness", [/stale|old\b|expired|not fresh|gone bad/i]],
+];
+const SECONDARY_CATEGORY_DEFS = [
+  ["ingredient_dietary", "Ingredient / Dietary Claims", [/mislead|false.{0,15}(claim|label|ad)|lie|not as describ|bait.{0,5}switch|misrepresent/i, /palm oil|hidden.{0,10}(ingredient|oil)|unlisted.{0,10}ingredient/i]],
+];
+const CATEGORY_LABELS = Object.fromEntries([...CATEGORY_DEFS, ...SECONDARY_CATEGORY_DEFS].map(([k, d]) => [k, d]));
+CATEGORY_LABELS.positive_aside = "Positive-Aside Mentions";
+
+// Fixed per-category colors (tied to the category, not its current rank, so
+// a panel doesn't change color just because it moved up/down the ranking).
+const CATEGORY_COLORS = {
+  damaged_broken: "#2878FF",
+  packaging: "#F99420",
+  flavor: "#00A86B",
+  texture: "#CC1F97",
+  value_price: "#CA8A04",
+  freshness: "#14532D",
+  ingredient_dietary: "#87CCF4",
+  positive_aside: "#5C6B0A",
+};
+
+function niceMax(value) {
+  if (value <= 0) return 1;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+  const residual = value / magnitude;
+  const niceResidual = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
+  return niceResidual * magnitude;
+}
+
+// Renders horizontal gridlines + left-side numeric labels, absolutely
+// positioned at `top`/`height` (px) within a `position:relative` ancestor —
+// callers pass the exact pixel box of the bar-plotting area so gridlines
+// line up with the bars regardless of whatever total/label rows surround
+// them, ascending 0..max in `count` steps.
+function axisHtml(max, top, height, count = 4) {
+  const step = max / count;
+  const rows = [];
+  for (let i = count; i >= 0; i--) rows.push(Math.round(step * i));
+  return `<div class="chart-axis" style="top:${top}px;height:${height}px">${rows.map((v) => `<div class="axis-row"><span class="axis-label">${v}</span><span class="axis-line"></span></div>`).join("")}</div>`;
+}
+
+function classifyCategories(r) {
+  if (Number(r.rating) > 3) return [];
+  const text = `${r.title || ""} ${r.content || ""}`;
+  const cats = [];
+  for (const [key, , patterns] of CATEGORY_DEFS) if (patterns.some((p) => p.test(text))) cats.push(key);
+  for (const [key, , patterns] of SECONDARY_CATEGORY_DEFS) if (patterns.some((p) => p.test(text))) cats.push(key);
+  if (POSITIVE_PATTERNS.some((p) => p.test(text))) cats.push("positive_aside");
+  return cats;
+}
+
+const GROUP_LABELS = { "Thins": "Snack Thins", "Cookies": "Cookie Bites", "Pretzel": "Pretzels", "Crispbread Crackers": "Crispbread Crackers" };
+const KNOWN_GROUPS = ["Thins", "Cookies", "Pretzel", "Crispbread Crackers"];
+function groupLabel(pg) { return GROUP_LABELS[pg] || pg; }
+
+let REVIEWS = [];
+
+function esc(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function fmtNum(n) { return (Number(n) || 0).toLocaleString(); }
+function fmtPct(n) { return (Number(n) || 0).toFixed(1) + "%"; }
+function monthKey(dateStr) { return (dateStr || "").slice(0, 7); }
+function monthLabel(key) {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }) + (m === 1 ? ` '${String(y).slice(2)}` : "");
+}
+function prevMonthKey(key) {
+  const [y, m] = key.split("-").map(Number);
+  const d = new Date(Date.UTC(y, m - 2, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+function monthBounds(key) {
+  const [y, m] = key.split("-").map(Number);
+  const from = `${key}-01`;
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const to = `${key}-${String(lastDay).padStart(2, "0")}`;
+  return { from, to };
+}
+
+function buildBrowseUrl(paramsObj) {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(paramsObj)) if (v) p.set(k, v);
+  return `/reviews-browse.html?${p.toString()}`;
+}
+
+// ---- filtering ----
+// Scoped to the current calendar year — the live review set goes back to
+// 2020, and a 74-month chart isn't useful. Matches the reference dashboard's
+// own framing ("Jan 1 - Sep 12, 2026"). The "Written Reviews Loaded" KPI and
+// every chart below reflect this same year window, not the all-time dataset.
+const CURRENT_YEAR = new Date().getUTCFullYear();
+
+function getFiltered() {
+  const group = document.getElementById("f-group").value;
+  const source = document.getElementById("f-source").value;
+  return REVIEWS.filter(
+    (r) => (!group || r.product_group === group) && (!source || r.source === source) && r.date && r.date.slice(0, 4) === String(CURRENT_YEAR),
+  );
+}
+
+function baseParams() {
+  const group = document.getElementById("f-group").value;
+  const source = document.getElementById("f-source").value;
+  return { group, source };
+}
+
+// ---- stats helpers ----
+function computeStats(list) {
+  const n = list.length;
+  if (n === 0) return { count: 0, positive: 0, neutral: 0, negative: 0, pos_pct: 0, neg_pct: 0, avg_rating: 0 };
+  const positive = list.filter((r) => r.sentiment === "positive").length;
+  const neutral = list.filter((r) => r.sentiment === "neutral").length;
+  const negative = list.filter((r) => r.sentiment === "negative").length;
+  const rated = list.filter((r) => r.rating > 0);
+  const avg = rated.length ? rated.reduce((s, r) => s + r.rating, 0) / rated.length : 0;
+  return { count: n, positive, neutral, negative, pos_pct: (positive / n) * 100, neg_pct: (negative / n) * 100, avg_rating: avg };
+}
+
+function groupByMonth(list) {
+  const byMonth = {};
+  for (const r of list) {
+    const k = monthKey(r.date);
+    if (!k) continue;
+    (byMonth[k] ||= []).push(r);
+  }
+  return byMonth;
+}
+
+// ---- KPI + context banner ----
+// Goal thresholds shown on the KPI cards' "vs goal" line and pill badge.
+const KPI_GOALS = { positive: 80, negative: 15, avgStar: 4.0 };
+
+// Tier thresholds driving each card's dynamic color (green/yellow/red).
+// "higherIsBetter" bands read as green >= a, yellow >= b (below a), red < b.
+// "lowerIsBetter" bands read as green <= a, yellow <= b (above a), red > b.
+const KPI_TIERS = {
+  positive: { direction: "higherIsBetter", green: 80, yellow: 70, note: "Green ≥80%, yellow 70–79%, red below 70%." },
+  negative: { direction: "lowerIsBetter", green: 15.5, yellow: 20, note: "Green ≤15.5%, yellow 15.6–20%, red above 20%." },
+  avgStar: { direction: "higherIsBetter", green: 4.2, yellow: 4.0, note: "Green ≥4.2★, yellow 4.0–4.1★, red below 4.0★." },
+};
+const TIER_COLORS = { green: "#1a8a4a", yellow: "#b8860b", red: "#dc2626" };
+
+function kpiTier(value, spec) {
+  const { direction, green, yellow } = spec;
+  let tier;
+  if (direction === "higherIsBetter") tier = value >= green ? "green" : value >= yellow ? "yellow" : "red";
+  else tier = value <= green ? "green" : value <= yellow ? "yellow" : "red";
+  return { tier, color: TIER_COLORS[tier] };
+}
+
+function renderKpis(filtered) {
+  const now = new Date();
+  const currentKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const prevKey = prevMonthKey(currentKey);
+  const byMonth = groupByMonth(filtered);
+  const monthKeys = Object.keys(byMonth).sort();
+  const currentStats = computeStats(byMonth[currentKey] || []);
+  const prevStats = computeStats(byMonth[prevKey] || []);
+  const isPartialMonth = now.getUTCDate() < new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+
+  let highestMonth = null;
+  let highestCount = -1;
+  for (const k of monthKeys) if (byMonth[k].length > highestCount) { highestCount = byMonth[k].length; highestMonth = k; }
+
+  // direction: "higherIsBetter" (positive %, avg star) or "lowerIsBetter" (negative %)
+  const deltaLine = (curr, prev, digits, unit, direction) => {
+    if (!prevStats.count) return "";
+    const d = curr - prev;
+    const good = direction === "higherIsBetter" ? d >= 0 : d <= 0;
+    const arrow = d >= 0 ? "▲" : "▼";
+    return `<div class="kpi-delta ${good ? "up" : "bad"}">${arrow} ${Math.abs(d).toFixed(digits)}${unit} vs ${monthLabel(prevKey)} — ${good ? "improved" : "declined"}</div>`;
+  };
+  const pctOfGoal = (curr, goal, direction) => {
+    if (!goal) return null;
+    const pct = direction === "higherIsBetter" ? (curr / goal) * 100 : goal > 0 ? (goal / Math.max(curr, 0.01)) * 100 : 100;
+    return Math.round(Math.min(pct, 999));
+  };
+
+  const posGoalPct = pctOfGoal(currentStats.pos_pct, KPI_GOALS.positive, "higherIsBetter");
+  const negGoalPct = pctOfGoal(currentStats.neg_pct, KPI_GOALS.negative, "lowerIsBetter");
+  const starGoalPct = pctOfGoal(currentStats.avg_rating, KPI_GOALS.avgStar, "higherIsBetter");
+
+  const posTier = kpiTier(currentStats.pos_pct, KPI_TIERS.positive);
+  const negTier = kpiTier(currentStats.neg_pct, KPI_TIERS.negative);
+  const starTier = kpiTier(currentStats.avg_rating, KPI_TIERS.avgStar);
+
+  document.getElementById("kpi-grid").innerHTML = `
+    <div class="card card-kpi tint-blue" style="--kpi-accent:#2878FF">
+      <div class="kpi-label">Written Reviews Logged</div>
+      <div class="kpi-val">${fmtNum(filtered.length)}</div>
+      <div class="kpi-sub">Jan–${monthLabel(currentKey)} ${now.getUTCFullYear()}${isPartialMonth ? " (partial)" : ""}</div>
+      ${highestMonth ? `<div class="kpi-pill">${highestCount} in ${monthLabel(highestMonth)} (highest)</div>` : ""}
+      <div class="kpi-bullet">• ${currentStats.count} in ${monthLabel(currentKey)} so far${isPartialMonth ? " (partial month)" : ""}</div>
+    </div>
+    <div class="card card-kpi tint-${posTier.tier}" style="--kpi-accent:${posTier.color}">
+      <div class="kpi-label">Positive Reviews (4–5★) — ${monthLabel(currentKey).toUpperCase()}</div>
+      <div class="kpi-val">${fmtPct(currentStats.pos_pct)}</div>
+      <div class="kpi-sub">vs ${KPI_GOALS.positive}% goal</div>
+      ${posGoalPct !== null ? `<div class="kpi-pill">${posGoalPct}% of goal</div>` : ""}
+      ${deltaLine(currentStats.pos_pct, prevStats.pos_pct, 1, "pp", "higherIsBetter")}
+      <div class="kpi-footnote">${esc(KPI_TIERS.positive.note)}</div>
+    </div>
+    <div class="card card-kpi tint-${negTier.tier}" style="--kpi-accent:${negTier.color}">
+      <div class="kpi-label">Negative Reviews (1–2★) — ${monthLabel(currentKey).toUpperCase()}</div>
+      <div class="kpi-val">${fmtPct(currentStats.neg_pct)}</div>
+      <div class="kpi-sub">vs ${KPI_GOALS.negative}% goal</div>
+      ${negGoalPct !== null ? `<div class="kpi-pill">${negGoalPct}% of goal</div>` : ""}
+      ${deltaLine(currentStats.neg_pct, prevStats.neg_pct, 1, "pp", "lowerIsBetter")}
+      <div class="kpi-footnote">${esc(KPI_TIERS.negative.note)}</div>
+    </div>
+    <div class="card card-kpi tint-${starTier.tier}" style="--kpi-accent:${starTier.color}">
+      <div class="kpi-label">Weighted Avg Star Rating — ${monthLabel(currentKey).toUpperCase()}</div>
+      <div class="kpi-val">${currentStats.avg_rating ? currentStats.avg_rating.toFixed(1) + "★" : "—"}</div>
+      <div class="kpi-stars">${"★".repeat(Math.round(currentStats.avg_rating))}${"☆".repeat(5 - Math.round(currentStats.avg_rating))}</div>
+      <div class="kpi-sub">vs ${KPI_GOALS.avgStar.toFixed(1)}★ goal</div>
+      ${starGoalPct !== null ? `<div class="kpi-pill">${starGoalPct}% of goal</div>` : ""}
+      ${deltaLine(currentStats.avg_rating, prevStats.avg_rating, 1, "★", "higherIsBetter")}
+      <div class="kpi-footnote">${esc(KPI_TIERS.avgStar.note)}</div>
+    </div>`;
+
+  // Narrative context line — computed from the real deltas, not templated
+  // wording, so it stays honest as filters/months change.
+  const banner = document.getElementById("context-banner");
+  if (currentStats.count > 0) {
+    const posMoved = prevStats.count ? currentStats.pos_pct - prevStats.pos_pct : 0;
+    const negMoved = prevStats.count ? currentStats.neg_pct - prevStats.neg_pct : 0;
+    let trend = "a mixed signal vs last month";
+    if (prevStats.count) {
+      if (posMoved >= 0 && negMoved <= 0) trend = "all moved in the right direction vs last month";
+      else if (posMoved <= 0 && negMoved >= 0) trend = "movement in the wrong direction vs last month";
+    }
+    const smallSample = currentStats.count < 20 ? ` — based on only ${currentStats.count} review${currentStats.count === 1 ? "" : "s"} so far, so treat this as directional, not conclusive` : "";
+    banner.style.display = "block";
+    banner.innerHTML = `<strong>${esc(monthLabel(currentKey))}</strong> is tracking ${fmtPct(currentStats.pos_pct)} positive (goal ${KPI_GOALS.positive}%), ${fmtPct(currentStats.neg_pct)} negative (goal ${KPI_GOALS.negative}%), and a ${currentStats.avg_rating.toFixed(2)}★ weighted average (goal ${KPI_GOALS.avgStar.toFixed(1)}★) — ${trend}${smallSample}.`;
+  } else {
+    banner.style.display = "none";
+  }
+}
+
+// ---- Monthly stacked mix chart (top of page) — axis gridlines, legend,
+// header total/negative-YTD line, and in-segment percentage labels, matching
+// the reference dashboard's layout. ----
+function renderMonthlyMix(filtered) {
+  const byMonth = groupByMonth(filtered);
+  const monthKeys = Object.keys(byMonth).sort();
+  const barMaxHeight = 190; // leaves room for the total-count label above
+  const maxCount = Math.max(1, ...monthKeys.map((k) => byMonth[k].length));
+  const axisMax = niceMax(maxCount);
+  const bp = baseParams();
+
+  const overall = computeStats(filtered);
+  document.getElementById("monthly-mix-total").textContent = `${fmtNum(overall.count)} total · ${fmtPct(overall.neg_pct)} negative YTD`;
+
+  // Only print a percentage label when the segment's actual pixel height has
+  // room for the text — a percentage-of-month threshold isn't enough on its
+  // own, since a short bar (a low-volume month) can have a "big share"
+  // segment that's still only a few pixels tall, and two overlapping labels
+  // in a ~15px sliver render as garbled text.
+  const MIN_LABEL_HEIGHT = 14;
+  const segLabel = (pct, heightPx) => (heightPx >= MIN_LABEL_HEIGHT ? `<span class="seg-pct-label">${Math.round(pct)}%</span>` : "");
+
+  const bars = monthKeys.map((k) => {
+    const list = byMonth[k];
+    const stats = computeStats(list);
+    const scale = barMaxHeight / axisMax;
+    const { from, to } = monthBounds(k);
+    const url = buildBrowseUrl({ ...bp, dateFrom: from, dateTo: to, title: `${monthLabel(k)} reviews` });
+    const posH = stats.positive * scale;
+    const neuH = stats.neutral * scale;
+    const negH = stats.negative * scale;
+    return `
+      <a class="month-col" href="${url}" title="${stats.count} reviews in ${esc(monthLabel(k))}">
+        <div class="month-total">${stats.count}</div>
+        <div class="month-bar" style="height:${barMaxHeight}px">
+          <div class="month-seg seg-neg" style="height:${negH.toFixed(1)}px">${segLabel(stats.neg_pct, negH)}</div>
+          <div class="month-seg seg-neu" style="height:${neuH.toFixed(1)}px"></div>
+          <div class="month-seg seg-pos" style="height:${posH.toFixed(1)}px">${segLabel(stats.pos_pct, posH)}</div>
+        </div>
+        <div class="month-label">${esc(monthLabel(k))}</div>
+      </a>`;
+  }).join("");
+
+  const frame = document.getElementById("monthly-mix-chart");
+  if (!monthKeys.length) {
+    frame.innerHTML = '<p class="empty-state">No reviews for this filter yet.</p>';
+    return;
+  }
+  const axisTop = 20; // month-total row height (14px) + flex gap (6px)
+  frame.style.height = `${axisTop + barMaxHeight + 6 + 14}px`; // + gap + month-label row
+  frame.innerHTML = `${axisHtml(axisMax, axisTop, barMaxHeight)}<div class="month-chart" style="position:relative;z-index:1">${bars}</div>`;
+}
+
+// ---- category mini bar-chart panels ----
+function categoryMonthlyCounts(list, key) {
+  const byMonth = groupByMonth(list.filter((r) => classifyCategories(r).includes(key)));
+  return byMonth;
+}
+
+function miniPanelHtml(key, label, list, rank, bp) {
+  const byMonth = categoryMonthlyCounts(list, key);
+  const monthKeys = Object.keys(byMonth).sort();
+  const total = monthKeys.reduce((s, k) => s + byMonth[k].length, 0);
+  const maxCount = Math.max(1, ...monthKeys.map((k) => byMonth[k].length));
+  const axisMax = niceMax(maxCount);
+  const color = CATEGORY_COLORS[key] || "var(--brand)";
+
+  // Bars are scaled to the FULL frame height (matching the axis gridlines
+  // exactly, no scale mismatch) — the peak label is positioned absolutely
+  // relative to the bar's own top edge, so it can render above the frame's
+  // box without needing to steal height from the bar itself.
+  const FRAME_H = 70;
+
+  const bars = monthKeys.map((k) => {
+    const count = byMonth[k].length;
+    const isPeak = count === maxCount && count > 0;
+    const barH = (count / axisMax) * FRAME_H;
+    const { from, to } = monthBounds(k);
+    const url = buildBrowseUrl({ ...bp, category: key, dateFrom: from, dateTo: to, title: `${label} — ${monthLabel(k)}` });
+    return `
+      <a class="mini-bar-col" href="${url}" title="${count} in ${esc(monthLabel(k))}">
+        ${isPeak ? `<span class="mini-bar-val" style="bottom:${(barH + 2).toFixed(1)}px">${count}</span>` : ""}
+        <div class="mini-bar-fill" style="height:${barH.toFixed(1)}px"></div>
+      </a>`;
+  }).join("");
+
+  const monthTicks = monthKeys.map((k) => `<div class="mini-month-label">${esc(monthLabel(k))}</div>`).join("");
+
+  const allUrl = buildBrowseUrl({ ...bp, category: key, title: label });
+  return `
+    <div class="mini-panel" style="--cat-color:${color}">
+      <div class="mini-panel-head">
+        <span class="mini-panel-title"><span class="mini-panel-rank">${rank}.</span> ${esc(label)}</span>
+        <a class="mini-panel-total" href="${allUrl}">${total} total →</a>
+      </div>
+      ${monthKeys.length
+        ? `<div class="chart-frame" style="height:${FRAME_H}px">${axisHtml(axisMax, 0, FRAME_H, 2)}<div class="mini-bars" style="position:relative;z-index:1">${bars}</div></div>
+           <div class="mini-month-labels">${monthTicks}</div>`
+        : `<div class="mini-panel-empty">No tagged mentions.</div>`}
+    </div>`;
+}
+
+function renderCategoryGrids(filtered) {
+  const negNeutral = filtered.filter((r) => r.rating <= 3);
+  const bp = baseParams();
+
+  const primaryTotals = CATEGORY_DEFS.map(([key, label]) => {
+    const count = negNeutral.filter((r) => classifyCategories(r).includes(key)).length;
+    return { key, label, count };
+  }).sort((a, b) => b.count - a.count);
+
+  document.getElementById("primary-category-grid").innerHTML = primaryTotals
+    .map((c, i) => miniPanelHtml(c.key, c.label, negNeutral, i + 1, bp))
+    .join("") || '<p class="empty-state">No negative/neutral reviews for this filter.</p>';
+
+  const secondaryKeys = [...SECONDARY_CATEGORY_DEFS.map(([k, l]) => [k, l]), ["positive_aside", CATEGORY_LABELS.positive_aside]];
+  const secondaryTotals = secondaryKeys.map(([key, label]) => {
+    const count = negNeutral.filter((r) => classifyCategories(r).includes(key)).length;
+    return { key, label, count };
+  }).sort((a, b) => b.count - a.count);
+
+  document.getElementById("secondary-category-grid").innerHTML = secondaryTotals
+    .map((c, i) => miniPanelHtml(c.key, c.label, negNeutral, primaryTotals.length + i + 1, bp))
+    .join("");
+}
+
+// ---- Review Brief ----
+// Static for now, per Chris's request — the live AI brief endpoint
+// (/api/reviews/category-actions) exists and works, but the Anthropic key
+// behind the AI Gateway is out of credit, so this was written by hand from
+// the same review data instead of blocking on that. Pulled from the actual
+// reviews table on 2026-09-17: last-30-days negative reviews (Aug 18-Sep 17)
+// vs. the 30 days before that (Jul 19-Aug 17), across all sources/groups.
+// Re-run this analysis and update the object below whenever it goes stale,
+// or re-wire loadPriorityActions()-style fetch once the AI Gateway credits
+// are restored (route is already built, see src/index.js).
+const REVIEW_BRIEF = {
+  generatedNote: "Written 2026-09-17 from live review data (10 negative reviews in the last 30 days, 15 in the 30 days before that) — static, not auto-refreshing.",
+  overview:
+    "In the last 30 days (Aug 18–Sep 17), Every Body Eat logged 60 written reviews: 40 positive, 10 neutral, and 10 negative (a 17% negative rate). That's a real improvement over the prior 30 days (Jul 19–Aug 17), which saw 47 reviews with 15 negative (a 32% negative rate). Negative reviews in the last 30 days are overwhelmingly about one thing: packaging and shipping damage, not the product itself. 8 of the 10 negative reviews explicitly describe crackers arriving broken, crushed, or reduced to crumbs — citing thin bags, missing box packaging, and in one case a heavy \"bed sheet\" used as packing filler. It's concentrated almost entirely on Snack Thins, specifically the Cheese-Less flavor (6 of those 8 complaints). What needs focus: packaging for Snack Thins / Cheese-Less. Several reviewers say the product tastes fine but arrives destroyed — that's a fixable fulfillment problem, not a formulation problem, and it's now the single largest driver of negative reviews.",
+  groups: [
+    {
+      name: "Snack Thins",
+      summary:
+        "9 of 36 reviews negative in the last 30 days (25%) — essentially flat vs. 6 of 25 (24%) the period before, but the reason shifted: 8 of the 9 negative reviews now cite packaging/shipping damage on Cheese-Less, versus a more even mix of taste, salt-level, and packaging complaints previously.",
+      actions: [
+        { severity: "high", owner: "Packaging & Fulfillment", issue: "Cheese-Less arriving crushed / broken", action: "Switch Cheese-Less to a rigid box or add void-fill/dunnage — 6 of 8 packaging complaints name this exact flavor, and several reviewers say the product tastes fine but arrived destroyed." },
+        { severity: "medium", owner: "Operations / Fulfillment", issue: "Bag (not box) shipping flagged by customers", action: "Audit the ship-in-bag vs. ship-in-box decision for Thins SKUs — two reviewers specifically blame bag-only packaging (vs. a box) for the damage." },
+        { severity: "low", owner: "Customer Care", issue: "Isolated quality miss (hair in bag)", action: "One reviewer reported a hair in their bag from the prior period; reach out directly and confirm it's isolated, not a pattern." },
+      ],
+    },
+    {
+      name: "Cookie Bites",
+      summary:
+        "Just 1 of 15 reviews negative in the last 30 days (7%) — a big improvement from 8 of 15 (53%) the period before. The prior period's complaints (texture described as \"sawdust,\" staleness on Ginger Cinnamon, and a cluster of \"unable to discontinue orders\" subscription complaints) did not recur.",
+      actions: [
+        { severity: "medium", owner: "Customer Care", issue: "Confirm subscription-cancellation issue actually resolved", action: "Three late-July reviews complained about being unable to stop recurring orders; none recurred this period, but this is billing-adjacent and worth explicitly confirming it's fixed, not just quiet." },
+        { severity: "low", owner: "QA", issue: "Watch Ginger Cinnamon / Chocolate Chip texture", action: "Prior-period reviews described a dry, \"sawdust\"-like texture; no repeat complaints this period, but keep an eye on it given the small sample size." },
+      ],
+    },
+    {
+      name: "Pretzels",
+      summary:
+        "0 of 6 reviews negative in the last 30 days, versus 1 of 6 the period before (a report of an off smell/taste, possibly a formula change). Volume is too low here to call a trend either way.",
+      actions: [
+        { severity: "low", owner: "QA", issue: "One report of off smell/taste", action: "A single July review claimed the product smelled and tasted different than a prior purchase and suspected a formula change. No repeat reports, but worth a spot QA check given how specific the complaint was." },
+      ],
+    },
+    {
+      name: "Crispbread Crackers",
+      summary: "0 of 3 reviews negative in the last 30 days. Smallest, cleanest product line — no action needed right now.",
+      actions: [],
+    },
+  ],
+};
+
+function renderReviewBrief() {
+  const body = document.getElementById("review-brief-body");
+  const groupsHtml = REVIEW_BRIEF.groups.map((g) => `
+    <div class="action-item">
+      <div class="action-item-head"><span class="action-item-issue">${esc(g.name)}</span></div>
+      <div class="action-item-body">${esc(g.summary)}</div>
+      ${g.actions.length
+        ? g.actions.map((a) => `
+          <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">
+            <div class="action-item-head">
+              <span class="severity-badge severity-${esc(a.severity)}">${esc(a.severity)}</span>
+              <span class="owner-badge">Owner: ${esc(a.owner)}</span>
+              <span style="font-weight:700;font-size:12.5px">${esc(a.issue)}</span>
+            </div>
+            <div class="action-item-body" style="margin-bottom:0">${esc(a.action)}</div>
+          </div>`).join("")
+        : '<p style="font-size:12px;color:var(--gray);margin-top:8px">No action needed right now.</p>'}
+    </div>`).join("");
+
+  body.innerHTML = `
+    <p class="priority-brief">${esc(REVIEW_BRIEF.overview)}</p>
+    ${groupsHtml}
+    <p class="priority-meta">${esc(REVIEW_BRIEF.generatedNote)}</p>`;
+}
+
+function initGroupDropdowns() {
+  const present = [...new Set(REVIEWS.map((r) => r.product_group))];
+  const ordered = KNOWN_GROUPS.filter((g) => present.includes(g));
+  const extra = present.filter((g) => !KNOWN_GROUPS.includes(g)).sort();
+  const all = [...ordered, ...extra];
+  const optsHtml = all.map((g) => `<option value="${esc(g)}">${esc(groupLabel(g))}</option>`).join("");
+
+  document.getElementById("f-group").innerHTML = '<option value="">All Products</option>' + optsHtml;
+}
+
+// ---- Current Month Review Summary (sits beside the Monthly Mix chart) ----
+function renderCurrentMonthSummary(filtered) {
+  const now = new Date();
+  const currentKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const prevKey = prevMonthKey(currentKey);
+  const byMonth = groupByMonth(filtered);
+  const currentList = byMonth[currentKey] || [];
+  const prevList = byMonth[prevKey] || [];
+  const stats = computeStats(currentList);
+  const prevStats = computeStats(prevList);
+  const bp = baseParams();
+
+  const el = document.getElementById("current-month-summary");
+  if (stats.count === 0) {
+    el.innerHTML = `<div class="month-summary-card"><p class="empty-state" style="padding:6px 0">No reviews yet for ${esc(monthLabel(currentKey))}.</p></div>`;
+    return;
+  }
+
+  const negNeutral = currentList.filter((r) => r.rating <= 3);
+  const catCounts = [...CATEGORY_DEFS, ...SECONDARY_CATEGORY_DEFS]
+    .map(([key, label]) => ({ key, label, count: negNeutral.filter((r) => classifyCategories(r).includes(key)).length }))
+    .filter((c) => c.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const topCategory = catCounts[0];
+
+  const groupCounts = {};
+  for (const r of currentList) groupCounts[r.product_group] = (groupCounts[r.product_group] || 0) + 1;
+  const topGroupEntry = Object.entries(groupCounts).sort((a, b) => b[1] - a[1])[0];
+
+  const monthUrl = buildBrowseUrl({ ...bp, dateFrom: monthBounds(currentKey).from, dateTo: monthBounds(currentKey).to, title: `${monthLabel(currentKey)} reviews` });
+  const volumeDelta = prevStats.count
+    ? `${stats.count >= prevStats.count ? "+" : ""}${stats.count - prevStats.count} vs ${prevStats.count} in ${monthLabel(prevKey)}`
+    : "";
+
+  el.innerHTML = `
+    <div class="month-summary-card">
+      <div class="month-summary-lede">
+        <strong>${esc(monthLabel(currentKey))} ${now.getUTCFullYear()}</strong> has <strong>${stats.count}</strong> review${stats.count === 1 ? "" : "s"} so far:
+        <strong style="color:var(--pos)">${stats.positive} positive</strong>,
+        ${stats.neutral} neutral, and
+        <strong style="color:var(--neg)">${stats.negative} negative</strong>
+        (${fmtPct(stats.pos_pct)} positive / ${fmtPct(stats.neg_pct)} negative), averaging <strong>${stats.avg_rating.toFixed(2)}★</strong>.
+      </div>
+      ${topGroupEntry ? `<div class="kpi-bullet">• Most-reviewed product line this month: <strong>${esc(groupLabel(topGroupEntry[0]))}</strong> (${topGroupEntry[1]} review${topGroupEntry[1] === 1 ? "" : "s"})</div>` : ""}
+      ${topCategory
+        ? `<div class="kpi-bullet">• Top complaint theme: <strong>${esc(topCategory.label)}</strong> (${topCategory.count} mention${topCategory.count === 1 ? "" : "s"})</div>`
+        : `<div class="kpi-bullet">• No negative/neutral reviews tagged to a category yet this month.</div>`}
+      ${volumeDelta ? `<div class="kpi-bullet">• Volume: ${volumeDelta}</div>` : ""}
+      <a href="${monthUrl}" style="display:inline-block;margin-top:10px;font-size:12px;font-weight:700;color:var(--brand);text-decoration:none">Browse this month's reviews →</a>
+    </div>`;
+}
+
+function rerender() {
+  const filtered = getFiltered();
+  document.getElementById("browse-all-link").href = buildBrowseUrl(baseParams());
+  renderKpis(filtered);
+  renderMonthlyMix(filtered);
+  renderCurrentMonthSummary(filtered);
+  renderCategoryGrids(filtered);
+}
+
+async function load() {
+  try {
+    const res = await fetch("/api/reviews/report?source=all");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    REVIEWS = data.reviews || [];
+    if (REVIEWS.length === 0) throw new Error("No reviews found yet — import some via Update Reviews.");
+
+    document.getElementById("sidenav-footer").textContent = `${fmtNum(REVIEWS.length)} reviews loaded`;
+    const todayLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+    document.getElementById("page-subtitle").textContent =
+      `Monthly count of written reviews, Jan 1 – ${todayLabel}. Source: reviews table, joined to product taxonomy for product group. Sources: Amazon + Okendo.`;
+
+    initGroupDropdowns();
+    rerender();
+    renderReviewBrief();
+
+    document.getElementById("footer-note").textContent =
+      `Ratings, themes, and dates come from the reviews table (source='amazon'|'okendo'), joined to product_taxonomy for product group. Categories (Damaged/Broken, Packaging, Flavor, Texture, Value/Price, Freshness, plus the two secondary themes) are detected from each review's title and content text, not the stored themes column, and only applied to reviews rated 1–3★. Refreshed on every page load — last loaded ${new Date().toLocaleString()}.`;
+
+    document.getElementById("loading-state").style.display = "none";
+    document.getElementById("content").style.display = "block";
+  } catch (err) {
+    document.getElementById("loading-state").style.display = "none";
+    document.getElementById("error-state").style.display = "block";
+    document.getElementById("error-text").textContent = err.message;
+    console.error("Failed to load reviews-by-category dashboard", err);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

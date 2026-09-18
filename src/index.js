@@ -1,5 +1,9 @@
 import * as XLSX from "xlsx";
 
+// Set true to relaunch the AI Assistant (/api/chat) — see the route below
+// for the rest of what a relaunch needs.
+const AI_ASSISTANT_ENABLED = false;
+
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 const JSON_HEADERS = {
@@ -185,7 +189,7 @@ function reviewRowFromDb(row) {
 
 async function getReviewData(env, limit = null, source = null) {
   let sql =
-    "SELECT r.*, t.product_group as product_group, t.flavor as flavor FROM reviews r " +
+    "SELECT r.*, COALESCE(t.product_group, 'Unmapped') as product_group, COALESCE(t.flavor, 'Unmapped') as flavor FROM reviews r " +
     "LEFT JOIN product_taxonomy t ON t.id = r.taxonomy_id";
   const binds = [];
   if (source && source !== "all") {
@@ -254,6 +258,47 @@ function searchSops(index, query) {
 async function getSopFile(env, id) {
   if (!SOP_ID_PATTERN.test(id)) return null;
   return env.CPG_DATA.get(`sops/${id}.pdf`);
+}
+
+function slugifySopId(title) {
+  return String(title || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+async function addSop(env, { title, description, category, tags, file }) {
+  const index = await getSopIndex(env);
+
+  const base = slugifySopId(title) || "sop";
+  let id = base;
+  let n = 2;
+  while (index.sops.some((s) => s.id === id)) {
+    id = `${base}-${n}`;
+    n += 1;
+  }
+
+  await env.CPG_DATA.put(`sops/${id}.pdf`, file.stream(), {
+    httpMetadata: { contentType: "application/pdf" },
+  });
+
+  const sop = {
+    id,
+    title: title.trim(),
+    description: (description || "").trim(),
+    category: (category || "General").trim(),
+    tags,
+    filename: `${id}.pdf`,
+    uploadedDate: new Date().toISOString().slice(0, 10),
+  };
+
+  index.sops.push(sop);
+  await env.CPG_DATA.put("sops/index.json", JSON.stringify(index), {
+    httpMetadata: { contentType: "application/json" },
+  });
+
+  return sop;
 }
 
 // --- Weekly data (Issues/Opportunities + 2026 Plan xlsx) data access helpers
@@ -803,6 +848,118 @@ async function analyzeRecentReviewSentiment(env, referenceDate = new Date()) {
   );
 
   return { ...base, ...analysis, generatedAt, cached: false };
+}
+
+// --- Priority Actions brief for the Reviews by Category dashboard —
+// per-product-group AI briefing, weighted toward the last 30 days, cached in
+// R2 by (group, review-ID signature) so it only regenerates when that
+// group's underlying review set actually changes ("refreshed every time new
+// data is added"), and switching the dropdown after a cache hit is instant.
+// Same AI Gateway + signature-cache pattern as analyzeRecentReviewSentiment
+// above, different prompt/shape (a brief + owned action items). ---
+const CATEGORY_ACTIONS_CACHE_KEY = "reviews/category-actions-cache.json";
+const CATEGORY_ACTIONS_SCHEMA_VERSION = 1;
+const CATEGORY_ACTIONS_RECENT_DAYS = 30;
+const CATEGORY_ACTIONS_MAX_REVIEWS = 60;
+const CATEGORY_ACTIONS_OWNERS = ["QA", "Packaging & Fulfillment", "Production", "Customer Care", "Marketing / Listings", "Leadership"];
+
+function slugifyGroup(group) {
+  return (
+    String(group || "all")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "all"
+  );
+}
+
+const CATEGORY_ACTIONS_SYSTEM_PROMPT =
+  `You are a CPG customer insights analyst writing a short operating brief for a snack brand's leadership team, based on Amazon and Okendo customer reviews for one product line. Weight the "Recent reviews" section (last ${CATEGORY_ACTIONS_RECENT_DAYS} days) more heavily than "Older reviews" (summarized only) when deciding what matters right now — older data is context, not the basis for action. Respond with ONLY a single JSON object — no markdown fences, no commentary before or after — in exactly this shape: {"brief": string, "actionItems": [{"issue": string, "severity": "low"|"medium"|"high", "suggestedOwner": string, "suggestedAction": string, "reviewIds": string[]}]}. "brief" is 2-4 sentences summarizing current standing and the most important trend. Each action item must be grounded in a real, recurring pattern (2 or more reviews) unless it is a safety issue (illness, allergic reaction, foreign object, spoilage/mold — always flag even from a single review, as "high" severity). "suggestedOwner" must be exactly one of: ${CATEGORY_ACTIONS_OWNERS.map((o) => `"${o}"`).join(", ")} — pick whichever team would actually own fixing it. reviewIds must be exact bracketed IDs (copied verbatim, no brackets) from the reviews given — never invent one. If there is not enough data to say anything meaningful, return a brief saying so and an empty actionItems array. Ground every statement only in the reviews given, never invent details or counts.`;
+
+function buildCategoryActionsPrompt(groupLabel, recent, olderStats) {
+  const recentText = reviewsForPrompt(recent.slice(0, CATEGORY_ACTIONS_MAX_REVIEWS)) || "(none)";
+  const olderLine =
+    olderStats.count > 0
+      ? `${olderStats.count} reviews, ${olderStats.pos_pct}% positive / ${olderStats.neg_pct}% negative, ${olderStats.avg_rating}★ avg — summarized only, not itemized.`
+      : "(none)";
+  return `Product line: ${groupLabel}\n\nRecent reviews (last ${CATEGORY_ACTIONS_RECENT_DAYS} days, ${recent.length} total):\n${recentText}\n\nOlder reviews (before that window):\n${olderLine}`;
+}
+
+async function analyzeCategoryPriorityActions(env, group, referenceDate = new Date()) {
+  const allReviews = await getReviewData(env);
+  if (!allReviews || allReviews.length === 0) return null;
+
+  const groupLabel = group && group !== "all" ? group : "All Products";
+  const scoped = group && group !== "all" ? allReviews.filter((r) => r.product_group === group) : allReviews;
+  if (scoped.length === 0) {
+    return { productGroup: groupLabel, brief: `No reviews found yet for ${groupLabel}.`, actionItems: [], generatedAt: null, cached: false };
+  }
+
+  const cutoff = new Date(referenceDate);
+  cutoff.setUTCDate(cutoff.getUTCDate() - CATEGORY_ACTIONS_RECENT_DAYS);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const recent = scoped.filter((r) => typeof r.date === "string" && r.date >= cutoffStr);
+  const older = scoped.filter((r) => !(typeof r.date === "string" && r.date >= cutoffStr));
+  const olderStats = computeReviewStats(older);
+
+  const slug = slugifyGroup(group);
+  const signature = await hashIds(scoped.map((r) => r.id));
+
+  const cachedObj = await env.CPG_DATA.get(CATEGORY_ACTIONS_CACHE_KEY);
+  let cacheData = {};
+  if (cachedObj) {
+    try {
+      cacheData = await cachedObj.json();
+    } catch {
+      cacheData = {};
+    }
+  }
+  const cachedEntry = cacheData[slug];
+  if (cachedEntry && cachedEntry.signature === signature && cachedEntry.schemaVersion === CATEGORY_ACTIONS_SCHEMA_VERSION) {
+    return { productGroup: groupLabel, ...cachedEntry.analysis, generatedAt: cachedEntry.generatedAt, cached: true };
+  }
+
+  const prompt = buildCategoryActionsPrompt(groupLabel, recent, olderStats);
+  const result = await postToClaude(
+    env,
+    {
+      model: CLAUDE_MODEL,
+      max_tokens: 1500,
+      system: CATEGORY_ACTIONS_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+    },
+    {},
+    { task: "category_priority_actions", group: slug },
+  );
+
+  const text = result.content?.[0]?.text || "{}";
+  const raw = parseJsonFromText(text);
+  const generatedAt = new Date().toISOString();
+
+  // Same hallucination guard as analyzeRecentReviewSentiment: drop any cited
+  // review ID that isn't actually in this group's review set, and any owner
+  // outside the fixed list, rather than trusting Claude's output blindly.
+  const idSet = new Set(scoped.map((r) => r.id));
+  const ownerSet = new Set(CATEGORY_ACTIONS_OWNERS);
+  const actionItems = (raw.actionItems || [])
+    .map((a) => {
+      const reviewIds = Array.isArray(a.reviewIds) ? a.reviewIds.filter((id) => idSet.has(id)) : [];
+      return {
+        issue: a.issue,
+        severity: ["low", "medium", "high"].includes(a.severity) ? a.severity : "low",
+        suggestedOwner: ownerSet.has(a.suggestedOwner) ? a.suggestedOwner : "Leadership",
+        suggestedAction: a.suggestedAction,
+        reviewIds,
+        reviewCount: reviewIds.length,
+      };
+    })
+    .filter((a) => a.reviewCount > 0);
+
+  const analysis = { brief: raw.brief || "", actionItems };
+
+  cacheData[slug] = { signature, schemaVersion: CATEGORY_ACTIONS_SCHEMA_VERSION, generatedAt, analysis };
+  await env.CPG_DATA.put(CATEGORY_ACTIONS_CACHE_KEY, JSON.stringify(cacheData));
+
+  return { productGroup: groupLabel, ...analysis, generatedAt, cached: false };
 }
 
 // --- Per-flavor action recommendations for the review sentiment report
@@ -1804,8 +1961,13 @@ function rowToPromotion(row) {
     ptype: row.ptype,
     discount: row.discount,
     baseline: row.baseline,
+    baselineUnits: row.baseline_units,
     promoRev: row.promo_rev,
+    promoUnits: row.promo_units,
     postRev: row.post_rev,
+    postUnits: row.post_units,
+    costPerRedemption: row.cost_per_redemption,
+    otherCosts: row.other_costs,
     trueCost: row.true_cost,
     notes: row.notes,
   };
@@ -1827,8 +1989,8 @@ async function replacePromotions(env, promotions) {
       db
         .prepare(
           `INSERT INTO promotions
-             (id, product, description, channel, retailer, campaign_id, start_date, end_date, ptype, discount, baseline, promo_rev, post_rev, true_cost, notes, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+             (id, product, description, channel, retailer, campaign_id, start_date, end_date, ptype, discount, baseline, baseline_units, promo_rev, promo_units, post_rev, post_units, cost_per_redemption, other_costs, true_cost, notes, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
         )
         .bind(
           p.id,
@@ -1842,8 +2004,13 @@ async function replacePromotions(env, promotions) {
           p.ptype ?? null,
           p.discount ?? null,
           p.baseline ?? null,
+          p.baselineUnits ?? null,
           p.promoRev ?? null,
+          p.promoUnits ?? null,
           p.postRev ?? null,
+          p.postUnits ?? null,
+          p.costPerRedemption ?? null,
+          p.otherCosts ?? null,
           p.trueCost ?? null,
           p.notes ?? null,
         ),
@@ -2080,6 +2247,720 @@ function validActualsRow(r) {
   return r && BUDGET_CHANNELS.includes(r.channel) && BUDGET_MONTH_PATTERN.test(r.month || "");
 }
 
+/* ---------- Marketing: Amazon Ad Spend Budget (bottoms-up) ---------- */
+// Separate from the Monthly Channel Budget vs Actuals tracker above (top-line
+// Sales/Ad Spend vs Actuals) — this models the ad funnel itself: Clicks, CPC,
+// and Conversion Rate are budget inputs, Spend/Ad Orders/Ad Sales/ROAS are
+// derived. Only Amazon is wired up for now; AD_BUDGET_CHANNELS/line items are
+// channel-scoped so Walmart/TikTok Shop/Shopify can be added later without a
+// schema change.
+
+const AD_BUDGET_CHANNELS = ["Amazon", "Walmart"];
+// Every Body Eat's own Amazon Ads account in Triple Whale. WFMOA reports
+// under the same channel='amazon' but a different account_id — excluding it
+// here matches how the tracker above splits "Amazon" from "Whole Foods on
+// Amazon" as separate channels.
+const AMAZON_ADS_ACCOUNT_ID = "1391283812218656";
+
+// Walmart's product catalog in Triple Whale is dozens of individual SKUs/pack
+// variants, not a clean small list like Amazon's ASINs — so Walmart's Traffic
+// Budget tracks the same 4 product-line categories the Income Statement uses
+// (via name-pattern matching over Triple Whale's orders_table), rather than
+// per-ASIN. See getWalmartTrafficActualsFromTriplewhale below.
+const WALMART_PRODUCT_GROUP_KEYS = ["thins", "cookies", "pretzel", "crispbread"];
+const WALMART_PRODUCT_GROUP_KEY_SET = new Set(WALMART_PRODUCT_GROUP_KEYS);
+// 3 SKUs with no product name in Triple Whale's data at all — can't be
+// categorized without knowing what they are (confirmed with Chris 2026-09-13).
+const WALMART_UNCATEGORIZED_SKUS = new Set(["GD-SJJD-VLMR", "VI-VW1L-D7JD", "N3-TCAB-DIQ8"]);
+// SKU "30009" and its "30009-01" variant have no product name in the data
+// either, but the adjacent "30009-2" SKU is clearly the same Chocolate Chip
+// Pack-of-6 item, so these are confidently Cookies rather than uncategorized.
+const WALMART_SKU_PREFIX_OVERRIDES = [{ prefix: "30009", group: "cookies" }];
+// "Snack Thins and Pretzel Thins Variety Pack" (SKU 30072) is a genuine mixed
+// pack — negligible revenue (~$72), defaults to Thins per Chris's call rather
+// than splitting it.
+const WALMART_SKU_OVERRIDES = { 30072: "thins" };
+function walmartProductGroupFor(sku, productName) {
+  const skuStr = String(sku ?? "");
+  if (WALMART_UNCATEGORIZED_SKUS.has(skuStr)) return null;
+  if (WALMART_SKU_OVERRIDES[skuStr]) return WALMART_SKU_OVERRIDES[skuStr];
+  for (const { prefix, group } of WALMART_SKU_PREFIX_OVERRIDES) {
+    if (skuStr.startsWith(prefix)) return group;
+  }
+  const name = (productName || "").toLowerCase();
+  if (name.includes("pretzel")) return "pretzel"; // checked before "thin" — real pretzel products are named "...Pretzel Thins..."
+  if (name.includes("cookie")) return "cookies";
+  if (name.includes("crispbread") || name.includes("cracker")) return "crispbread";
+  if (name.includes("thin")) return "thins";
+  return null;
+}
+
+// Product groups the Traffic Budget is split by, one row per (asin, month).
+const AD_BUDGET_ASINS = [
+  { asin: "B0HF1FS3QM", label: "Snack Thins Full Size" },
+  { asin: "B0GZ2Y9TYX", label: "Snack Thins Single Serve" },
+  { asin: "B0GP2VN4W5", label: "Cookie Bites Full Size" },
+  { asin: "B0F2TML2ZX", label: "Cookie Bites Single Serve" },
+  { asin: "B0GNWN9P1W", label: "Crispbread Crackers" },
+  { asin: "B0H12RRFS3", label: "Pretzels" },
+];
+const AD_BUDGET_ASIN_SET = new Set(AD_BUDGET_ASINS.map((p) => p.asin));
+
+// Income Statement product-line categories, rolling the 6 ASINs above up into
+// the 4 revenue lines the reference P&L uses (Thins/Cookies each cover a Full
+// Size + Single Serve ASIN; Pretzel and Crispbread are single-ASIN lines).
+const AD_BUDGET_INCOME_CATEGORIES = [
+  { key: 'thins', label: 'Thins Revenue', asins: ['B0HF1FS3QM', 'B0GZ2Y9TYX'] },
+  { key: 'cookies', label: 'Cookies Revenue', asins: ['B0GP2VN4W5', 'B0F2TML2ZX'] },
+  { key: 'pretzel', label: 'Pretzel Revenue', asins: ['B0H12RRFS3'] },
+  { key: 'crispbread', label: 'Crispbread Revenue', asins: ['B0GNWN9P1W'] },
+];
+
+// The 8 single-rate Income Statement line items (one rate per version, not
+// per month — unlike PPC/Traffic Budget inputs). Amazon Advertising is
+// deliberately excluded: its budget and actual come straight from the
+// existing PPC Budget tab (Spend), not a rate of Gross Revenue.
+const AD_BUDGET_INCOME_ITEMS = [
+  { key: 'shipping_income_chargeback', label: 'Shipping Income/Charge Back', group: 'revenue' },
+  { key: 'promotions', label: 'Promotions', group: 'revenue' },
+  { key: 'selling_fees', label: 'Amazon Selling Fees', group: 'revenue' },
+  { key: 'refunds_spoils', label: 'Refunds and Spoils', group: 'revenue' },
+  { key: 'fba_fees', label: 'Amazon FBA Fees', group: 'opex' },
+  { key: 'misc_other_fees', label: 'Amazon Misc Other Fees', group: 'opex' },
+  { key: 'shipping_freight_out', label: 'Amazon Shipping (Freight Out)', group: 'opex' },
+  { key: 'fba_fees_storage', label: 'Amazon FBA Fees - Storage', group: 'opex' },
+];
+const AD_BUDGET_INCOME_ITEM_KEY_SET = new Set(AD_BUDGET_INCOME_ITEMS.map((i) => i.key));
+
+function rowToAdBudgetVersion(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    year: row.year,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function getAdBudgetVersions(env) {
+  const { results } = await env.secure_cpg_marketing.prepare("SELECT * FROM ad_budget_versions ORDER BY created_at").all();
+  return results.map(rowToAdBudgetVersion);
+}
+
+async function getAdBudgetVersionDetail(env, id) {
+  const version = await env.secure_cpg_marketing.prepare("SELECT * FROM ad_budget_versions WHERE id = ?").bind(id).first();
+  if (!version) return null;
+  const [{ results: liResults }, { results: trafficResults }, { results: incomeResults }] = await Promise.all([
+    env.secure_cpg_marketing
+      .prepare("SELECT channel, month, clicks, cpc, conversion_rate, aov FROM ad_budget_line_items WHERE version_id = ?")
+      .bind(id)
+      .all(),
+    env.secure_cpg_marketing
+      .prepare("SELECT channel, asin, month, sessions, conversion_rate, aov, repeat_sales_pct, units_ordered FROM ad_budget_traffic_line_items WHERE version_id = ?")
+      .bind(id)
+      .all(),
+    env.secure_cpg_marketing
+      .prepare("SELECT channel, item_key, rate FROM ad_budget_income_rates WHERE version_id = ?")
+      .bind(id)
+      .all(),
+  ]);
+  return {
+    version: rowToAdBudgetVersion(version),
+    lineItems: liResults.map((r) => ({
+      channel: r.channel,
+      month: r.month,
+      clicks: r.clicks,
+      cpc: r.cpc,
+      conversionRate: r.conversion_rate,
+      aov: r.aov,
+    })),
+    trafficLineItems: trafficResults.map((r) => ({
+      channel: r.channel,
+      asin: r.asin,
+      month: r.month,
+      sessions: r.sessions,
+      conversionRate: r.conversion_rate,
+      aov: r.aov,
+      repeatSalesPct: r.repeat_sales_pct,
+      unitsOrdered: r.units_ordered,
+    })),
+    incomeRates: incomeResults.map((r) => ({
+      channel: r.channel,
+      itemKey: r.item_key,
+      rate: r.rate,
+    })),
+  };
+}
+
+async function saveAdBudgetVersion(env, id, body) {
+  const db = env.secure_cpg_marketing;
+  const statements = [
+    db
+      .prepare(
+        `INSERT INTO ad_budget_versions (id, name, year, notes, updated_at)
+         VALUES (?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET
+           name=excluded.name, year=excluded.year, notes=excluded.notes, updated_at=datetime('now')`,
+      )
+      .bind(id, body.name, body.year, body.notes ?? null),
+    db.prepare("DELETE FROM ad_budget_line_items WHERE version_id = ?").bind(id),
+    db.prepare("DELETE FROM ad_budget_traffic_line_items WHERE version_id = ?").bind(id),
+    db.prepare("DELETE FROM ad_budget_income_rates WHERE version_id = ?").bind(id),
+  ];
+  for (const li of body.lineItems || []) {
+    statements.push(
+      db
+        .prepare(`INSERT INTO ad_budget_line_items (version_id, channel, month, clicks, cpc, conversion_rate, aov) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+        .bind(id, li.channel, li.month, li.clicks ?? null, li.cpc ?? null, li.conversionRate ?? null, li.aov ?? null),
+    );
+  }
+  for (const ti of body.trafficLineItems || []) {
+    // Amazon's traffic rows are keyed by real ASIN; Walmart's are keyed by
+    // product-group slug (thins/cookies/pretzel/crispbread) — validate
+    // against whichever set matches the row's own channel.
+    const validKey = ti.channel === "Walmart" ? WALMART_PRODUCT_GROUP_KEY_SET.has(ti.asin) : AD_BUDGET_ASIN_SET.has(ti.asin);
+    if (!validKey) continue;
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO ad_budget_traffic_line_items (version_id, channel, asin, month, sessions, conversion_rate, aov, repeat_sales_pct, units_ordered) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          id,
+          ti.channel,
+          ti.asin,
+          ti.month,
+          ti.sessions ?? null,
+          ti.conversionRate ?? null,
+          ti.aov ?? null,
+          ti.repeatSalesPct ?? null,
+          ti.unitsOrdered ?? null,
+        ),
+    );
+  }
+  for (const ir of body.incomeRates || []) {
+    if (!AD_BUDGET_INCOME_ITEM_KEY_SET.has(ir.itemKey)) continue;
+    statements.push(
+      db
+        .prepare(`INSERT INTO ad_budget_income_rates (version_id, channel, item_key, rate) VALUES (?, ?, ?, ?)`)
+        .bind(id, ir.channel, ir.itemKey, ir.rate ?? null),
+    );
+  }
+  await db.batch(statements);
+}
+
+async function deleteAdBudgetVersionRow(env, id) {
+  await env.secure_cpg_marketing.prepare("DELETE FROM ad_budget_versions WHERE id = ?").bind(id).run();
+}
+
+async function duplicateAdBudgetVersion(env, sourceId, newId, newName) {
+  const source = await getAdBudgetVersionDetail(env, sourceId);
+  if (!source) return null;
+  await saveAdBudgetVersion(env, newId, {
+    name: newName,
+    year: source.version.year,
+    notes: source.version.notes,
+    lineItems: source.lineItems,
+    trafficLineItems: source.trafficLineItems,
+    incomeRates: source.incomeRates,
+  });
+  return getAdBudgetVersionDetail(env, newId);
+}
+
+async function getActiveAdBudgetVersionId(env) {
+  const row = await env.secure_cpg_marketing
+    .prepare("SELECT value FROM ad_budget_settings WHERE key = 'active_version_id'")
+    .first();
+  return row ? row.value : null;
+}
+
+async function setActiveAdBudgetVersionId(env, id) {
+  await env.secure_cpg_marketing
+    .prepare(
+      `INSERT INTO ad_budget_settings (key, value) VALUES ('active_version_id', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    )
+    .bind(id)
+    .run();
+}
+
+function validAdBudgetVersionBody(b) {
+  return (
+    b &&
+    typeof b.name === "string" &&
+    b.name.trim().length > 0 &&
+    Number.isInteger(b.year) &&
+    Array.isArray(b.lineItems || [])
+  );
+}
+
+// Live Amazon Ads actuals from Triple Whale's ads_table for the given
+// calendar year — queried fresh on every request (no cache table) so the
+// numbers are always current, same reasoning as Instacart's live read above.
+async function getAmazonAdActualsFromTriplewhale(env, year) {
+  await getTriplewhaleTools(env); // ensures the MCP session is initialized
+  const sql = `SELECT toStartOfMonth(adt.event_date) AS month, SUM(adt.spend) AS spend, SUM(adt.clicks) AS clicks, SUM(adt.conversions) AS orders, SUM(adt.conversion_value) AS ad_sales
+FROM ads_table AS adt
+WHERE adt.channel = 'amazon' AND adt.account_id = '${AMAZON_ADS_ACCOUNT_ID}' AND adt.event_date BETWEEN '${year}-01-01' AND '${year}-12-31'
+GROUP BY month ORDER BY month ASC`;
+  const result = await callTriplewhaleTool(env, "run-sql", { query: sql });
+  if (result?.error) throw new Error(result.error);
+  const columns = result?.columns || null;
+  const rawRows = result?.rows || [];
+  // run-sql returns rows as positional arrays matched to `columns`, not
+  // objects with named keys — normalize to objects here before mapping.
+  const rows = columns
+    ? rawRows.map((r) => Object.fromEntries(columns.map((c, i) => [c, r[i]])))
+    : rawRows;
+  return rows.map((r) => ({
+    month: String(r.month).slice(0, 7),
+    clicks: Number(r.clicks) || 0,
+    spend: Number(r.spend) || 0,
+    orders: Number(r.orders) || 0,
+    adSales: Number(r.ad_sales) || 0,
+  }));
+}
+
+// Same as getAmazonAdActualsFromTriplewhale above, for Walmart Connect ads.
+// No account_id filter needed — 'walmart-ads' isn't shared with another
+// account the way 'amazon' is with Whole Foods on Amazon.
+async function getWalmartAdActualsFromTriplewhale(env, year) {
+  await getTriplewhaleTools(env);
+  const sql = `SELECT toStartOfMonth(adt.event_date) AS month, SUM(adt.spend) AS spend, SUM(adt.clicks) AS clicks, SUM(adt.conversions) AS orders, SUM(adt.conversion_value) AS ad_sales
+FROM ads_table AS adt
+WHERE adt.channel = 'walmart-ads' AND adt.event_date BETWEEN '${year}-01-01' AND '${year}-12-31'
+GROUP BY month ORDER BY month ASC`;
+  const result = await callTriplewhaleTool(env, "run-sql", { query: sql });
+  if (result?.error) throw new Error(result.error);
+  const columns = result?.columns || null;
+  const rawRows = result?.rows || [];
+  const rows = columns
+    ? rawRows.map((r) => Object.fromEntries(columns.map((c, i) => [c, r[i]])))
+    : rawRows;
+  return rows.map((r) => ({
+    month: String(r.month).slice(0, 7),
+    clicks: Number(r.clicks) || 0,
+    spend: Number(r.spend) || 0,
+    orders: Number(r.orders) || 0,
+    adSales: Number(r.ad_sales) || 0,
+  }));
+}
+
+// Walmart Traffic Budget actuals: unlike Amazon, there's no marketplace
+// page-traffic connector for Walmart (Triple Whale's session tables only
+// cover the Shopify DTC website), so this only ever returns unitsOrdered and
+// salesAmount — sessions is always null (confirmed with Chris 2026-09-13,
+// Sessions/Conversion Rate stay Budget-only inputs for Walmart). Queried live
+// from Triple Whale's orders_table on every request, no cache table, same
+// reasoning as the Amazon Ads query above. Per-line revenue uses the
+// products_info tuple's own price x quantity (not the order-level total),
+// since one order can contain multiple different products.
+async function getWalmartTrafficActualsFromTriplewhale(env, year) {
+  await getTriplewhaleTools(env);
+  const sql = `WITH exploded AS (
+  SELECT event_date, arrayJoin(products_info) AS p
+  FROM orders_table
+  WHERE platform = 'walmart' AND event_date BETWEEN '${year}-01-01' AND '${year}-12-31'
+)
+SELECT toStartOfMonth(event_date) AS month, p.product_sku AS sku, p.product_name AS product_name,
+       SUM(p.product_name_price * p.product_name_quantity_sold) AS revenue,
+       SUM(p.product_name_quantity_sold) AS units
+FROM exploded
+GROUP BY month, sku, product_name
+ORDER BY month ASC`;
+  const result = await callTriplewhaleTool(env, "run-sql", { query: sql });
+  if (result?.error) throw new Error(result.error);
+  const columns = result?.columns || null;
+  const rawRows = result?.rows || [];
+  const rows = columns
+    ? rawRows.map((r) => Object.fromEntries(columns.map((c, i) => [c, r[i]])))
+    : rawRows;
+
+  const byMonthGroup = new Map(); // "month|group" -> { month, asin: group, unitsOrdered, salesAmount }
+  for (const r of rows) {
+    const group = walmartProductGroupFor(r.sku, r.product_name);
+    if (!group) continue; // uncategorized SKU — excluded per Chris's call, not silently lumped into a category
+    const month = String(r.month).slice(0, 7);
+    const key = `${month}|${group}`;
+    if (!byMonthGroup.has(key)) byMonthGroup.set(key, { month, asin: group, sessions: null, unitsOrdered: 0, salesAmount: 0 });
+    const row = byMonthGroup.get(key);
+    row.unitsOrdered += Number(r.units) || 0;
+    row.salesAmount += Number(r.revenue) || 0;
+  }
+  return [...byMonthGroup.values()];
+}
+
+// Walmart Traffic Budget actuals, sourced directly from the Walmart
+// Marketplace API's own order data (env.secure_cpg_walmart — see
+// syncWalmartMarketplaceOrders) instead of Triple Whale's copy. More
+// authoritative and doesn't depend on a third-party ETL, but only covers the
+// last ~180 days — that's a hard limit of Walmart's own Orders API, not
+// something this Worker can work around (confirmed against Walmart's docs
+// 2026-09-15). getWalmartTrafficActualsFromTriplewhale above is left in place
+// as a fallback for months outside that window, in case Triple Whale's
+// history is ever wired back in. Same categorization (walmartProductGroupFor)
+// and per-line-item revenue basis as the Triple Whale version, just reading
+// charge_amount/quantity off our own walmart_order_lines instead.
+async function getWalmartTrafficActualsFromD1(env, year) {
+  const { results } = await env.secure_cpg_walmart
+    .prepare(
+      `SELECT o.order_date, l.sku, l.item_name, l.quantity, l.charge_amount
+       FROM walmart_order_lines l
+       JOIN walmart_orders o ON o.purchase_order_id = l.purchase_order_id
+       WHERE o.order_date BETWEEN ? AND ?`,
+    )
+    .bind(`${year}-01-01`, `${year}-12-31T23:59:59Z`)
+    .all();
+
+  const byMonthGroup = new Map(); // "month|group" -> { month, asin: group, sessions: null, unitsOrdered, salesAmount }
+  for (const r of results) {
+    const group = walmartProductGroupFor(r.sku, r.item_name);
+    if (!group) continue; // uncategorized SKU — excluded per Chris's call, not silently lumped into a category
+    const month = String(r.order_date).slice(0, 7);
+    const key = `${month}|${group}`;
+    if (!byMonthGroup.has(key)) byMonthGroup.set(key, { month, asin: group, sessions: null, unitsOrdered: 0, salesAmount: 0 });
+    const row = byMonthGroup.get(key);
+    row.unitsOrdered += Number(r.quantity) || 0;
+    row.salesAmount += Number(r.charge_amount) || 0;
+  }
+  return [...byMonthGroup.values()];
+}
+
+// Per-product Traffic Budget actuals (Sessions, Units Ordered, Sales Amount)
+// are fed into ad_budget_traffic_actuals via a GitHub relay, not fetched live
+// or pulled directly by this Worker. Chain: a nightly Claude scheduled agent
+// calls Sophie Society's query_sales_traffic MCP tool (fast, backed by
+// pre-ingested S3 data) and commits the result as JSON to the private repo
+// cfuoss/ebe-data-cache; this Worker's own Cron Trigger (see scheduled()
+// below) then pulls that file via GitHub's Contents API and upserts it here.
+// The relay exists because neither more direct path works: Windsor.ai's
+// per-ASIN Amazon Sales & Traffic query hangs indefinitely (Amazon's own
+// report generation for that breakdown is very slow, confirmed via direct
+// fetch()), and the scheduled agent's sandbox has an egress allowlist that
+// blocks direct HTTP calls to this Worker's own domain (MCP traffic and git
+// operations are allowed; arbitrary HTTPS fetch is not) — so the ingest route
+// below is reachable only from the manual/testing path, not the automation.
+function validAmazonTrafficActualsRow(r) {
+  return (
+    r &&
+    AD_BUDGET_ASIN_SET.has(r.asin) &&
+    typeof r.date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(r.date)
+  );
+}
+
+async function upsertAmazonTrafficActuals(env, rows) {
+  const db = env.secure_cpg_marketing;
+  const statements = rows.map((r) =>
+    db
+      .prepare(
+        `INSERT INTO ad_budget_traffic_actuals (channel, asin, event_date, sessions, units_ordered, sales_amount, updated_at)
+         VALUES ('Amazon', ?, ?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(channel, asin, event_date) DO UPDATE SET
+           sessions=excluded.sessions, units_ordered=excluded.units_ordered, sales_amount=excluded.sales_amount, updated_at=datetime('now')`,
+      )
+      .bind(r.asin, r.date, r.sessions ?? 0, r.unitsOrdered ?? 0, r.salesAmount ?? 0),
+  );
+  if (statements.length) await db.batch(statements);
+  return statements.length;
+}
+
+// Pulls the latest relay file from the private GitHub repo (see comment
+// above) via the Contents API — which resolves the default branch on its
+// own, so this doesn't need to guess "main" vs "master" — and upserts it
+// into the daily cache.
+async function syncAmazonTrafficActualsFromGithub(env) {
+  const res = await fetch("https://api.github.com/repos/cfuoss/ebe-data-cache/contents/traffic-actuals-latest.json", {
+    headers: {
+      Authorization: `Bearer ${env.GITHUB_DATA_CACHE_TOKEN}`,
+      Accept: "application/vnd.github.raw+json",
+      "User-Agent": "secure-cpg-demo-worker",
+    },
+  });
+  if (!res.ok) throw new Error(`GitHub fetch failed: ${res.status} ${await res.text()}`);
+  const rows = await res.json();
+  if (!Array.isArray(rows)) throw new Error("Expected traffic-actuals-latest.json to be a JSON array.");
+  const validRows = rows.filter(validAmazonTrafficActualsRow);
+  const count = await upsertAmazonTrafficActuals(env, validRows);
+  return { pulled: rows.length, cached: count };
+}
+
+// Reads the daily cache and sums it up to months for the given year — the
+// Traffic Budget by Product table is monthly, but the cache stores Amazon's
+// native daily grain so re-aggregation here never double-counts.
+async function getAmazonTrafficActualsFromCache(env, year) {
+  const { results } = await env.secure_cpg_marketing
+    .prepare(
+      `SELECT asin, substr(event_date, 1, 7) AS month, SUM(sessions) AS sessions, SUM(units_ordered) AS units_ordered, SUM(sales_amount) AS sales_amount
+       FROM ad_budget_traffic_actuals
+       WHERE channel = 'Amazon' AND event_date BETWEEN ? AND ?
+       GROUP BY asin, month ORDER BY month ASC, asin ASC`,
+    )
+    .bind(`${year}-01-01`, `${year}-12-31`)
+    .all();
+  return results.map((r) => ({
+    month: r.month,
+    asin: r.asin,
+    sessions: Number(r.sessions) || 0,
+    unitsOrdered: Number(r.units_ordered) || 0,
+    salesAmount: Number(r.sales_amount) || 0,
+  }));
+}
+
+// Income Statement actuals, live from Business Central (env.ebe_bc_database —
+// a synced mirror kept by the separate ebe-bc-mcp Worker) exclusively — no
+// other MCP/data source feeds this endpoint. Same "query fresh every
+// request, no cache table" pattern as getAmazonAdActualsFromTriplewhale
+// above. Each of these 9 GL accounts is Amazon-only by definition/booking
+// convention (confirmed with Chris — not blended with Walmart/TikTok/
+// wholesale/etc.), unlike the 4 product-line revenue accounts (40210/40220/
+// 40230/40240), which ARE blended across every sales channel with no
+// per-GL-entry channel field — see getRevenueActualsFromBc below for
+// how those get scoped to Amazon anyway (via each sales invoice's own
+// channel dimension). debitAmount - creditAmount gives the right signed monthly
+// contribution for every account here regardless of its normal balance: it's
+// positive (a deduction) for the debit-normal expense/discount accounts, and
+// negative (an addition back to Net Revenue) for the credit-normal Shipping
+// Income account — both fall out of the same formula, no per-account sign
+// special-casing needed.
+const AD_BUDGET_INCOME_BC_ACCOUNTS = {
+  shipping_income_chargeback: "40298",
+  promotions: "40340",
+  selling_fees: "61250",
+  refunds_spoils: "40430",
+  fba_fees: "61220",
+  misc_other_fees: "61240",
+  shipping_freight_out: "61330",
+  fba_fees_storage: "61225",
+  // Not one of the 8 rate items (Advertising has no rate input — its Budget
+  // comes from the PPC Budget tab), but its Actual pulls from BC too, same as
+  // every other Income Statement actual — no other MCP/data source is used here.
+  advertising: "61810",
+};
+// Walmart's parallel fee structure. No shipping_income_chargeback/promotions/
+// refunds_spoils equivalents: those 3 accounts on the Amazon side are shared,
+// whole-account, no-channel-filter numbers (Chris confirmed "Amazon-only in
+// practice" for Amazon) — reusing them for Walmart would double-count the
+// same dollars in both channels' statements, and there's no dedicated
+// Walmart account for any of the 3. Confirmed with Chris 2026-09-13: leave
+// them out of Walmart's Income Statement entirely rather than guess.
+const WALMART_INCOME_BC_ACCOUNTS = {
+  selling_fees: "61265", // Walmart Net Commissions
+  fba_fees: "61270", // Walmart Fulfillment Fees
+  misc_other_fees: "61280", // Walmart Adjustments
+  shipping_freight_out: "61285", // Walmart Freight
+  fba_fees_storage: "61275", // Walmart Storage Fees
+  advertising: "61811", // Walmart Advertising
+};
+
+// Generic version of the two channel-specific functions this replaced
+// (this used to be two separate near-identical Amazon/Walmart functions —
+// been identical apart from the account map) — takes any {itemKey: account}
+// map and returns the same debitAmount - creditAmount signed monthly
+// contribution described above, since every account in both maps is a
+// debit-normal expense/discount account (or, for Shipping Income, the one
+// credit-normal exception where the same formula still yields the correct
+// sign — see the comment above AD_BUDGET_INCOME_BC_ACCOUNTS's original
+// version for why no per-account sign special-casing is needed).
+async function getIncomeActualsFromBc(env, year, accountMap) {
+  const accounts = Object.values(accountMap);
+  const accountToItem = Object.fromEntries(Object.entries(accountMap).map(([itemKey, account]) => [account, itemKey]));
+  const placeholders = accounts.map(() => "?").join(",");
+  const { results } = await env.ebe_bc_database
+    .prepare(
+      `SELECT substr(postingDate, 1, 7) AS month, accountNumber,
+              SUM(debitAmount) AS debit, SUM(creditAmount) AS credit
+       FROM generalLedgerEntries
+       WHERE accountNumber IN (${placeholders}) AND postingDate BETWEEN ? AND ?
+       GROUP BY month, accountNumber`,
+    )
+    .bind(...accounts, `${year}-01-01`, `${year}-12-31 23:59:59`)
+    .all();
+  return results.map((r) => ({
+    month: r.month,
+    itemKey: accountToItem[r.accountNumber],
+    amount: (Number(r.debit) || 0) - (Number(r.credit) || 0),
+  }));
+}
+
+// Revenue category accounts (Thins/Cookies/Pretzel/Crispbread) are blended
+// across every sales channel — unlike the fee/advertising accounts above,
+// which are Amazon-only by account definition, these need an explicit
+// channel filter. Business Central has no per-GL-entry channel field, but
+// each sales invoice carries one (shortcutDimension1Code — its "Sales
+// Channel" dimension), and generalLedgerEntries.documentNumber matches
+// salesInvoices.number 1:1, so joining recovers it. Code "205" is confirmed
+// as "Amazon" (its dimensionValues row exists but is orphaned from the
+// SALESCHANNELS dimension group in this mirror's sync, which is why it
+// didn't show up when the fee accounts above were first investigated).
+// creditAmount - debitAmount (not debit - credit, the opposite of the fee
+// accounts) because these are credit-normal income accounts and we want a
+// natural positive revenue figure, matching how Traffic Budget's Gross Sales
+// is already signed.
+const AD_BUDGET_REVENUE_BC_ACCOUNTS = {
+  thins: "40240",
+  cookies: "40210",
+  pretzel: "40220",
+  crispbread: "40230",
+};
+// Same 4 GL accounts for every channel (they're blended across all of them) —
+// only the Sales Channel dimension code differs. Code "205" = Amazon (its
+// dimensionValues row is orphaned from the SALESCHANNELS dimension group in
+// this mirror's sync, which is why it didn't show up in the first pass);
+// code "210" = "Walmart.com", cleanly linked.
+const AMAZON_SALES_CHANNEL_DIMENSION_CODE = "205";
+const WALMART_SALES_CHANNEL_DIMENSION_CODE = "210";
+
+// Takes any {itemKey: account} map plus the channel's own Sales Channel
+// dimension code, so one function covers every channel's revenue query.
+// creditAmount - debitAmount (not debit - credit, the opposite of the fee
+// accounts) because these are credit-normal income accounts and we want a
+// natural positive revenue figure, matching how Traffic Budget's Gross Sales
+// is already signed.
+async function getRevenueActualsFromBc(env, year, accountMap, dimensionCode) {
+  const accounts = Object.values(accountMap);
+  const accountToKey = Object.fromEntries(Object.entries(accountMap).map(([key, account]) => [account, key]));
+  const placeholders = accounts.map(() => "?").join(",");
+  const { results } = await env.ebe_bc_database
+    .prepare(
+      `SELECT substr(gle.postingDate, 1, 7) AS month, gle.accountNumber,
+              SUM(gle.creditAmount) AS credit, SUM(gle.debitAmount) AS debit
+       FROM generalLedgerEntries gle
+       JOIN salesInvoices si ON si.number = gle.documentNumber
+       WHERE gle.accountNumber IN (${placeholders})
+         AND si.shortcutDimension1Code = ?
+         AND gle.postingDate BETWEEN ? AND ?
+       GROUP BY month, gle.accountNumber`,
+    )
+    .bind(...accounts, dimensionCode, `${year}-01-01`, `${year}-12-31 23:59:59`)
+    .all();
+  return results.map((r) => ({
+    month: r.month,
+    itemKey: accountToKey[r.accountNumber],
+    amount: (Number(r.credit) || 0) - (Number(r.debit) || 0),
+  }));
+}
+
+async function getIncomeActualsManual(env, channel) {
+  const { results } = await env.secure_cpg_marketing
+    .prepare("SELECT month, item_key, amount FROM ad_income_actuals_manual WHERE channel = ?")
+    .bind(channel)
+    .all();
+  return results.map((r) => ({ month: r.month, itemKey: r.item_key, amount: r.amount }));
+}
+
+function validIncomeActualsManualRow(r) {
+  return r && AD_BUDGET_INCOME_ITEM_KEY_SET.has(r.itemKey) && typeof r.month === "string" && /^\d{4}-\d{2}$/.test(r.month);
+}
+
+async function putIncomeActualsManual(env, channel, rows) {
+  const db = env.secure_cpg_marketing;
+  const statements = rows.map((r) =>
+    db
+      .prepare(
+        `INSERT INTO ad_income_actuals_manual (channel, month, item_key, amount, updated_at)
+         VALUES (?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(channel, month, item_key) DO UPDATE SET
+           amount=excluded.amount, updated_at=datetime('now')`,
+      )
+      .bind(channel, r.month, r.itemKey, r.amount ?? null),
+  );
+  if (statements.length) await db.batch(statements);
+}
+
+async function getManualAdActuals(env, channel) {
+  const { results } = await env.secure_cpg_marketing
+    .prepare("SELECT channel, month, clicks, spend, orders, ad_sales, updated_at FROM ad_actuals_manual WHERE channel = ?")
+    .bind(channel)
+    .all();
+  return results.map((r) => ({
+    month: r.month,
+    clicks: r.clicks,
+    spend: r.spend,
+    orders: r.orders,
+    adSales: r.ad_sales,
+    updatedAt: r.updated_at,
+  }));
+}
+
+async function putManualAdActuals(env, rows) {
+  const db = env.secure_cpg_marketing;
+  const statements = rows.map((r) =>
+    db
+      .prepare(
+        `INSERT INTO ad_actuals_manual (channel, month, clicks, spend, orders, ad_sales, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(channel, month) DO UPDATE SET
+           clicks=excluded.clicks, spend=excluded.spend, orders=excluded.orders, ad_sales=excluded.ad_sales, updated_at=datetime('now')`,
+      )
+      .bind(r.channel, r.month, r.clicks ?? null, r.spend ?? null, r.orders ?? null, r.adSales ?? null),
+  );
+  await db.batch(statements);
+}
+
+function deriveAdMetrics(row) {
+  const clicks = row.clicks ?? null;
+  const spend = row.spend ?? null;
+  const orders = row.orders ?? null;
+  const adSales = row.adSales ?? null;
+  return {
+    clicks,
+    spend,
+    orders,
+    adSales,
+    cpc: clicks ? spend / clicks : null,
+    conversionRate: clicks ? orders / clicks : null,
+    roas: spend ? adSales / spend : null,
+  };
+}
+
+// Combines live Triple Whale actuals with manual overrides (for months TW
+// has no data for, e.g. before Amazon Ads was connected there). A manual row
+// always wins for its month when present, so re-entering a month after TW
+// picks it up just means clearing the manual row.
+const AD_CHANNEL_TRIPLEWHALE_FN = {
+  Amazon: getAmazonAdActualsFromTriplewhale,
+  Walmart: getWalmartAdActualsFromTriplewhale,
+};
+
+async function getAdChannelActuals(env, channel, year) {
+  const twSourceFn = AD_CHANNEL_TRIPLEWHALE_FN[channel];
+  if (!twSourceFn) return { actuals: [], twError: null }; // no live source wired up for this channel
+
+  let twRows = [];
+  let twError = null;
+  try {
+    twRows = await twSourceFn(env, year);
+  } catch (err) {
+    twError = err.message;
+  }
+  const manualRows = await getManualAdActuals(env, channel);
+
+  const byMonth = new Map();
+  for (const r of twRows) byMonth.set(r.month, { ...r, source: "triplewhale" });
+  for (const r of manualRows) {
+    if (r.clicks == null && r.spend == null && r.orders == null && r.adSales == null) continue;
+    byMonth.set(r.month, {
+      month: r.month,
+      clicks: r.clicks,
+      spend: r.spend,
+      orders: r.orders,
+      adSales: r.adSales,
+      source: "manual",
+    });
+  }
+
+  const actuals = [...byMonth.values()]
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((r) => ({ channel, month: r.month, source: r.source, ...deriveAdMetrics(r) }));
+
+  return { actuals, twError };
+}
+
+function validAdManualActualsRow(r) {
+  return r && AD_BUDGET_CHANNELS.includes(r.channel) && BUDGET_MONTH_PATTERN.test(r.month || "");
+}
+
 function campaignAssetKey(campaignId, filename) {
   return `${MARKETING_ASSET_PREFIX}${campaignId}/${filename}`;
 }
@@ -2212,10 +3093,6 @@ async function postToClaude(env, body, extraHeaders = {}, meta = {}) {
     ...meta,
     durationMs: Date.now() - start,
     stopReason: json.stop_reason,
-    // mcp_tool_use blocks are Windsor tool calls Anthropic already resolved
-    // server-side during this single call — we never see their individual
-    // timing, only that they happened before this response came back.
-    mcpToolUseCount: content.filter((b) => b.type === "mcp_tool_use").length,
     toolUseCount: content.filter((b) => b.type === "tool_use").length,
   });
   return json;
@@ -2370,7 +3247,232 @@ async function getSopsForTool(env, args = {}) {
   };
 }
 
-async function executeTool(env, name, input) {
+// --- Instacart Ads data (local D1, same database instacart-data-mcp fills) ---
+// secure-cpg-demo already binds this D1 directly (env.instacart_data, used
+// for the home page sync tile) — no remote MCP call needed, just a guarded
+// read-only SQL tool over the same tables instacart-data-mcp's own MCP
+// server (get_schema/query_instacart_data) exposes.
+const INSTACART_SQL_FORBIDDEN = /\b(insert|update|delete|drop|alter|create|replace|truncate|attach|detach|pragma|vacuum)\b/i;
+const INSTACART_QUERY_ROW_CAP = 1000;
+
+function assertReadOnlySql(sql) {
+  const trimmed = String(sql || "").trim().replace(/;+\s*$/, "");
+  if (!trimmed) throw new Error("SQL query is required.");
+  if (trimmed.includes(";")) throw new Error("Only a single SQL statement is allowed.");
+  if (!/^(select|with)\b/i.test(trimmed)) throw new Error("Only SELECT/WITH statements are allowed.");
+  if (INSTACART_SQL_FORBIDDEN.test(trimmed)) throw new Error("Query contains a forbidden keyword.");
+  return trimmed;
+}
+
+async function queryInstacartData(env, sql) {
+  const cleanSql = assertReadOnlySql(sql);
+  const { results } = await env.instacart_data.prepare(cleanSql).all();
+  const truncated = results.length > INSTACART_QUERY_ROW_CAP;
+  return {
+    rowCount: results.length,
+    truncated,
+    rows: truncated ? results.slice(0, INSTACART_QUERY_ROW_CAP) : results,
+  };
+}
+
+const INSTACART_SCHEMA_NOTES = `Instacart Ads data (Every Body Eat) — Sponsored Products + Sponsored Display. SQLite dialect (Cloudflare D1, not ClickHouse/Postgres).
+
+sp_events (Sponsored Products, one row per campaign per day):
+  date (YYYY-MM-DD), campaign (name), spend, attributed_sales, ntb_attributed_sales
+
+sd_events (Sponsored Display, one row per campaign per day):
+  date (YYYY-MM-DD), name (campaign name), starts_at, ends_at, status (ACTIVE/PAUSED/ENDED),
+  spend, direct_sales, halo_sales, ntb_direct_sales
+
+campaigns (Sponsored Products only — one row per campaign, current state):
+  uuid, name, campaign_type (always "featured_product" for SP), campaign_status
+  (active/paused/draft/ended), enabled, target_daily_budget, budget_type,
+  avg_missed_auctions_percentage (Instacart's own at-risk flag)
+
+campaign_budget_insights (Sponsored Products only, rolling 7-day window; join to campaigns
+  on campaign_uuid = uuid): campaign_uuid, date, missed_auction_participation_rate,
+  estimated_missed_impressions, estimated_missed_sales
+
+Notes:
+- ROAS = sales / spend. For SD use direct_sales as "sales" (halo_sales already includes
+  direct_sales — never add them together, that double-counts).
+- NTB% = ntb_attributed_sales / attributed_sales (SP) or ntb_direct_sales / direct_sales (SD),
+  as a fraction of the campaign's own sales, times 100.
+- Campaign "type" is: Sponsored Display (its own channel), or for Sponsored Products, inferred
+  from the campaign name — names containing "Acquire"/"Aquire" are Acquire, everything else
+  is Max Sales.
+- This data source does NOT include clicks, impressions, CTR, average CPC, or attributed
+  units — Instacart's pull for this account never captured those fields. If asked for them,
+  say clearly they aren't available here rather than estimating or inventing them.
+- Data covers a rolling ~20-month window and is fully replaced on every pull (no append-only
+  history beyond what's currently in these tables).`;
+
+const INSTACART_TOOLS = [
+  {
+    name: "query_instacart_data",
+    description:
+      "Run a read-only SQL SELECT query against Instacart Ads data (Sponsored Products + Sponsored Display campaign spend, sales, and new-to-brand metrics). Only SELECT/WITH, single statement, results capped at 1000 rows — include your own ORDER BY/LIMIT for predictable results.\n\n" +
+      INSTACART_SCHEMA_NOTES,
+    input_schema: {
+      type: "object",
+      properties: {
+        sql: { type: "string", description: "A single read-only SQL SELECT statement (SQLite dialect)." },
+      },
+      required: ["sql"],
+    },
+  },
+];
+
+// --- Triple Whale MCP proxy (DTC order/revenue/attribution + ad-platform
+// performance data — the default marketing/ad-spend source; windsor-ai was
+// removed from this loop because its Anthropic-native MCP connector runs
+// windsor-ai's entire tool-use loop inside a single Claude API call with no
+// visibility into it, so a slow/hung Windsor request looked like the whole
+// chat was stuck with no status update the whole time.) ---
+// Triple Whale's endpoint authenticates via an `x-api-key` header, which
+// Anthropic's server-side MCP connector can't send — it only ever sends
+// `Authorization: Bearer`, and Triple Whale rejects that for an API key
+// (confirmed: 401 "Invalid or expired token" on Bearer, 200 OK on
+// x-api-key). So instead of connecting Claude to Triple Whale directly, this
+// Worker speaks MCP to them itself and hands the resulting tools to Claude
+// as regular function-call tools — same shape as get_reviews/get_sops.
+const TRIPLEWHALE_MCP_URL = "https://mcp.triplewhale.com/v1/mcp";
+const TRIPLEWHALE_TOOLS_CACHE_MS = 10 * 60 * 1000;
+let twToolsCache = null;
+let twToolsCacheAt = 0;
+
+async function triplewhaleRequest(env, method, params, attempt = 1) {
+  const response = await fetch(TRIPLEWHALE_MCP_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "x-api-key": env.TRIPLEWHALE_API_KEY,
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: crypto.randomUUID(), method, params }),
+  });
+
+  const raw = await response.text();
+
+  // A non-2xx here can be a plain-text infra error (e.g. "no healthy
+  // upstream" from whatever fronts their endpoint), not JSON — check status
+  // before ever trying to parse, and retry once since these look transient.
+  if (!response.ok) {
+    if (attempt < 2) return triplewhaleRequest(env, method, params, attempt + 1);
+    throw new Error(`Triple Whale MCP error: ${response.status} — ${raw.slice(0, 200)}`);
+  }
+
+  // On success, Triple Whale responds with a single SSE-framed event rather
+  // than plain JSON — pull the JSON payload out of the "data:" line.
+  const dataLine = raw.split("\n").find((line) => line.startsWith("data:"));
+  let json;
+  try {
+    json = dataLine ? JSON.parse(dataLine.slice(5).trim()) : raw ? JSON.parse(raw) : {};
+  } catch {
+    throw new Error(`Triple Whale MCP returned an unparseable response: ${raw.slice(0, 200)}`);
+  }
+
+  if (json.error) {
+    throw new Error(json.error.message || "Triple Whale MCP returned an error.");
+  }
+  return json.result;
+}
+
+async function triplewhaleNotify(env, method, params) {
+  // True JSON-RPC notification (no id, no response expected) — best-effort.
+  await fetch(TRIPLEWHALE_MCP_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "x-api-key": env.TRIPLEWHALE_API_KEY,
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", method, params }),
+  }).catch(() => {});
+}
+
+// Fetches Triple Whale's tool list (converted to Anthropic's tool schema)
+// plus their server-provided workflow instructions, once per warm isolate.
+async function getTriplewhaleTools(env) {
+  const now = Date.now();
+  if (twToolsCache && now - twToolsCacheAt < TRIPLEWHALE_TOOLS_CACHE_MS) {
+    return twToolsCache;
+  }
+
+  const init = await triplewhaleRequest(env, "initialize", {
+    protocolVersion: "2025-03-26",
+    capabilities: {},
+    clientInfo: { name: "secure-cpg-demo", version: "1.0" },
+  });
+  await triplewhaleNotify(env, "notifications/initialized", {});
+  const list = await triplewhaleRequest(env, "tools/list", {});
+
+  const tools = (list.tools || []).map((t) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: t.inputSchema,
+  }));
+
+  const fetched = { tools, instructions: init.instructions || "" };
+  twToolsCache = fetched;
+  twToolsCacheAt = now;
+  return fetched;
+}
+
+async function callTriplewhaleTool(env, name, args) {
+  const result = await triplewhaleRequest(env, "tools/call", { name, arguments: args || {} });
+
+  if (result?.isError) {
+    const text = (result.content || []).map((c) => c.text).join("\n");
+    return { error: text || "Triple Whale tool returned an error." };
+  }
+  // Prefer structuredContent (already a parsed object matching the tool's
+  // outputSchema) over re-parsing the text content block.
+  if (result?.structuredContent !== undefined) return result.structuredContent;
+
+  const text = (result?.content || []).map((c) => c.text).join("\n");
+  if (!text) return { error: "Triple Whale tool returned no content." };
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { text };
+  }
+}
+
+const TRIPLEWHALE_TOOL_STATUS_LABELS = {
+  "list-stores": "Checking connected stores…",
+  "get-shop-info": "Loading store context…",
+  "get-available-tables": "Looking up available e-commerce data…",
+  "get-table-schemas": "Checking data structure…",
+  "find-sql-examples": "Finding a similar query…",
+  "get-date-range": "Resolving date range…",
+  "run-sql": "Querying e-commerce data…",
+  "search-knowledge-base": "Searching Triple Whale docs…",
+  "get-summary-kpis": "Pulling summary KPIs…",
+  "explain-metric-change": "Analyzing what changed…",
+  "pixel-attribution": "Pulling attribution data…",
+};
+
+function friendlyToolLabel(name) {
+  if (name === "get_reviews") return "Checking customer reviews…";
+  if (name === "get_sops") return "Searching SOPs…";
+  if (name === "query_instacart_data") return "Querying Instacart ad data…";
+  if (TRIPLEWHALE_TOOL_STATUS_LABELS[name]) return TRIPLEWHALE_TOOL_STATUS_LABELS[name];
+  return `Using ${name}…`;
+}
+
+// Human-readable data source for a tool call — shown in the "Checked: ..."
+// line under a chat answer, and while the loop is synthesizing an answer
+// from already-fetched data ("Pulling together data from ...").
+function toolSourceLabel(name, triplewhaleToolNames) {
+  if (name === "get_reviews") return "Reviews";
+  if (name === "get_sops") return "SOPs";
+  if (name === "query_instacart_data") return "Instacart";
+  if (triplewhaleToolNames?.has(name)) return "Triple Whale";
+  return null;
+}
+
+async function executeTool(env, name, input, triplewhaleToolNames) {
   const start = Date.now();
   logEvent("tool_call_start", { tool: name });
 
@@ -2379,6 +3481,14 @@ async function executeTool(env, name, input) {
     result = await getReviewsForTool(env, input);
   } else if (name === "get_sops") {
     result = await getSopsForTool(env, input);
+  } else if (name === "query_instacart_data") {
+    try {
+      result = await queryInstacartData(env, input?.sql);
+    } catch (err) {
+      result = { error: err.message };
+    }
+  } else if (triplewhaleToolNames?.has(name)) {
+    result = await callTriplewhaleTool(env, name, input);
   } else {
     result = { error: `Unknown tool: ${name}` };
   }
@@ -2387,60 +3497,91 @@ async function executeTool(env, name, input) {
   return result;
 }
 
-// --- Windsor.ai MCP connector (marketing/ad platform data, tool execution handled by Anthropic) ---
-const WINDSOR_MCP_SERVER_NAME = "windsor-ai";
-const WINDSOR_TOOLSET = { type: "mcp_toolset", mcp_server_name: WINDSOR_MCP_SERVER_NAME };
-const MCP_BETA_HEADER = "mcp-client-2025-11-20";
-
 // --- Agentic tool-use loop ---
 const CHAT_SYSTEM_PROMPT =
-  "You are an assistant for a CPG (consumer packaged goods) company. You help analyze customer review data, marketing/ad platform performance data, and internal Standard Operating Procedures (SOPs). Use the get_reviews tool to look up real review data before answering any question about customer sentiment, flavors, or products. Use the windsor-ai tools to look up real ad spend, ROAS, and campaign performance data before answering any question about marketing or advertising performance. Use the get_sops tool to find the right SOP before answering any question about internal processes or how to do something operationally (e.g. 'how do I trace a lot in Business Central'). The SOP tool only returns metadata, not full document text — reference the matching SOP by title, summarize what it covers based on its description, and tell the person they can open the full document from the SOPs section of the hub. If no SOP matches, say so rather than inventing steps. Never invent data for reviews, marketing, or SOPs — if a tool returns no results, say so. If a question is unrelated to all three, answer normally without calling a tool.";
-const MAX_CHAT_TOOL_ITERATIONS = 5;
+  "You are an assistant for a CPG (consumer packaged goods) company. You help analyze customer review data, marketing/ad platform performance data, e-commerce order/revenue data, Instacart ad performance data, and internal Standard Operating Procedures (SOPs). Use the get_reviews tool to look up real review data before answering any question about customer sentiment, flavors, or products. Use the triple-whale tools as the default source for marketing and advertising performance — ad spend, ROAS, blended/channel-level performance, attribution, order-level e-commerce revenue, GMV, and which channels are driving sales — before answering any marketing or advertising question that isn't specifically about Instacart. Use the query_instacart_data tool (a read-only SQL tool — its description has the full schema) to look up Instacart Sponsored Products/Sponsored Display ad performance (spend, ROAS, attributed sales, new-to-brand sales) before answering any Instacart-specific ad question; it does not have clicks, impressions, CTR, average CPC, or attributed units, so say so plainly if asked for those rather than estimating them. Use the get_sops tool to find the right SOP before answering any question about internal processes or how to do something operationally (e.g. 'how do I trace a lot in Business Central'). The SOP tool only returns metadata, not full document text — reference the matching SOP by title, summarize what it covers based on its description, and tell the person they can open the full document from the SOPs section of the hub. If no SOP matches, say so rather than inventing steps. Never invent data for reviews, marketing, e-commerce, Instacart, or SOPs — if a tool returns no results, say so. If a question is unrelated to these topics, answer normally without calling a tool. This is a narrow chat panel — use short paragraphs and simple bullet lists, and avoid markdown tables since they don't render well at this width.";
+// Triple Whale's own recommended workflow is up to ~6 sequential tool calls
+// (get-shop-info -> get-available-tables -> get-table-schemas ->
+// find-sql-examples -> get-date-range -> run-sql) before a final answer, so
+// this needs more headroom than the old windsor/reviews/SOPs-only loop did.
+const MAX_CHAT_TOOL_ITERATIONS = 8;
+const MAX_CHAT_HISTORY_MESSAGES = 20;
 
-async function runChatLoop(env, userMessage, requestId) {
+// Prior turns come from the client on every request (the Worker holds no
+// session state) — sanitize to plain {role, content} text pairs and cap
+// length so a long-running chat can't grow the request payload/context
+// unboundedly.
+function sanitizeChatHistory(history) {
+  if (!Array.isArray(history)) return [];
+  return history
+    .filter(
+      (m) =>
+        m &&
+        (m.role === "user" || m.role === "assistant") &&
+        typeof m.content === "string" &&
+        m.content.trim().length > 0,
+    )
+    .slice(-MAX_CHAT_HISTORY_MESSAGES)
+    .map((m) => ({ role: m.role, content: m.content }));
+}
+
+async function runChatLoop(env, priorMessages, userMessage, requestId, onStatus = async () => {}) {
   const overallStart = Date.now();
-  const messages = [{ role: "user", content: userMessage }];
+  const messages = [...priorMessages, { role: "user", content: userMessage }];
   const toolCalls = [];
+  // Sources fetched so far in this request — once non-empty, the next
+  // "thinking" status names them instead of showing a bare "Thinking…".
+  const usedSourceLabels = new Set();
 
-  logEvent("chat_loop_start", { requestId, messageLength: userMessage.length });
+  logEvent("chat_loop_start", {
+    requestId,
+    messageLength: userMessage.length,
+    priorMessageCount: priorMessages.length,
+  });
+
+  // Triple Whale tools are fetched (and proxied) by this Worker rather than
+  // connected via Anthropic's native mcp_servers — see the proxy section
+  // above for why. Degrade gracefully (reviews/SOPs/Instacart only) if the
+  // fetch fails, so a Triple Whale outage doesn't break the whole chat.
+  let twTools = [];
+  let twInstructions = "";
+  let twToolNames = new Set();
+  if (env.TRIPLEWHALE_API_KEY) {
+    try {
+      const fetched = await getTriplewhaleTools(env);
+      twTools = fetched.tools;
+      twInstructions = fetched.instructions;
+      twToolNames = new Set(twTools.map((t) => t.name));
+    } catch (err) {
+      logEvent("triplewhale_tools_fetch_error", { requestId, error: err.message });
+    }
+  }
+
+  const systemPrompt = twInstructions ? `${CHAT_SYSTEM_PROMPT}\n\n${twInstructions}` : CHAT_SYSTEM_PROMPT;
 
   for (let i = 0; i < MAX_CHAT_TOOL_ITERATIONS; i++) {
+    await onStatus(
+      usedSourceLabels.size > 0
+        ? `Pulling together data from ${[...usedSourceLabels].join(", ")}…`
+        : "Thinking…",
+    );
     const result = await postToClaude(
       env,
       {
         model: CLAUDE_MODEL,
         max_tokens: 1500,
-        system: CHAT_SYSTEM_PROMPT,
-        tools: [...CHAT_TOOLS, WINDSOR_TOOLSET],
-        mcp_servers: [
-          {
-            type: "url",
-            url: "https://mcp.windsor.ai/",
-            name: WINDSOR_MCP_SERVER_NAME,
-            authorization_token: env.WINDSOR_API_KEY,
-          },
-        ],
+        system: systemPrompt,
+        tools: [...CHAT_TOOLS, ...INSTACART_TOOLS, ...twTools],
         messages,
       },
-      { "anthropic-beta": MCP_BETA_HEADER },
+      {},
       { requestId, iteration: i + 1 },
     );
 
     messages.push({ role: "assistant", content: result.content });
 
-    // MCP-toolset tools (e.g. windsor-ai) are executed by Anthropic server-side and
-    // arrive already resolved as mcp_tool_use/mcp_tool_result blocks in this same
-    // response — log them, but there's nothing for us to execute or answer back.
-    for (const block of result.content) {
-      if (block.type === "mcp_tool_use") {
-        toolCalls.push({ tool: block.name, server: block.server_name, input: block.input, source: "mcp" });
-      }
-    }
-
     if (result.stop_reason !== "tool_use") {
-      // MCP-toolset turns can interleave narration text between server-executed
-      // tool calls, so the real final answer isn't necessarily the first text
-      // block — concatenate all of them in order.
+      // A turn can carry more than one text block — concatenate in order.
       const finalText = result.content
         .filter((b) => b.type === "text")
         .map((b) => b.text)
@@ -2455,10 +3596,15 @@ async function runChatLoop(env, userMessage, requestId) {
     }
 
     const toolUseBlocks = result.content.filter((b) => b.type === "tool_use");
+    const labels = [...new Set(toolUseBlocks.map((b) => friendlyToolLabel(b.name)))];
+    if (labels.length) await onStatus(labels.join(" "));
+
     const toolResults = [];
     for (const block of toolUseBlocks) {
-      const output = await executeTool(env, block.name, block.input);
-      toolCalls.push({ tool: block.name, input: block.input });
+      const output = await executeTool(env, block.name, block.input, twToolNames);
+      const source = toolSourceLabel(block.name, twToolNames);
+      if (source) usedSourceLabels.add(source);
+      toolCalls.push({ tool: block.name, server: source, input: block.input });
       toolResults.push({
         type: "tool_result",
         tool_use_id: block.id,
@@ -2472,8 +3618,243 @@ async function runChatLoop(env, userMessage, requestId) {
   throw new Error("Exceeded max tool-use iterations without a final answer.");
 }
 
+// --- Walmart Marketplace + Walmart Connect data (env.secure_cpg_walmart D1) ---
+// Unlike Instacart (pulled by a separate standalone Worker), this Worker owns
+// the pull itself: it holds the OAuth tokens (walmart_tokens table, one row
+// per API surface since Marketplace and Connect are separately credentialed)
+// and writes directly into walmart_orders/walmart_order_lines and
+// walmart_ad_campaigns/walmart_ad_performance. See migrations/0021_walmart_init.sql.
+//
+// Marketplace API auth: POST https://marketplace.walmartapis.com/v3/token,
+// Basic auth of WALMART_CLIENT_ID:WALMART_CLIENT_SECRET, grant_type=client_credentials.
+// Access tokens last 15 minutes — cached in D1 and refreshed with a safety margin.
+//
+// Walmart Connect (ads) auth is NOT wired up yet: Connect's Sponsored Search/
+// Display APIs are gated to Walmart Connect Partner Network members with
+// partner-specific credentials, which may not be the same client_credentials
+// flow as Marketplace. Confirm the exact token endpoint/headers Chris's WCPN
+// access uses before implementing syncWalmartConnect — don't guess at it.
+
+const WALMART_TOKEN_URL = "https://marketplace.walmartapis.com/v3/token";
+const WALMART_ORDERS_URL = "https://marketplace.walmartapis.com/v3/orders";
+const WALMART_TOKEN_SAFETY_MARGIN_MS = 60 * 1000; // refresh 60s before actual expiry
+
+async function getWalmartMarketplaceToken(env) {
+  const row = await env.secure_cpg_walmart
+    .prepare("SELECT access_token, expires_at FROM walmart_tokens WHERE api = 'marketplace'")
+    .first();
+
+  if (row?.access_token && row.expires_at && new Date(row.expires_at).getTime() - WALMART_TOKEN_SAFETY_MARGIN_MS > Date.now()) {
+    return row.access_token;
+  }
+
+  if (!env.WALMART_CLIENT_ID || !env.WALMART_CLIENT_SECRET) {
+    throw new Error("WALMART_CLIENT_ID / WALMART_CLIENT_SECRET Worker secrets are not set.");
+  }
+
+  const basicAuth = btoa(`${env.WALMART_CLIENT_ID}:${env.WALMART_CLIENT_SECRET}`);
+  const response = await fetch(WALMART_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth}`,
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+      "WM_QOS.CORRELATION_ID": crypto.randomUUID(),
+      "WM_SVC.NAME": "Walmart Marketplace",
+    },
+    body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Walmart token request failed: ${response.status} — ${errText}`);
+  }
+
+  const token = await response.json();
+  const expiresAt = new Date(Date.now() + (token.expires_in || 900) * 1000).toISOString();
+
+  await env.secure_cpg_walmart
+    .prepare(
+      `INSERT INTO walmart_tokens (api, access_token, expires_at, updated_at)
+       VALUES ('marketplace', ?, ?, datetime('now'))
+       ON CONFLICT(api) DO UPDATE SET access_token = excluded.access_token, expires_at = excluded.expires_at, updated_at = excluded.updated_at`,
+    )
+    .bind(token.access_token, expiresAt)
+    .run();
+
+  return token.access_token;
+}
+
+async function walmartMarketplaceGet(env, url) {
+  const accessToken = await getWalmartMarketplaceToken(env);
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "WM_SEC.ACCESS_TOKEN": accessToken,
+      "WM_QOS.CORRELATION_ID": crypto.randomUUID(),
+      "WM_SVC.NAME": "Walmart Marketplace",
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Walmart Marketplace API error: ${response.status} — ${errText}`);
+  }
+
+  return response.json();
+}
+
+function firstWalmartLineStatus(orderLine) {
+  return orderLine?.orderLineStatuses?.orderLineStatus?.[0]?.status || null;
+}
+
+async function upsertWalmartOrder(env, order) {
+  const purchaseOrderId = order.purchaseOrderId;
+  if (!purchaseOrderId) return;
+
+  const lines = order.orderLines?.orderLine || [];
+  const overallStatus = firstWalmartLineStatus(lines[0]) || null;
+  const orderDate = order.orderDate ? new Date(order.orderDate).toISOString() : null;
+
+  await env.secure_cpg_walmart
+    .prepare(
+      `INSERT INTO walmart_orders (purchase_order_id, customer_order_id, order_date, status, order_type, shipping_method, raw_json, synced_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(purchase_order_id) DO UPDATE SET
+         customer_order_id = excluded.customer_order_id,
+         order_date = excluded.order_date,
+         status = excluded.status,
+         order_type = excluded.order_type,
+         shipping_method = excluded.shipping_method,
+         raw_json = excluded.raw_json,
+         synced_at = excluded.synced_at`,
+    )
+    .bind(
+      purchaseOrderId,
+      order.customerOrderId || null,
+      orderDate,
+      overallStatus,
+      order.orderType || null,
+      order.shippingInfo?.methodCode || null,
+      JSON.stringify(order),
+    )
+    .run();
+
+  await env.secure_cpg_walmart.prepare("DELETE FROM walmart_order_lines WHERE purchase_order_id = ?").bind(purchaseOrderId).run();
+
+  for (const line of lines) {
+    const productCharge = line.charges?.charge?.find((c) => c.chargeType === "PRODUCT") || line.charges?.charge?.[0];
+    await env.secure_cpg_walmart
+      .prepare(
+        `INSERT INTO walmart_order_lines (purchase_order_id, line_number, sku, item_name, quantity, charge_amount, charge_type, line_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        purchaseOrderId,
+        line.lineNumber || null,
+        line.item?.sku || null,
+        line.item?.productName || null,
+        Number(line.orderLineQuantity?.amount) || null,
+        productCharge?.chargeAmount?.amount ?? null,
+        productCharge?.chargeType || null,
+        firstWalmartLineStatus(line),
+      )
+      .run();
+  }
+}
+
+// Pulls Marketplace orders created since `createdStartDate` (ISO date),
+// following nextCursor pagination. Defaults to the last 7 days, which covers
+// the daily-cron case; pass an explicit earlier date for a backfill (the API
+// itself refuses anything older than ~180 days — there is no way around that
+// via Marketplace Orders API or the bulk Reports API, confirmed against
+// Walmart's own docs 2026-09-15).
+//
+// Loops over all three shipNodeType values — the API defaults to
+// SellerFulfilled only, which would silently miss WFS- or 3PL-fulfilled
+// orders. Running all three explicitly is the only way to be sure nothing's
+// missed without knowing in advance which fulfillment types this account uses.
+const WALMART_SYNC_MAX_PAGES = 60; // safety cap per ship-node type — 60 x 200 = 12,000 orders
+const WALMART_SHIP_NODE_TYPES = ["SellerFulfilled", "WFSFulfilled", "3PLFulfilled"];
+
+function toWalmartDate(date) {
+  return date.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+async function syncWalmartOrdersForShipNodeType(env, startDate, shipNodeType) {
+  let nextCursor = `?createdStartDate=${encodeURIComponent(startDate)}&limit=200&shipNodeType=${shipNodeType}`;
+  let totalSynced = 0;
+  let pages = 0;
+
+  while (nextCursor) {
+    if (pages >= WALMART_SYNC_MAX_PAGES) {
+      throw new Error(
+        `Walmart sync (${shipNodeType}) stopped after ${WALMART_SYNC_MAX_PAGES} pages (${totalSynced} orders) — more pages remain, re-run to continue.`,
+      );
+    }
+    pages += 1;
+
+    const url = nextCursor.startsWith("http") ? nextCursor : WALMART_ORDERS_URL + nextCursor;
+    const data = await walmartMarketplaceGet(env, url);
+    const orders = data?.list?.elements?.order || [];
+
+    for (const order of orders) {
+      await upsertWalmartOrder(env, order);
+      totalSynced += 1;
+    }
+
+    const newCursor = data?.list?.meta?.nextCursor || null;
+    if (newCursor && newCursor === nextCursor) {
+      throw new Error(`Walmart sync (${shipNodeType}) stopped — nextCursor did not advance after ${totalSynced} orders.`);
+    }
+    nextCursor = newCursor;
+  }
+
+  return totalSynced;
+}
+
+async function syncWalmartMarketplaceOrders(env, createdStartDate) {
+  const startDate = createdStartDate || toWalmartDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+  let totalSynced = 0;
+  const byType = {};
+
+  for (const shipNodeType of WALMART_SHIP_NODE_TYPES) {
+    const count = await syncWalmartOrdersForShipNodeType(env, startDate, shipNodeType);
+    byType[shipNodeType] = count;
+    totalSynced += count;
+  }
+
+  return { totalSynced, byType };
+}
+
+async function getWalmartStatus(env) {
+  const [orderStats, campaignCount, perfStats, marketplaceToken] = await Promise.all([
+    env.secure_cpg_walmart.prepare("SELECT COUNT(*) as count, MAX(synced_at) as lastSyncedAt FROM walmart_orders").first(),
+    env.secure_cpg_walmart.prepare("SELECT COUNT(*) as count FROM walmart_ad_campaigns").first(),
+    env.secure_cpg_walmart.prepare("SELECT COUNT(*) as count, MAX(synced_at) as lastSyncedAt FROM walmart_ad_performance").first(),
+    env.secure_cpg_walmart.prepare("SELECT expires_at, updated_at FROM walmart_tokens WHERE api = 'marketplace'").first(),
+  ]);
+
+  return {
+    marketplace: {
+      orderCount: orderStats?.count || 0,
+      lastSyncedAt: orderStats?.lastSyncedAt || null,
+      tokenLastRefreshed: marketplaceToken?.updated_at || null,
+      configured: Boolean(env.WALMART_CLIENT_ID && env.WALMART_CLIENT_SECRET),
+    },
+    connect: {
+      campaignCount: campaignCount?.count || 0,
+      performanceRowCount: perfStats?.count || 0,
+      lastSyncedAt: perfStats?.lastSyncedAt || null,
+      configured: false, // not yet wired up — see comment above syncWalmartMarketplaceOrders
+    },
+  };
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.pathname === "/api/validate-reviews") {
@@ -2492,40 +3873,81 @@ export default {
     }
 
     if (url.pathname === "/api/chat" && request.method === "POST") {
+      // AI Assistant feature is pulled from the live hub (cost control — every
+      // message here spends real Anthropic API credits) but kept fully intact
+      // for a fast relaunch. To bring it back: flip AI_ASSISTANT_ENABLED to
+      // true, move disabled-features/ai-assistant.html back into public/, and
+      // re-add its two "AI Assistant" nav-item links (index.html, sops.html).
+      if (!AI_ASSISTANT_ENABLED) {
+        return jsonResponse({ error: "The AI Assistant is not currently available." }, 404);
+      }
+
       const requestId = crypto.randomUUID();
       const handlerStart = Date.now();
-      try {
-        const body = await request.json().catch(() => null);
-        const userMessage = body?.message;
 
-        if (!userMessage || typeof userMessage !== "string") {
-          return jsonResponse({ error: "Request body must include a 'message' string." }, 400);
-        }
+      const body = await request.json().catch(() => null);
+      const userMessage = body?.message;
 
-        logEvent("chat_request_received", { requestId, messageLength: userMessage.length });
-
-        const result = await runChatLoop(env, userMessage, requestId);
-
-        logEvent("chat_request_complete", {
-          requestId,
-          totalDurationMs: Date.now() - handlerStart,
-          iterations: result.iterations,
-          toolCallCount: result.toolCalls.length,
-        });
-
-        return jsonResponse({
-          response: result.finalText,
-          toolCalls: result.toolCalls,
-          iterations: result.iterations,
-        });
-      } catch (err) {
-        logEvent("chat_request_error", {
-          requestId,
-          totalDurationMs: Date.now() - handlerStart,
-          error: err.message,
-        });
-        return jsonResponse({ error: err.message }, 500);
+      if (!userMessage || typeof userMessage !== "string") {
+        return jsonResponse({ error: "Request body must include a 'message' string." }, 400);
       }
+
+      const priorMessages = sanitizeChatHistory(body?.history);
+
+      logEvent("chat_request_received", {
+        requestId,
+        messageLength: userMessage.length,
+        priorMessageCount: priorMessages.length,
+      });
+
+      // Streamed as newline-delimited JSON so the UI can show what the agent
+      // is doing (thinking / checking a tool) instead of just a spinner —
+      // the loop can take 10-20s end to end across multiple Claude calls.
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      const encoder = new TextEncoder();
+      const writeLine = (obj) => writer.write(encoder.encode(JSON.stringify(obj) + "\n"));
+
+      const run = async () => {
+        try {
+          const result = await runChatLoop(env, priorMessages, userMessage, requestId, (message) =>
+            writeLine({ type: "status", message }),
+          );
+
+          logEvent("chat_request_complete", {
+            requestId,
+            totalDurationMs: Date.now() - handlerStart,
+            iterations: result.iterations,
+            toolCallCount: result.toolCalls.length,
+          });
+
+          await writeLine({
+            type: "final",
+            response: result.finalText,
+            toolCalls: result.toolCalls,
+            iterations: result.iterations,
+          });
+        } catch (err) {
+          logEvent("chat_request_error", {
+            requestId,
+            totalDurationMs: Date.now() - handlerStart,
+            error: err.message,
+          });
+          await writeLine({ type: "error", error: err.message });
+        } finally {
+          await writer.close();
+        }
+      };
+
+      ctx.waitUntil(run());
+
+      return new Response(readable, {
+        headers: {
+          "content-type": "application/x-ndjson; charset=utf-8",
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+        },
+      });
     }
 
     if (url.pathname === "/api/analyze-reviews" && request.method === "GET") {
@@ -2558,6 +3980,37 @@ export default {
       const q = url.searchParams.get("q") || "";
       const index = await getSopIndex(env);
       return jsonResponse({ query: q, results: searchSops(index, q) });
+    }
+
+    if (url.pathname === "/api/sops" && request.method === "POST") {
+      const contentLength = Number(request.headers.get("content-length") || 0);
+      if (contentLength > MAX_FILE_BYTES + 100_000) {
+        return jsonResponse({ error: "The file is larger than 5 MB." }, 413);
+      }
+
+      const formData = await request.formData().catch(() => null);
+      const file = formData?.get("file");
+      const title = String(formData?.get("title") || "").trim();
+      const description = String(formData?.get("description") || "");
+      const category = String(formData?.get("category") || "");
+      const tagsRaw = String(formData?.get("tags") || "");
+      const tags = tagsRaw.split(",").map((t) => t.trim()).filter(Boolean);
+
+      if (!(file instanceof File)) {
+        return jsonResponse({ error: "Choose a PDF file to upload." }, 400);
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        return jsonResponse({ error: "The file is larger than 5 MB." }, 413);
+      }
+      if (file.type && file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+        return jsonResponse({ error: "SOPs must be uploaded as a PDF." }, 422);
+      }
+      if (!title) {
+        return jsonResponse({ error: "Give the SOP a title." }, 422);
+      }
+
+      const sop = await addSop(env, { title, description, category, tags, file });
+      return jsonResponse({ ok: true, sop });
     }
 
     const sopFileMatch = url.pathname.match(/^\/api\/sops\/([a-z0-9-]+)\/file$/);
@@ -2620,6 +4073,19 @@ export default {
     if (url.pathname === "/api/reviews/sentiment-analysis" && request.method === "GET") {
       try {
         const analysis = await analyzeRecentReviewSentiment(env, new Date());
+        if (!analysis) {
+          return jsonResponse({ error: "No review data found." }, 404);
+        }
+        return jsonResponse(analysis);
+      } catch (err) {
+        return jsonResponse({ error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/reviews/category-actions" && request.method === "GET") {
+      try {
+        const group = url.searchParams.get("group") || "all";
+        const analysis = await analyzeCategoryPriorityActions(env, group, new Date());
         if (!analysis) {
           return jsonResponse({ error: "No review data found." }, 404);
         }
@@ -3257,6 +4723,222 @@ export default {
       return jsonResponse({ ok: true, count: body.length });
     }
 
+    if (url.pathname === "/api/marketing/ad-budget/versions" && request.method === "GET") {
+      const versions = await getAdBudgetVersions(env);
+      const activeVersionId = await getActiveAdBudgetVersionId(env);
+      return jsonResponse({ versions, activeVersionId });
+    }
+
+    const adBudgetVersionMatch = url.pathname.match(/^\/api\/marketing\/ad-budget\/versions\/([A-Za-z0-9_-]+)$/);
+    if (adBudgetVersionMatch && request.method === "GET") {
+      const detail = await getAdBudgetVersionDetail(env, adBudgetVersionMatch[1]);
+      if (!detail) return jsonResponse({ error: "Version not found." }, 404);
+      return jsonResponse(detail);
+    }
+
+    if (adBudgetVersionMatch && request.method === "PUT") {
+      const body = await request.json().catch(() => null);
+      if (!validAdBudgetVersionBody(body)) {
+        return jsonResponse({ error: "Version needs a name, a year, and a lineItems array." }, 422);
+      }
+      await saveAdBudgetVersion(env, adBudgetVersionMatch[1], body);
+      return jsonResponse({ ok: true });
+    }
+
+    if (adBudgetVersionMatch && request.method === "DELETE") {
+      await deleteAdBudgetVersionRow(env, adBudgetVersionMatch[1]);
+      return jsonResponse({ ok: true });
+    }
+
+    const adBudgetDuplicateMatch = url.pathname.match(/^\/api\/marketing\/ad-budget\/versions\/([A-Za-z0-9_-]+)\/duplicate$/);
+    if (adBudgetDuplicateMatch && request.method === "POST") {
+      const body = await request.json().catch(() => ({}));
+      const newId =
+        typeof body.newId === "string" && CAMPAIGN_ID_PATTERN.test(body.newId) ? body.newId : `ABV${Date.now()}`;
+      const newName = typeof body.newName === "string" && body.newName.trim() ? body.newName : "Copy";
+      const detail = await duplicateAdBudgetVersion(env, adBudgetDuplicateMatch[1], newId, newName);
+      if (!detail) return jsonResponse({ error: "Source version not found." }, 404);
+      return jsonResponse(detail);
+    }
+
+    if (url.pathname === "/api/marketing/ad-budget/active" && request.method === "PUT") {
+      const body = await request.json().catch(() => null);
+      if (!body || typeof body.versionId !== "string") {
+        return jsonResponse({ error: "Body needs a versionId." }, 422);
+      }
+      await setActiveAdBudgetVersionId(env, body.versionId);
+      return jsonResponse({ ok: true });
+    }
+
+    if (url.pathname === "/api/marketing/ad-budget/actuals" && request.method === "GET") {
+      const channel = url.searchParams.get("channel") || "Amazon";
+      const year = Number(url.searchParams.get("year")) || new Date().getFullYear();
+      if (!AD_BUDGET_CHANNELS.includes(channel)) {
+        return jsonResponse({ error: `Unsupported channel. Supported: ${AD_BUDGET_CHANNELS.join(", ")}` }, 422);
+      }
+      const { actuals, twError } = await getAdChannelActuals(env, channel, year);
+      return jsonResponse({ actuals, twError });
+    }
+
+    if (url.pathname === "/api/marketing/ad-budget/traffic-actuals" && request.method === "GET") {
+      const channel = url.searchParams.get("channel") || "Amazon";
+      const year = Number(url.searchParams.get("year")) || new Date().getFullYear();
+      if (!AD_BUDGET_CHANNELS.includes(channel)) {
+        return jsonResponse({ error: `Unsupported channel. Supported: ${AD_BUDGET_CHANNELS.join(", ")}` }, 422);
+      }
+      // Amazon uses the D1 cache fed by the Sophie Society/GitHub relay;
+      // Walmart reads its own Marketplace API order data directly (see
+      // getWalmartTrafficActualsFromD1) — covers the last ~180 days, which is
+      // as far back as Walmart's Orders API itself allows.
+      if (channel === "Walmart") {
+        try {
+          const actuals = await getWalmartTrafficActualsFromD1(env, year);
+          return jsonResponse({ actuals, twError: null });
+        } catch (err) {
+          return jsonResponse({ actuals: [], twError: err.message });
+        }
+      }
+      const actuals = await getAmazonTrafficActualsFromCache(env, year);
+      return jsonResponse({ actuals, twError: null });
+    }
+
+    // Written to by the nightly scheduled Claude agent (Sophie Society's
+    // query_sales_traffic tool has no server-callable REST API, so a
+    // scheduled agent pulls it and pushes results here instead of a
+    // Cloudflare Cron Trigger fetching it directly). Whole-batch upsert,
+    // keyed by (asin, date) — safe to re-post overlapping days.
+    if (url.pathname === "/api/marketing/ad-budget/traffic-actuals/ingest" && request.method === "POST") {
+      const body = await request.json().catch(() => null);
+      if (!Array.isArray(body) || !body.every(validAmazonTrafficActualsRow)) {
+        return jsonResponse(
+          {
+            error:
+              "Body must be a JSON array of {asin, date, sessions, unitsOrdered, salesAmount} with asin one of " +
+              AD_BUDGET_ASINS.map((p) => p.asin).join("/") +
+              " and date as YYYY-MM-DD.",
+          },
+          422,
+        );
+      }
+      const count = await upsertAmazonTrafficActuals(env, body);
+      return jsonResponse({ ok: true, count });
+    }
+
+    // Manual trigger for the same GitHub pull the nightly Cron Trigger does —
+    // useful for testing without waiting for the schedule.
+    if (url.pathname === "/api/marketing/ad-budget/traffic-actuals/sync-github" && request.method === "POST") {
+      try {
+        const result = await syncAmazonTrafficActualsFromGithub(env);
+        return jsonResponse({ ok: true, ...result });
+      } catch (err) {
+        return jsonResponse({ ok: false, error: err.message }, 502);
+      }
+    }
+
+    if (url.pathname === "/api/marketing/ad-budget/actuals/manual" && request.method === "GET") {
+      const channel = url.searchParams.get("channel") || "Amazon";
+      const rows = await getManualAdActuals(env, channel);
+      return jsonResponse({ rows });
+    }
+
+    if (url.pathname === "/api/marketing/ad-budget/actuals/manual" && request.method === "PUT") {
+      const body = await request.json().catch(() => null);
+      if (!Array.isArray(body) || !body.every(validAdManualActualsRow)) {
+        return jsonResponse(
+          {
+            error: "Body must be a JSON array of {channel, month, clicks, spend, orders, adSales} with channel in " + AD_BUDGET_CHANNELS.join("/") + " and month as YYYY-MM.",
+          },
+          422,
+        );
+      }
+      await putManualAdActuals(env, body);
+      return jsonResponse({ ok: true, count: body.length });
+    }
+
+    if (url.pathname === "/api/marketing/ad-budget/income-actuals" && request.method === "GET") {
+      const channel = url.searchParams.get("channel") || "Amazon";
+      const year = Number(url.searchParams.get("year")) || new Date().getFullYear();
+      const itemAccounts = channel === "Walmart" ? WALMART_INCOME_BC_ACCOUNTS : AD_BUDGET_INCOME_BC_ACCOUNTS;
+      const revenueDimensionCode = channel === "Walmart" ? WALMART_SALES_CHANNEL_DIMENSION_CODE : AMAZON_SALES_CHANNEL_DIMENSION_CODE;
+      try {
+        const [feeActuals, revenueActuals] = await Promise.all([
+          getIncomeActualsFromBc(env, year, itemAccounts),
+          getRevenueActualsFromBc(env, year, AD_BUDGET_REVENUE_BC_ACCOUNTS, revenueDimensionCode),
+        ]);
+        return jsonResponse({ actuals: [...feeActuals, ...revenueActuals], bcError: null });
+      } catch (err) {
+        return jsonResponse({ actuals: [], bcError: err.message });
+      }
+    }
+
+    if (url.pathname === "/api/marketing/ad-budget/income-actuals/manual" && request.method === "GET") {
+      const channel = url.searchParams.get("channel") || "Amazon";
+      const rows = await getIncomeActualsManual(env, channel);
+      return jsonResponse({ rows });
+    }
+
+    if (url.pathname === "/api/marketing/ad-budget/income-actuals/manual" && request.method === "PUT") {
+      const channel = url.searchParams.get("channel") || "Amazon";
+      const body = await request.json().catch(() => null);
+      if (!Array.isArray(body) || !body.every(validIncomeActualsManualRow)) {
+        return jsonResponse(
+          {
+            error:
+              "Body must be a JSON array of {month, itemKey, amount} with month as YYYY-MM and itemKey one of " +
+              AD_BUDGET_INCOME_ITEMS.map((i) => i.key).join("/"),
+          },
+          422,
+        );
+      }
+      await putIncomeActualsManual(env, channel, body);
+      return jsonResponse({ ok: true, count: body.length });
+    }
+
+    if (url.pathname === "/api/walmart/status" && request.method === "GET") {
+      const status = await getWalmartStatus(env);
+      return jsonResponse(status);
+    }
+
+    if (url.pathname === "/api/walmart/refresh/marketplace" && request.method === "POST") {
+      try {
+        const body = await request.json().catch(() => ({}));
+        const { totalSynced, byType } = await syncWalmartMarketplaceOrders(env, body?.createdStartDate);
+        return jsonResponse({ ok: true, ordersSynced: totalSynced, byShipNodeType: byType });
+      } catch (err) {
+        return jsonResponse({ ok: false, error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/walmart/refresh/connect" && request.method === "POST") {
+      return jsonResponse(
+        {
+          ok: false,
+          error:
+            "Walmart Connect sync is not wired up yet — need the exact WCPN token endpoint/auth details before implementing it.",
+        },
+        501,
+      );
+    }
+
     return env.ASSETS.fetch(request);
+  },
+
+  // Nightly Cron Trigger (see wrangler.jsonc `triggers.crons`) — pulls the
+  // GitHub relay file a scheduled Claude agent maintains and upserts it into
+  // ad_budget_traffic_actuals. See the comment above syncAmazonTrafficActualsFromGithub
+  // for why this indirection exists instead of a direct pull.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(
+      syncAmazonTrafficActualsFromGithub(env).catch((err) => {
+        console.error("ad-budget traffic actuals GitHub sync failed:", err.message);
+      }),
+    );
+    if (env.WALMART_CLIENT_ID && env.WALMART_CLIENT_SECRET) {
+      ctx.waitUntil(
+        syncWalmartMarketplaceOrders(env).catch((err) => {
+          console.error("Walmart Marketplace sync failed:", err.message);
+        }),
+      );
+    }
   },
 };

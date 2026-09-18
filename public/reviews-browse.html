@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Every Body Eat — Browse All Reviews</title>
+<style>
+  :root {
+  --bg:#FFFFFF; --bg-soft:#F7F5EE; --card:#FFFFFF; --card-border:#E8E4D6;
+  --text:#1A1A1A; --text-dim:#6B6B64; --text-dimmer:#78766E; --ink:#1A1A1A;
+  --pretzel:#2878FF; --pretzel-text:#1E5FDB;
+  --lime:#CADC30; --lime-text:#5C6B0A;
+  --orange:#F99420; --teal:#0099F3; --sky:#87CCF4; --magenta:#CC1F97;
+  --rose:#ED1C24; --rose-text:#B0181D; --grey:#878787; --focus:#2878FF;
+  --brand:#2878FF; --brand-dark:#1A1A1A; --border:#E8E4D6;
+  --gray:#6B6B64; --pos:#00bf63; --neu:#78766E; --neg:#ff3131;
+  --pos-bg:rgba(0,191,99,0.15); --pos-light:rgba(0,191,99,0.07);
+  --neg-bg:rgba(255,49,49,0.12); --neg-light:rgba(255,49,49,0.06);
+  --neu-bg:rgba(120,118,110,0.12); --brand-light:rgba(40,120,255,0.08);
+}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* NAV */
+  .sidenav { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #fff; border-right: 1px solid #E8E4D6; overflow-y: auto; z-index: 100; display: flex; flex-direction: column; transition: transform 0.2s ease; }
+  .nav-collapsed .sidenav { transform: translateX(-220px); }
+  .nav-collapsed .main { margin-left: 0 !important; }
+  #nav-toggle { position: fixed; top: 20px; left: 204px; z-index: 200; background: var(--ink); border: none; border-radius: 999px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 2px 8px rgba(0,0,0,0.18); transition: left 0.2s ease, background 0.2s ease, color 0.2s ease; }
+  #nav-toggle svg { width: 16px; height: 16px; transition: transform 0.2s ease; }
+  .nav-collapsed #nav-toggle { left: 12px; background: var(--lime); color: #1A1A1A; }
+  .nav-collapsed #nav-toggle svg { transform: rotate(180deg); }
+  .main { transition: margin-left 0.2s ease; }
+  .hub-brand { display: flex; align-items: center; height: 62px; padding: 0 18px; border-bottom: 1px solid #E8E4D6; text-decoration: none; color: inherit; transition: background 0.15s; }
+  .hub-brand:hover { background: #f6f6f7; }
+  .hub-brand-mark { display: grid; width: 32px; height: 32px; margin-right: 10px; place-items: center; border-radius: 9px; background: #1A1A1A; color: #fff; font-size: 12px; font-weight: 850; letter-spacing: -.04em; }
+  .hub-brand-name { font-size: 15px; font-weight: 760; letter-spacing: -.02em; color: #1A1A1A; }
+  .nav-section { padding: 12px 8px 4px 16px; color: #78766E; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .sidenav-footer { margin-top: auto; padding: 14px 16px; border-top: 1px solid #E8E4D6; color: #6B6B64; font-size: 11px; }
+  .sidenav a { display: block; padding: 9px 16px; color: #62636a; text-decoration: none; font-size: 14px; font-weight: 530; border-radius: 9px; margin: 2px 8px; transition: background 0.15s, color 0.15s; }
+  .sidenav a:hover { background: #f6f6f7; color: #1A1A1A; }
+  .sidenav a.active { background: #d9d9db; color: #1A1A1A; }
+
+  /* MAIN */
+  .main { margin-left: 220px; min-height: 100vh; }
+  .section { padding: 32px 36px; border-bottom: 1px solid var(--card-border); background: var(--bg); }
+  .section:last-child { border-bottom: none; }
+  h2.page-title { font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin-bottom: 4px; }
+  .subtitle { color: var(--gray); font-size: 13px; margin-bottom: 24px; }
+
+  /* SENTIMENT PILL */
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .pill-pos { background: var(--pos-bg); color: var(--pos); }
+  .pill-neu { background: var(--neu-bg); color: var(--neu); }
+  .pill-neg { background: var(--neg-bg); color: var(--neg); }
+
+  /* FILTER CONTROLS */
+  .filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .filter-row select, .filter-row input[type=date], .filter-row input[type=text] {
+    padding: 7px 12px; border: 1px solid var(--card-border); border-radius: 999px; font-size: 13px;
+    background: white; color: var(--text); font-family: inherit; outline: none;
+  }
+  .filter-row select:focus, .filter-row input:focus { border-color: var(--brand); }
+
+  /* REVIEW CARD */
+  .review-card { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; }
+  .review-card-header { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; }
+  .review-card-meta { flex: 1; }
+  .review-title { font-weight: 600; font-size: 14px; color: var(--text); }
+  .review-meta { font-size: 11px; color: var(--gray); margin-top: 2px; }
+  .review-content { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
+  .review-content.clamped { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .review-expand-btn { display: inline-block; margin-top: 4px; padding: 0; background: none; border: none; color: var(--brand); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .review-expand-btn:hover { text-decoration: underline; }
+  .review-themes { margin-top: 8px; }
+
+  .theme-tag { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; margin: 1px; }
+  .theme-pos { background: var(--pos-bg); color: var(--pos); }
+  .theme-neg { background: var(--neg-bg); color: var(--neg); }
+  .theme-cat { background: var(--brand-light); color: var(--brand); }
+
+  .pg-label { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; background: #f3f4f6; color: #374151; }
+  .pg-Thins { background: #dbeafe; color: #1d4ed8; }
+  .pg-Cookies { background: #fce7f3; color: #be185d; }
+  .pg-Pretzel { background: #fef3c7; color: #92400e; }
+  .pg-CrispbreadCrackers { background: #dbeafe; color: #0099F3; }
+
+  .source-badge { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 10.5px; font-weight: 700; }
+  .source-badge-amazon { background: #fef3c7; color: #92400e; }
+  .source-badge-okendo { background: #ede9fe; color: #6d28d9; }
+
+  .no-results { text-align: center; padding: 40px; color: var(--gray); font-size: 14px; }
+
+  .back-btn { background: none; border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 700; color: var(--text); cursor: pointer; margin-bottom: 18px; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; text-decoration: none; }
+  .back-btn:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-light); }
+
+  .loading-spinner { display: inline-block; width: 22px; height: 22px; border: 3px solid #e5e7eb; border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .context-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--brand-light); color: var(--brand); border-radius: 999px; padding: 5px 14px; font-size: 12px; font-weight: 700; margin-right: 8px; margin-bottom: 8px; }
+  .context-chip button { background: none; border: none; color: inherit; font-size: 13px; cursor: pointer; padding: 0; margin-left: 2px; line-height: 1; }
+</style>
+</head>
+<body>
+
+<button id="nav-toggle" onclick="document.body.classList.toggle('nav-collapsed')" title="Toggle sidebar" aria-label="Toggle sidebar">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6" /></svg>
+</button>
+
+<nav class="sidenav">
+  <a class="hub-brand" href="/">
+    <div class="hub-brand-mark">LP</div>
+    <div class="hub-brand-name">LaunchPlan Hub</div>
+  </a>
+  <div class="nav-section">Reviews</div>
+  <a href="/reviews-by-category.html">📊 Reviews by Category</a>
+  <a class="active" href="/reviews-browse.html">🔍 Browse All Reviews</a>
+  <div class="sidenav-footer" id="sidenav-footer">Loading live data…</div>
+</nav>
+
+<div class="main">
+  <div class="section">
+    <h2 class="page-title">Browse All Reviews</h2>
+    <p class="subtitle">Every written review across Amazon and Okendo. Filter by product group, source, flavor, rating, sentiment, category, helpful votes, and date range.</p>
+
+    <div id="active-context" style="display:none;margin-bottom:6px"></div>
+
+    <div class="filter-row">
+      <select id="f-source" onchange="filterReviews()">
+        <option value="">All Reviews</option>
+        <option value="amazon">Amazon Reviews</option>
+        <option value="okendo">Okendo Reviews</option>
+      </select>
+      <select id="f-group" onchange="onGroupChange()">
+        <option value="">All Products</option>
+      </select>
+      <select id="f-flavor" onchange="filterReviews()">
+        <option value="">All Flavors</option>
+      </select>
+      <select id="f-category" onchange="filterReviews()">
+        <option value="">All Categories</option>
+      </select>
+      <select id="f-rating" onchange="filterReviews()">
+        <option value="">All Ratings</option>
+        <option value="5">5 Stars</option>
+        <option value="4">4 Stars</option>
+        <option value="3">3 Stars</option>
+        <option value="2">2 Stars</option>
+        <option value="1">1 Star</option>
+      </select>
+      <select id="f-sentiment" onchange="filterReviews()">
+        <option value="">All Sentiments</option>
+        <option value="positive">Positive</option>
+        <option value="neutral">Neutral</option>
+        <option value="negative">Negative</option>
+      </select>
+      <select id="f-helpful" onchange="filterReviews()">
+        <option value="">Any Helpful Count</option>
+        <option value="1">1+ Helpful Votes</option>
+        <option value="5">5+ Helpful Votes</option>
+      </select>
+      <select id="f-verified" onchange="filterReviews()">
+        <option value="">All Buyers</option>
+        <option value="Yes">Verified Only</option>
+      </select>
+      <select id="f-packsize" onchange="filterReviews()">
+        <option value="">All Pack Sizes</option>
+      </select>
+      <input type="date" id="f-date-from" onchange="filterReviews()" placeholder="From date">
+      <input type="date" id="f-date-to" onchange="filterReviews()" placeholder="To date">
+      <select id="f-sort" onchange="filterReviews()">
+        <option value="newest">Newest First</option>
+        <option value="oldest">Oldest First</option>
+        <option value="highest">Highest Rated</option>
+        <option value="lowest">Lowest Rated</option>
+      </select>
+      <input type="text" id="f-search" oninput="filterReviews()" placeholder="Search text..." style="min-width:160px">
+      <button type="button" class="review-expand-btn" style="align-self:center" onclick="clearAllFilters()">Clear all</button>
+    </div>
+
+    <div id="filter-stats-bar" style="display:flex;align-items:center;gap:24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin-bottom:12px;flex-wrap:wrap">
+      <div id="review-count-line" style="font-size:13px;color:var(--gray)">Loading reviews…</div>
+      <div id="filter-avg-rating" style="font-size:13px;font-weight:700;color:var(--brand);display:none">
+        Avg Rating: <span id="filter-avg-val">—</span> ★
+      </div>
+      <div id="filter-sentiment-summary" style="font-size:12px;color:var(--gray);display:none">
+        <span id="filter-pos-pct" style="color:var(--pos);font-weight:600"></span>
+        <span style="margin:0 6px">·</span>
+        <span id="filter-neu-pct" style="color:#f59e0b;font-weight:600"></span>
+        <span style="margin:0 6px">·</span>
+        <span id="filter-neg-pct" style="color:var(--neg);font-weight:600"></span>
+      </div>
+    </div>
+
+    <div id="reviews-table-wrap"><p class="no-results"><span class="loading-spinner"></span>Loading reviews…</p></div>
+  </div>
+</div>
+
+<script>
+// ---- shared category taxonomy (mirrors src/index.js REVIEW_THEME_DEFS, grouped
+// into the dashboard's 6 primary + 2 secondary issue buckets). Computed
+// client-side from title+content so it works even for rows whose stored
+// `themes` column is empty (see plan notes). Only applied to rating<=3. ----
+const POSITIVE_PATTERNS = [
+  /delici|tasty|yummy|yum\b|love.{0,15}flavor|amazing.{0,10}taste|so good|great taste|wonderful flavor|wonderful taste/i,
+  /crisp|crunch|crunchy|texture/i,
+  /gluten.?free|gluten free/i,
+  /dairy.?free|dairy free|vegan/i,
+  /nut.?free|nut free|allergy|allerg|school safe|allergen/i,
+  /alternative|replacement|instead of|substitute|swap/i,
+  /buy again|will order|reorder|repurchase|keep buying|stock up/i,
+  /clean ingredient|simple ingredient|real ingredient|minimal ingredient|whole food/i,
+  /can.t stop|addictive|addicted|one more|hard to stop/i,
+  /worth.{0,10}(price|money|it)|great value|good price|affordable/i,
+];
+
+const CATEGORY_DEFS = [
+  ["damaged_broken", "Damaged / Broken", [/broken|crumbs|crumbled|crushed|shattered|in pieces/i, /arriv.{0,10}(damaged|broken|crushed|smashed)|damaged.{0,10}shipping|shipping damage/i]],
+  ["packaging", "Packaging", [/packag|reseal|seal|bag.{0,15}(broke|open|problem)|zip/i]],
+  ["flavor", "Flavor", [/bland|dry\b|flavorless|tasteless|no flavor|boring|watery|not much flavor/i, /too spicy|too hot|very spicy|burn.{0,15}mouth|spice.{0,10}too much/i, /too salt|very salt|overly salt|way too salt/i, /not.{0,10}pretzel|nothing like.{0,10}pretzel|doesn.t taste like.{0,10}pretzel|not a (real )?pretzel/i]],
+  ["texture", "Texture", [/mushy|soggy|too (hard|tough|dense)|chip.{0,10}tooth|rock hard/i]],
+  ["value_price", "Value / Price", [/not enough|small amount|tiny.{0,10}(portion|amount|serving)|overpriced|too expensive|not worth.{0,10}(price|money)/i]],
+  ["freshness", "Freshness", [/stale|old\b|expired|not fresh|gone bad/i]],
+  ["ingredient_dietary", "Ingredient / Dietary Claims", [/mislead|false.{0,15}(claim|label|ad)|lie|not as describ|bait.{0,5}switch|misrepresent/i, /palm oil|hidden.{0,10}(ingredient|oil)|unlisted.{0,10}ingredient/i]],
+];
+const CATEGORY_LABELS = Object.fromEntries(CATEGORY_DEFS.map(([k, d]) => [k, d]));
+CATEGORY_LABELS.positive_aside = "Positive-Aside Mentions";
+
+function classifyCategories(r) {
+  if (Number(r.rating) > 3) return [];
+  const text = `${r.title || ""} ${r.content || ""}`;
+  const cats = [];
+  for (const [key, , patterns] of CATEGORY_DEFS) {
+    if (patterns.some((p) => p.test(text))) cats.push(key);
+  }
+  if (POSITIVE_PATTERNS.some((p) => p.test(text))) cats.push("positive_aside");
+  return cats;
+}
+
+const GROUP_LABELS = { "Thins": "Snack Thins", "Cookies": "Cookie Bites", "Pretzel": "Pretzels", "Crispbread Crackers": "Crispbread Crackers" };
+function groupLabel(pg) { return GROUP_LABELS[pg] || pg; }
+
+let REVIEWS = [];
+const params = new URLSearchParams(location.search);
+const idsFilter = (params.get("ids") || "").split(",").map((s) => s.trim()).filter(Boolean);
+
+function esc(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function fmtNum(n) { return (Number(n) || 0).toLocaleString(); }
+function fmtPct(n) { return (Number(n) || 0).toFixed(1) + "%"; }
+function starStr(n) { return "★".repeat(n) + "☆".repeat(5 - n); }
+function sentPill(s) {
+  const cls = s === "positive" ? "pill-pos" : s === "negative" ? "pill-neg" : "pill-neu";
+  return `<span class="pill ${cls}">${esc(s.charAt(0).toUpperCase() + s.slice(1))}</span>`;
+}
+function pgLabelHtml(pg) {
+  const cls = `pg-${String(pg).replace(/[^a-zA-Z]/g, "")}`;
+  return `<span class="pg-label ${cls}">${esc(groupLabel(pg))}</span>`;
+}
+function sourceBadge(source) {
+  if (source !== "amazon" && source !== "okendo") return "";
+  return `<span class="source-badge source-badge-${source}">${source === "amazon" ? "Amazon" : "Okendo"}</span>`;
+}
+function categoryTagsHtml(cats) {
+  return cats.map((k) => `<span class="theme-tag theme-cat">${esc(CATEGORY_LABELS[k] || k)}</span>`).join(" ");
+}
+
+function toggleReviewContent(id, btn) {
+  const el = document.getElementById(id);
+  const expanded = !el.classList.contains("clamped");
+  el.classList.toggle("clamped", expanded);
+  btn.textContent = expanded ? "Read more" : "Show less";
+}
+
+function reviewCardHtml(r) {
+  const cats = classifyCategories(r);
+  return `
+    <div class="review-card">
+      <div class="review-card-header">
+        <div style="font-size:18px;color:#f59e0b;min-width:80px">${starStr(r.rating)}</div>
+        <div class="review-card-meta">
+          <div class="review-title">${esc(r.title)}</div>
+          <div class="review-meta">
+            ${pgLabelHtml(r.product_group)} &nbsp;
+            <strong>${esc(r.flavor)}</strong> &nbsp;&middot;&nbsp;
+            ${r.date} &nbsp;&middot;&nbsp;
+            ${sentPill(r.sentiment)} &nbsp;&middot;&nbsp;
+            ${sourceBadge(r.source)} &nbsp;&middot;&nbsp;
+            ${r.verified === "Yes" ? "✅ Verified" : "🔗 Unverified"}
+            ${r.helpful > 0 ? ` &nbsp;&middot;&nbsp; 👍 ${r.helpful} found helpful` : ""}
+            ${r.pack_size ? ` &nbsp;&middot;&nbsp; <span style="background:#f1f5f9;border-radius:4px;padding:1px 6px;font-size:11px;color:var(--gray)">${esc(r.pack_size)}</span>` : ""}
+          </div>
+        </div>
+      </div>
+      <div class="review-content${(r.content || "").length > 400 ? " clamped" : ""}" id="rc-${esc(r.id)}">${esc(r.content)}</div>
+      ${(r.content || "").length > 400 ? `<button type="button" class="review-expand-btn" onclick="toggleReviewContent('rc-${esc(r.id)}', this)">Read more</button>` : ""}
+      ${cats.length ? `<div class="review-themes">${categoryTagsHtml(cats)}</div>` : ""}
+    </div>`;
+}
+
+function renderReviews(list) {
+  const wrap = document.getElementById("reviews-table-wrap");
+  const countLine = document.getElementById("review-count-line");
+  countLine.textContent = `Showing ${list.length} of ${REVIEWS.length} reviews`;
+  if (list.length === 0) {
+    wrap.innerHTML = '<div class="no-results">No reviews match your filters.</div>';
+    return;
+  }
+  wrap.innerHTML = list.map(reviewCardHtml).join("");
+}
+
+function updateFilterStats(list) {
+  const avgBox = document.getElementById("filter-avg-rating");
+  const sentBox = document.getElementById("filter-sentiment-summary");
+  if (list.length === 0) { avgBox.style.display = "none"; sentBox.style.display = "none"; return; }
+  const rated = list.filter((r) => r.rating > 0);
+  const avg = rated.length ? (rated.reduce((s, r) => s + r.rating, 0) / rated.length).toFixed(2) : "—";
+  document.getElementById("filter-avg-val").textContent = avg;
+  avgBox.style.display = "block";
+
+  const pos = list.filter((r) => r.sentiment === "positive").length;
+  const neu = list.filter((r) => r.sentiment === "neutral").length;
+  const neg = list.filter((r) => r.sentiment === "negative").length;
+  document.getElementById("filter-pos-pct").textContent = `${fmtNum(pos)} positive (${fmtPct((pos / list.length) * 100)})`;
+  document.getElementById("filter-neu-pct").textContent = `${fmtNum(neu)} neutral (${fmtPct((neu / list.length) * 100)})`;
+  document.getElementById("filter-neg-pct").textContent = `${fmtNum(neg)} negative (${fmtPct((neg / list.length) * 100)})`;
+  sentBox.style.display = "block";
+}
+
+function filterReviews() {
+  const source = document.getElementById("f-source").value;
+  const group = document.getElementById("f-group").value;
+  const flavor = document.getElementById("f-flavor").value;
+  const category = document.getElementById("f-category").value;
+  const rating = document.getElementById("f-rating").value;
+  const sentiment = document.getElementById("f-sentiment").value;
+  const helpful = parseInt(document.getElementById("f-helpful").value) || 0;
+  const verified = document.getElementById("f-verified").value;
+  const packsize = document.getElementById("f-packsize").value;
+  const dateFrom = document.getElementById("f-date-from").value;
+  const dateTo = document.getElementById("f-date-to").value;
+  const search = document.getElementById("f-search").value.toLowerCase();
+  const sortBy = (document.getElementById("f-sort") || { value: "newest" }).value;
+
+  const filtered = REVIEWS.filter((r) => {
+    if (idsFilter.length && !idsFilter.includes(r.id)) return false;
+    if (source && r.source !== source) return false;
+    if (group && r.product_group !== group) return false;
+    if (flavor && r.flavor !== flavor) return false;
+    if (category && !classifyCategories(r).includes(category)) return false;
+    if (rating && r.rating !== parseInt(rating)) return false;
+    if (sentiment && r.sentiment !== sentiment) return false;
+    if (helpful && r.helpful < helpful) return false;
+    if (verified && r.verified !== verified) return false;
+    if (packsize && r.pack_size !== packsize) return false;
+    if (dateFrom && r.date < dateFrom) return false;
+    if (dateTo && r.date > dateTo) return false;
+    if (search && !(r.title.toLowerCase().includes(search) || r.content.toLowerCase().includes(search) || r.author.toLowerCase().includes(search) || r.flavor.toLowerCase().includes(search) || r.product_group.toLowerCase().includes(search))) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    if (sortBy === "oldest") return (a.date || "").localeCompare(b.date || "");
+    if (sortBy === "highest") return b.rating - a.rating;
+    if (sortBy === "lowest") return a.rating - b.rating;
+    return (b.date || "").localeCompare(a.date || "");
+  });
+
+  renderReviews(filtered);
+  updateFilterStats(filtered);
+}
+
+function onGroupChange() {
+  initFlavorDropdown();
+  filterReviews();
+}
+
+function initFlavorDropdown() {
+  const group = document.getElementById("f-group").value;
+  const sel = document.getElementById("f-flavor");
+  const current = sel.value;
+  const flavors = [...new Set(REVIEWS.filter((r) => !group || r.product_group === group).map((r) => r.flavor))].sort();
+  sel.innerHTML = '<option value="">All Flavors</option>' + flavors.map((f) => `<option value="${esc(f)}">${esc(f)}</option>`).join("");
+  if (flavors.includes(current)) sel.value = current;
+}
+
+function initGroupDropdown() {
+  const known = ["Thins", "Cookies", "Pretzel", "Crispbread Crackers"];
+  const present = [...new Set(REVIEWS.map((r) => r.product_group))];
+  const ordered = known.filter((g) => present.includes(g));
+  const extra = present.filter((g) => !known.includes(g)).sort();
+  const sel = document.getElementById("f-group");
+  sel.innerHTML = '<option value="">All Products</option>' + [...ordered, ...extra].map((g) => `<option value="${esc(g)}">${esc(groupLabel(g))}</option>`).join("");
+}
+
+function initCategoryDropdown() {
+  const sel = document.getElementById("f-category");
+  const opts = [...CATEGORY_DEFS.map(([k, d]) => [k, d]), ["positive_aside", CATEGORY_LABELS.positive_aside]];
+  sel.innerHTML = '<option value="">All Categories</option>' + opts.map(([k, d]) => `<option value="${esc(k)}">${esc(d)}</option>`).join("");
+}
+
+function initPackSizeDropdown() {
+  const sizes = [...new Set(REVIEWS.map((r) => r.pack_size).filter(Boolean))].sort();
+  document.getElementById("f-packsize").innerHTML = '<option value="">All Pack Sizes</option>' + sizes.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+}
+
+function clearAllFilters() {
+  ["f-source", "f-group", "f-flavor", "f-category", "f-rating", "f-sentiment", "f-helpful", "f-verified", "f-packsize"].forEach((id) => (document.getElementById(id).value = ""));
+  document.getElementById("f-date-from").value = "";
+  document.getElementById("f-date-to").value = "";
+  document.getElementById("f-search").value = "";
+  document.getElementById("f-sort").value = "newest";
+  idsFilter.length = 0;
+  history.replaceState(null, "", location.pathname);
+  document.getElementById("active-context").style.display = "none";
+  initFlavorDropdown();
+  filterReviews();
+}
+
+function applyUrlParams() {
+  const map = { source: "f-source", group: "f-group", flavor: "f-flavor", category: "f-category", rating: "f-rating", sentiment: "f-sentiment", dateFrom: "f-date-from", dateTo: "f-date-to", sort: "f-sort", search: "f-search" };
+  const chips = [];
+  for (const [param, id] of Object.entries(map)) {
+    const val = params.get(param);
+    if (val && document.getElementById(id)) {
+      document.getElementById(id).value = val;
+      chips.push(`${param}: ${val}`);
+    }
+  }
+  if (idsFilter.length) chips.push(`${idsFilter.length} flagged review${idsFilter.length === 1 ? "" : "s"}`);
+  const title = params.get("title");
+  if (title) chips.push(title);
+
+  if (chips.length) {
+    const box = document.getElementById("active-context");
+    box.style.display = "block";
+    box.innerHTML = chips.map((c) => `<span class="context-chip">${esc(c)}</span>`).join("") +
+      `<span class="context-chip" style="background:#f3f4f6;color:var(--gray)"><a href="/reviews-browse.html" style="color:inherit;text-decoration:none">Clear filters ✕</a></span>`;
+  }
+}
+
+async function load() {
+  try {
+    const res = await fetch("/api/reviews/report?source=all");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    REVIEWS = data.reviews || [];
+    document.getElementById("sidenav-footer").textContent = `${fmtNum(REVIEWS.length)} reviews loaded`;
+
+    initGroupDropdown();
+    initFlavorDropdown();
+    initCategoryDropdown();
+    initPackSizeDropdown();
+    applyUrlParams();
+    filterReviews();
+  } catch (err) {
+    document.getElementById("reviews-table-wrap").innerHTML = `<div class="no-results">Couldn't load reviews right now (${esc(err.message)}).</div>`;
+    console.error("Failed to load reviews", err);
+  }
+}
+
+load();
+</script>
+</body>
+</html>
