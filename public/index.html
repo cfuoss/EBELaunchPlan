@@ -757,6 +757,7 @@
       <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
       <symbol id="i-collapse" viewBox="0 0 24 24"><path d="M9 3v3a2 2 0 0 1-2 2H4M15 3v3a2 2 0 0 0 2 2h3M9 21v-3a2 2 0 0 0-2-2H4M15 21v-3a2 2 0 0 1 2-2h3"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></symbol>
     </svg>
 
     <div class="overlay" id="overlay"></div>
@@ -996,7 +997,7 @@
       const dashboardCategories = [
         { name: "Company Analytics", icon: "i-building", tone: "violet", description: "Company-wide KPIs, financial health, and cross-functional performance.", count: 0 },
         { name: "Executive Summaries", icon: "i-file", tone: "orange", description: "Leadership-ready weekly, monthly, and quarterly decision summaries.", count: 0 },
-        { name: "Marketing Analytics", icon: "i-megaphone", tone: "orange", description: "Customer voice, campaigns, content, retail media, and acquisition.", count: 4 },
+        { name: "Marketing Analytics", icon: "i-megaphone", tone: "orange", description: "Customer voice, campaigns, content, retail media, and acquisition.", count: 6 },
         { name: "Sales Analytics", icon: "i-dollar", tone: "green", description: "Retailer, channel, SKU, velocity, and distribution performance.", count: 0 },
         { name: "Marketing/Sales Summaries", icon: "i-merge", tone: "violet", description: "One shared narrative connecting marketing activity to commercial results.", count: 0 },
         { name: "Operations Analytics", icon: "i-gear", tone: "green", description: "Inventory, demand planning, fulfillment, and supply chain visibility.", count: 4 }
@@ -1656,6 +1657,15 @@
           </article>
           <article class="card tool-card">
             <div class="tool-top"><div class="tool-icon orange">${icon("i-chart")}</div><span class="badge live">Ready</span></div>
+            <h3>Reviews by Category &amp; Product Group</h3>
+            <p>Monthly sentiment trend, negative/neutral reviews ranked by category, per-product-group breakdowns, and an AI-generated priority-actions brief — filterable by product and source.</p>
+            <div class="actions">
+              <a class="button primary" href="/reviews-by-category.html">${icon("i-eye")}Open dashboard</a>
+              <a class="button" href="/reviews-browse.html">${icon("i-eye")}Browse all reviews</a>
+            </div>
+          </article>
+          <article class="card tool-card">
+            <div class="tool-top"><div class="tool-icon orange">${icon("i-chart")}</div><span class="badge live">Ready</span></div>
             <h3>Instacart Campaign Analysis</h3>
             <p>Sponsored Products and Sponsored Display performance, NTB% and ROAS trends, and campaign-level spend breakdowns.</p>
             <div class="actions">
@@ -1676,6 +1686,14 @@
             <p>Sales and ad spend, budget vs actual, by month across Amazon, Walmart, TikTok, and DTC — actuals synced from Triple Whale, budgets saved as loadable versions.</p>
             <div class="actions">
               <a class="button primary" href="/ebe-marketing-budget-tracker.html">${icon("i-eye")}Open tool</a>
+            </div>
+          </article>
+          <article class="card tool-card">
+            <div class="tool-top"><div class="tool-icon orange">${icon("i-chart")}</div><span class="badge live">Ready</span></div>
+            <h3>Ad Spend Budget Planner</h3>
+            <p>Bottoms-up ad spend budgeting by channel — Clicks, CPC, and Conversion Rate drive Spend, Ad Orders, Ad Sales, and ROAS, vs actuals synced live from Triple Whale. Starts with Amazon.</p>
+            <div class="actions">
+              <a class="button primary" href="/amazon-ad-budget-planner.html">${icon("i-eye")}Open tool</a>
             </div>
           </article>` : "";
 

@@ -1,0 +1,2061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Every Body Eat — Ad Spend Budget Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #FFFFFF;
+  --bg-soft: #F7F5EE;
+  --card: #FFFFFF;
+  --card-border: #E8E4D6;
+  --text: #1A1A1A;
+  --text-dim: #6B6B64;
+  --text-dimmer: #78766E;
+  --ink: #1A1A1A;
+  --pretzel: #2878FF;
+  --pretzel-text: #1E5FDB;
+  --lime: #CADC30;
+  --lime-text: #5C6B0A;
+  --orange: #F99420;
+  --teal: #0099F3;
+  --sky: #87CCF4;
+  --magenta: #CC1F97;
+  --rose: #ED1C24;
+  --rose-text: #B0181D;
+  --grey: #878787;
+  --pos: #00bf63;
+  --neg: #ff3131;
+  --neu: #78766E;
+  --pos-bg: rgba(0,191,99,0.15);
+  --pos-light: rgba(0,191,99,0.07);
+  --neg-bg: rgba(255,49,49,0.12);
+  --neg-light: rgba(255,49,49,0.06);
+  --neu-bg: rgba(120,118,110,0.12);
+  --brand-light: rgba(40,120,255,0.08);
+  --focus: #2878FF;
+  --border: #E8E4D6;
+  --brand: #2878FF;
+  --brand-dark: #1A1A1A;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; font-family: 'Barlow Semi Condensed', sans-serif; color: var(--text);
+  background: var(--bg);
+}
+h1, h2, h3 { font-family: 'Anton', sans-serif; font-weight: 400; margin: 0 0 8px; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+a { color: var(--pretzel-text); }
+
+.sidenav {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+  background: var(--bg-soft); border-right: 1px solid var(--card-border);
+  overflow-y: auto; z-index: 100; padding: 0 0 40px; transition: transform .2s;
+}
+.sidenav.collapsed { transform: translateX(-220px); }
+.hub-brand { display: flex; align-items: center; height: 52px; padding: 0 16px; border-bottom: 1px solid var(--card-border); text-decoration: none; color: inherit; transition: background .15s; }
+.hub-brand:hover { background: rgba(0,0,0,0.05); }
+.hub-brand-mark { display: grid; width: 28px; height: 28px; margin-right: 9px; place-items: center; border-radius: 8px; background: var(--ink); color: #fff; font-size: 11px; font-weight: 850; letter-spacing: -.04em; flex: none; }
+.hub-brand-name { font-size: 13px; font-weight: 700; letter-spacing: -.01em; color: var(--ink); }
+.sidenav-logo { padding: 20px 16px 12px; border-bottom: 1px solid var(--card-border); }
+.sidenav-logo h1 { color: var(--ink); font-size: 15px; letter-spacing: 0.03em; }
+.sidenav-logo p { color: var(--text-dim); font-size: 11px; margin: 4px 0 0; }
+.nav-section { padding: 14px 8px 4px 16px; color: var(--text-dimmer); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.sidenav a { display: block; padding: 8px 16px; color: var(--ink); text-decoration: none; font-size: 14px; border-radius: 4px; margin: 1px 8px; transition: background .15s; cursor: pointer; border-left: 3px solid transparent; }
+.sidenav a:hover, .sidenav a.active { background: rgba(0,0,0,0.07); }
+.sidenav a.soon { color: var(--text-dimmer); cursor: default; }
+.sidenav a.soon:hover { background: none; }
+.navtoggle {
+  position: fixed; top: 16px; left: 176px; z-index: 200;
+  width: 32px; height: 32px; border-radius: 999px; border: none; background: var(--ink);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px;
+  transition: left .2s;
+}
+.navtoggle.collapsed-state { left: 16px; }
+.navtoggle span { width: 16px; height: 2px; background: #fff; display: block; }
+.main { margin-left: 220px; padding: 32px 36px 80px; min-height: 100vh; transition: margin .2s; }
+.main.expanded { margin-left: 0; }
+
+.pagehead { background: var(--bg); border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+.pagehead h1 { font-size: 30px; }
+.pagehead .sub { color: var(--text-dim); font-size: 14px; margin-top: 4px; }
+.savestate { font-size: 12px; color: var(--text-dimmer); font-family: 'IBM Plex Mono', monospace; }
+
+.versionbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; padding: 14px 16px; background: var(--bg-soft); border: 1px solid var(--card-border); border-radius: 12px; }
+.versionbar label { margin: 0; }
+.versionbar select { width: auto; min-width: 220px; }
+
+.section { display: none; }
+.section.active { display: block; }
+
+.card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; box-shadow: 0 1px 3px rgba(20,20,10,.05); padding: 20px; margin-bottom: 20px; }
+.card h2 { font-size: 20px; margin-bottom: 4px; }
+.card .desc { color: var(--text-dim); font-size: 13px; margin-bottom: 16px; }
+
+.banner { display: flex; gap: 10px; align-items: flex-start; background: var(--brand-light); border: 1px solid var(--card-border); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: var(--text-dim); }
+.banner.warn { background: var(--neg-light); }
+.banner strong { color: var(--text); }
+
+.btn { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; border: 2px solid var(--ink); background: transparent; color: var(--ink); padding: 8px 18px; font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 600; font-size: 14px; cursor: pointer; transition: all .15s; }
+.btn:hover { background: rgba(0,0,0,0.05); }
+.btn-primary { background: var(--ink); color: #fff; }
+.btn-primary:hover { background: #333; }
+.btn-mini { border-radius: 999px; border: 1px solid var(--card-border); background: #fff; color: var(--text-dim); padding: 4px 12px; font-size: 12px; cursor: pointer; }
+.btn-mini:hover { border-color: var(--ink); color: var(--ink); }
+.btn-danger { border-color: var(--rose-text); color: var(--rose-text); }
+.btn-danger:hover { background: var(--neg-light); }
+.btn[disabled] { background: transparent; border-color: var(--card-border); color: var(--text-dimmer); cursor: not-allowed; }
+
+label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; font-weight: 600; }
+input, select, textarea { padding: 9px 11px; border: 1px solid var(--card-border); border-radius: 8px; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 14px; color: var(--text); background: #fff; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--brand-light); }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: right; font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dimmer); border-bottom: 2px solid var(--ink); padding: 8px 10px; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+td { padding: 7px 10px; border-bottom: 1px solid var(--card-border); vertical-align: middle; }
+.numcell { font-family: 'IBM Plex Mono', monospace; text-align: right; font-variant-numeric: tabular-nums; }
+.rowlabel { font-weight: 600; white-space: nowrap; }
+.rowlabel.sub { font-weight: 400; color: var(--text-dim); padding-left: 18px; }
+.budget-input { width: 78px; padding: 4px 6px; font-size: 12px; text-align: right; font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+.dim { color: var(--text-dimmer); }
+.var-pos { color: var(--pos); font-weight: 600; }
+.var-neg { color: var(--neg); font-weight: 600; }
+.total-col { border-left: 2px solid var(--ink); font-weight: 700; }
+.month-group { border-left: 2px solid var(--card-border); }
+.month-head { text-align: center; }
+#resultsTable-Amazon th, #resultsTable-Walmart th { text-align: right; }
+#resultsTable-Amazon th.month-head, #resultsTable-Walmart th.month-head { text-align: center; }
+
+/* Frozen first column (row labels) and frozen header row(s) for the three
+   tall Amazon/Walmart tables (PPC Budget vs Actuals, Traffic Budget inputs,
+   Traffic Budget by Product). Each wrapper div is given a bounded max-height +
+   overflow:auto so it's a real internal scroll container — sticky needs a
+   genuinely scrolling ancestor to anchor to; a div with only overflow-x:auto
+   and an unbounded height never actually scrolls vertically, so
+   top-stickiness silently does nothing in that case.
+
+   border-collapse:separate (with border-spacing:0, so cells still look
+   adjacent) is required here too: with the default border-collapse:collapse,
+   a sticky cell's border is painted as part of the shared collapsed-border
+   layer rather than the cell's own box, so it doesn't repaint correctly at
+   the cell's stuck position and visibly disappears on scroll. All the
+   borders these tables use are one-sided (border-bottom or border-left only,
+   never a matching border on the adjacent cell's opposite side), so
+   switching to separate does not create doubled border lines. */
+#resultsTable-Amazon,
+#organicTable-Amazon,
+#productTrafficTable-Amazon,
+#resultsTable-Walmart,
+#organicTable-Walmart,
+#productTrafficTable-Walmart {
+  border-collapse: separate; border-spacing: 0;
+}
+
+#resultsTable-Amazon td.rowlabel,
+#organicTable-Amazon td.rowlabel,
+#productTrafficTable-Amazon td.rowlabel,
+#resultsTable-Walmart td.rowlabel,
+#organicTable-Walmart td.rowlabel,
+#productTrafficTable-Walmart td.rowlabel {
+  position: sticky; left: 0; z-index: 2; background: var(--card);
+}
+#resultsTable-Amazon thead th,
+#organicTable-Amazon thead th,
+#productTrafficTable-Amazon thead th,
+#resultsTable-Walmart thead th,
+#organicTable-Walmart thead th,
+#productTrafficTable-Walmart thead th {
+  position: sticky; z-index: 3; background: var(--card);
+}
+#resultsTable-Amazon thead tr:first-child th,
+#productTrafficTable-Amazon thead tr:first-child th,
+#organicTable-Amazon thead th,
+#resultsTable-Walmart thead tr:first-child th,
+#productTrafficTable-Walmart thead tr:first-child th,
+#organicTable-Walmart thead th {
+  top: 0;
+}
+/* Corner cells (blank first <th> in each header row) need both axes; higher
+   z-index so they render above both the sticky header row and sticky column. */
+#resultsTable-Amazon th:first-child,
+#organicTable-Amazon th:first-child,
+#productTrafficTable-Amazon th:first-child,
+#resultsTable-Walmart th:first-child,
+#organicTable-Walmart th:first-child,
+#productTrafficTable-Walmart th:first-child {
+  left: 0; z-index: 4;
+}
+/* position:sticky on the group-header's own <td> doesn't stick reliably
+   because that cell spans every column (colspan) — sticky only behaves
+   predictably on a plain, non-spanning cell (confirmed against the working
+   td.rowlabel above). The fix is an inner, non-spanning element instead.
+   resultsTable-Amazon/-Walmart have no per-product group-header rows, so this
+   only matters for the other two per channel. */
+#organicTable-Amazon tr.group-header .sticky-label,
+#productTrafficTable-Amazon tr.group-header .sticky-label,
+#organicTable-Walmart tr.group-header .sticky-label,
+#productTrafficTable-Walmart tr.group-header .sticky-label {
+  position: sticky; left: 10px; display: inline-block;
+}
+.channel-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; flex: none; }
+.group-title { font-size: 22px; margin: 32px 0 14px; padding-bottom: 8px; border-bottom: 2px solid var(--ink); display: flex; align-items: center; }
+.group-title:first-child { margin-top: 0; }
+.card h2.sub { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--card-border); }
+tr.group-header td { background: var(--bg-soft); font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dimmer); padding: 9px 10px 5px; border-bottom: 1px solid var(--card-border); }
+.tag { display: inline-block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: .03em; padding: 1px 6px; border-radius: 999px; background: var(--neu-bg); color: var(--text-dimmer); margin-left: 6px; }
+.tag.tw { background: var(--pos-bg); color: var(--pos); }
+.tag.manual { background: var(--brand-light); color: var(--pretzel-text); }
+
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.stat { background: var(--bg-soft); border: 1px solid var(--card-border); border-radius: 12px; padding: 14px 16px; }
+.stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dimmer); font-family: 'IBM Plex Mono', monospace; margin-bottom: 6px; }
+.stat .value { font-size: 22px; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.soon-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+.soon-card { border: 1px dashed var(--card-border); border-radius: 12px; padding: 16px; text-align: center; color: var(--text-dimmer); font-size: 13px; }
+
+.tabbar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 2px solid var(--card-border); }
+.tabbtn { padding: 10px 20px; border: none; background: transparent; font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 600; font-size: 15px; color: var(--text-dim); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.tabbtn:hover { color: var(--ink); }
+.tabbtn.active { color: var(--ink); border-bottom-color: var(--ink); }
+.amztab { display: none; }
+.amztab.active { display: block; }
+
+.step { display: flex; gap: 14px; margin-bottom: 18px; }
+.step-num { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; }
+.step-body h3 { font-size: 16px; margin-bottom: 4px; }
+.step-body p { color: var(--text-dim); font-size: 14px; margin: 0; }
+</style>
+</head>
+<body>
+
+<button class="navtoggle" id="navtoggle" onclick="toggleNav()"><span></span><span></span><span></span></button>
+
+<nav class="sidenav" id="sidenav">
+  <a class="hub-brand" href="/" title="Back to LaunchPlan Hub">
+    <div class="hub-brand-mark">LP</div>
+    <div class="hub-brand-name">LaunchPlan Hub</div>
+  </a>
+  <div class="sidenav-logo">
+    <h1>EVERY BODY EAT</h1>
+    <p>Ad Spend Budget Planner</p>
+  </div>
+  <a onclick="showSection('overview')" data-section="overview">Overview</a>
+  <div class="nav-section">Channels</div>
+  <a onclick="showSection('ch-Amazon')" data-section="ch-Amazon" style="border-left:3px solid #F99420; padding-left:13px;">Amazon</a>
+  <a onclick="showSection('ch-Walmart')" data-section="ch-Walmart" style="border-left:3px solid #0099F3; padding-left:13px;">Walmart</a>
+  <a class="soon" style="border-left:3px solid #CADC30; padding-left:13px;">TikTok Shop <span class="tag">Soon</span></a>
+  <a class="soon" style="border-left:3px solid #2878FF; padding-left:13px;">Shopify <span class="tag">Soon</span></a>
+  <div class="nav-section">Reference</div>
+  <a onclick="showSection('manual')" data-section="manual">Manual Actuals</a>
+  <a onclick="showSection('howto')" data-section="howto">How It Works</a>
+</nav>
+
+<div class="main" id="main">
+  <div class="pagehead">
+    <div>
+      <h1 id="pageTitle">Overview</h1>
+      <div class="sub" id="pageSub">Bottoms-up ad spend budgeting: Clicks, CPC, and Conversion Rate drive Spend, Ad Orders, Ad Sales, and ROAS.</div>
+    </div>
+    <div class="savestate" id="savestate">Loading…</div>
+  </div>
+
+  <div class="versionbar">
+    <div>
+      <label>Budget Version</label>
+      <select id="versionSelect" onchange="onVersionSelect()"></select>
+    </div>
+    <div>
+      <label>Year</label>
+      <input type="number" id="yearDisplay" class="mono" style="width:80px;" disabled>
+    </div>
+    <div style="margin-left:auto; display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="saveCurrentVersion()">Save</button>
+      <button class="btn" onclick="newVersion()">New Version</button>
+      <button class="btn" onclick="duplicateVersion()">Duplicate</button>
+      <button class="btn btn-danger" onclick="deleteVersion()">Delete</button>
+    </div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section class="section active" id="section-overview">
+    <div class="banner" id="actualsBanner"></div>
+    <div class="summary-grid" id="overviewStats"></div>
+    <div class="card">
+      <h2>Channels</h2>
+      <div class="desc">Bottoms-up budgeting is live for Amazon and Walmart. Other channels are planned next.</div>
+      <div class="soon-grid">
+        <div class="soon-card" style="border-color:#F99420; color:var(--text);"><strong>Amazon</strong><br>Live — see the Amazon tab</div>
+        <div class="soon-card" style="border-color:#0099F3; color:var(--text);"><strong>Walmart</strong><br>Live — see the Walmart tab</div>
+        <div class="soon-card">TikTok Shop<br>Coming soon</div>
+        <div class="soon-card">Shopify<br>Coming soon</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AMAZON -->
+  <section class="section" id="section-ch-Amazon">
+    <h1 class="group-title"><span class="channel-dot" style="background:#F99420;"></span>Amazon</h1>
+
+    <div class="tabbar" id="amazonTabbar">
+      <button class="tabbtn active" data-chtab="income" onclick="showChannelTab('Amazon','income')">Income Statement</button>
+      <button class="tabbtn" data-chtab="traffic" onclick="showChannelTab('Amazon','traffic')">Traffic Budget</button>
+      <button class="tabbtn" data-chtab="ppc" onclick="showChannelTab('Amazon','ppc')">PPC Budget</button>
+    </div>
+
+    <!-- INCOME STATEMENT -->
+    <div class="amztab active" id="amztab-income">
+      <div class="card">
+        <h2>Income Statement Rates</h2>
+        <div class="desc">One rate per item (not per month) — applied as a % of Gross Revenue to compute that item's Budget every month. Amazon Advertising isn't listed here: its Budget and Actual come directly from the PPC Budget tab.</div>
+        <div style="overflow-x:auto;">
+          <table id="incomeRatesTable-Amazon" style="max-width:440px;"></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Amazon Income Statement — Budget vs Actuals</h2>
+        <div class="desc">Revenue Budget rows roll up the Traffic Budget's per-product Gross Sales into 4 product lines; Revenue Actuals, the 8 rate-driven items, and Amazon Advertising's Actual all pull live from Business Central only (Revenue via each sales invoice's Amazon Sales Channel dimension; the rest are Amazon-only accounts by definition) — no other data source feeds this table's Actuals; a Manual Actual (see "Manual Actuals") always overrides Business Central for a given month.</div>
+        <div class="tabbar periodview-tabbar">
+          <button class="tabbtn periodview-tab active" data-period="monthly" onclick="setPeriodView('monthly')">Monthly</button>
+          <button class="tabbtn periodview-tab" data-period="quarterly" onclick="setPeriodView('quarterly')">Quarterly</button>
+        </div>
+        <div class="banner" id="incomeActualsNote-Amazon" style="margin-bottom:14px;"></div>
+        <div style="overflow-x:auto;">
+          <table id="incomeStatementTable-Amazon"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRAFFIC BUDGET -->
+    <div class="amztab" id="amztab-traffic">
+      <div class="card">
+        <h2>Traffic Budget</h2>
+        <div class="desc">Type monthly Sessions, Conversion Rate, AOV, and Repeat Sales % for each product group. Units Ordered and Gross Sales are calculated automatically and shown under each product group's inputs. Saved together with the PPC Budget inputs on the PPC Budget tab.</div>
+        <div style="overflow: auto; max-height: 70vh;">
+          <table id="organicTable-Amazon"></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Traffic Budget by Product — Budget vs Actuals</h2>
+        <div class="desc">Sessions, Conversion Rate, Units Ordered, AOV, and Gross Sales vs actuals for each product group. Actuals refresh nightly from Amazon Seller Central Sales &amp; Traffic data.</div>
+        <div class="tabbar periodview-tabbar">
+          <button class="tabbtn periodview-tab active" data-period="monthly" onclick="setPeriodView('monthly')">Monthly</button>
+          <button class="tabbtn periodview-tab" data-period="quarterly" onclick="setPeriodView('quarterly')">Quarterly</button>
+        </div>
+        <div class="banner" id="trafficActualsNote-Amazon" style="margin-bottom:14px;"></div>
+        <div style="overflow: auto; max-height: 70vh;">
+          <table id="productTrafficTable-Amazon"></table>
+        </div>
+
+        <div class="desc" style="margin-top:20px;">Total Gross Sales (Units Ordered × AOV) for each product group, then the sum across all product groups. Ad Sales % uses live Actual Ad Sales (not ASIN-specific, so it stays blended); Repeat Sales % is the revenue-weighted average of each product's Traffic Budget input; Organic Sales % is the remainder.</div>
+        <div style="overflow-x:auto;">
+          <table id="trafficSummaryTable-Amazon"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PPC BUDGET -->
+    <div class="amztab" id="amztab-ppc">
+      <div class="card">
+        <h2>PPC Budget</h2>
+        <div class="desc">Type monthly Clicks, CPC, Conversion Rate, and AOV. Spend, Ad Orders, and Ad Sales are calculated automatically. Nothing is saved until you click "Save" in the version bar above.</div>
+        <div style="overflow-x:auto;">
+          <table id="inputsTable-Amazon"></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Amazon Ad Spend Budget vs Actuals</h2>
+        <div class="desc">Actuals pull live from Triple Whale (Every Body Eat Amazon Ads account) on every load; a month with a manual entry (see "Manual Actuals") uses that instead.</div>
+        <div class="tabbar periodview-tabbar">
+          <button class="tabbtn periodview-tab active" data-period="monthly" onclick="setPeriodView('monthly')">Monthly</button>
+          <button class="tabbtn periodview-tab" data-period="quarterly" onclick="setPeriodView('quarterly')">Quarterly</button>
+        </div>
+        <div style="overflow: auto; max-height: 70vh;">
+          <table id="resultsTable-Amazon"></table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WALMART -->
+  <section class="section" id="section-ch-Walmart">
+    <h1 class="group-title"><span class="channel-dot" style="background:#0099F3;"></span>Walmart</h1>
+
+    <div class="tabbar" id="walmartTabbar">
+      <button class="tabbtn active" data-chtab="income" onclick="showChannelTab('Walmart','income')">Income Statement</button>
+      <button class="tabbtn" data-chtab="traffic" onclick="showChannelTab('Walmart','traffic')">Traffic Budget</button>
+      <button class="tabbtn" data-chtab="ppc" onclick="showChannelTab('Walmart','ppc')">PPC Budget</button>
+    </div>
+
+    <!-- INCOME STATEMENT -->
+    <div class="amztab active" id="walmarttab-income">
+      <div class="card">
+        <h2>Income Statement Rates</h2>
+        <div class="desc">One rate per item (not per month) — applied as a % of Gross Revenue to compute that item's Budget every month. Walmart Advertising isn't listed here: its Budget and Actual come directly from the PPC Budget tab.</div>
+        <div style="overflow-x:auto;">
+          <table id="incomeRatesTable-Walmart" style="max-width:440px;"></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Walmart Income Statement — Budget vs Actuals</h2>
+        <div class="desc">Revenue Budget rows roll up the Traffic Budget's per-product Gross Sales into 4 product lines; Revenue Actuals, the rate-driven items, and Walmart Advertising's Actual all pull live from Business Central only (Revenue via each sales invoice's Walmart Sales Channel dimension) — no other data source feeds this table's Actuals; a Manual Actual (see "Manual Actuals") always overrides Business Central for a given month.</div>
+        <div class="tabbar periodview-tabbar">
+          <button class="tabbtn periodview-tab active" data-period="monthly" onclick="setPeriodView('monthly')">Monthly</button>
+          <button class="tabbtn periodview-tab" data-period="quarterly" onclick="setPeriodView('quarterly')">Quarterly</button>
+        </div>
+        <div class="banner" id="incomeActualsNote-Walmart" style="margin-bottom:14px;"></div>
+        <div style="overflow-x:auto;">
+          <table id="incomeStatementTable-Walmart"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRAFFIC BUDGET -->
+    <div class="amztab" id="walmarttab-traffic">
+      <div class="card">
+        <h2>Traffic Budget</h2>
+        <div class="desc">Type monthly Units Ordered and AOV for each product group. Gross Sales is calculated automatically and shown under each product group's inputs. Saved together with the PPC Budget inputs on the PPC Budget tab. Walmart has no session-level data source, so Units Ordered is typed directly rather than derived from Sessions x Conversion Rate the way Amazon's is.</div>
+        <div style="overflow: auto; max-height: 70vh;">
+          <table id="organicTable-Walmart"></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Traffic Budget by Product — Budget vs Actuals</h2>
+        <div class="desc">Units Ordered, AOV, and Gross Sales vs actuals for each product group. Actuals pull live from the Walmart Marketplace API's order data on every load.</div>
+        <div class="tabbar periodview-tabbar">
+          <button class="tabbtn periodview-tab active" data-period="monthly" onclick="setPeriodView('monthly')">Monthly</button>
+          <button class="tabbtn periodview-tab" data-period="quarterly" onclick="setPeriodView('quarterly')">Quarterly</button>
+        </div>
+        <div class="banner" id="trafficActualsNote-Walmart" style="margin-bottom:14px;"></div>
+        <div style="overflow: auto; max-height: 70vh;">
+          <table id="productTrafficTable-Walmart"></table>
+        </div>
+
+        <div class="desc" style="margin-top:20px;">Total Gross Sales (Units Ordered × AOV) for each product group, then the sum across all product groups. Ad Sales % uses live Actual Ad Sales (not product-specific, so it stays blended); Repeat Sales % is the revenue-weighted average of each product's Traffic Budget input; Organic Sales % is the remainder.</div>
+        <div style="overflow-x:auto;">
+          <table id="trafficSummaryTable-Walmart"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PPC BUDGET -->
+    <div class="amztab" id="walmarttab-ppc">
+      <div class="card">
+        <h2>PPC Budget</h2>
+        <div class="desc">Type monthly Clicks, CPC, Conversion Rate, and AOV. Spend, Ad Orders, and Ad Sales are calculated automatically. Nothing is saved until you click "Save" in the version bar above.</div>
+        <div style="overflow-x:auto;">
+          <table id="inputsTable-Walmart"></table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Walmart Ad Spend Budget vs Actuals</h2>
+        <div class="desc">Actuals pull live from Triple Whale (Walmart Ads) on every load; a month with a manual entry (see "Manual Actuals") uses that instead.</div>
+        <div class="tabbar periodview-tabbar">
+          <button class="tabbtn periodview-tab active" data-period="monthly" onclick="setPeriodView('monthly')">Monthly</button>
+          <button class="tabbtn periodview-tab" data-period="quarterly" onclick="setPeriodView('quarterly')">Quarterly</button>
+        </div>
+        <div style="overflow: auto; max-height: 70vh;">
+          <table id="resultsTable-Walmart"></table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MANUAL ACTUALS -->
+  <section class="section" id="section-manual">
+    <h2 class="group-title" style="margin-top:0;">Amazon</h2>
+    <div class="card">
+      <h2>Manual Actuals Entry</h2>
+      <div class="desc">For months Triple Whale has no Amazon Ads data for (e.g. before the account was connected there), enter actuals here. A month left blank here uses Triple Whale's live number instead; clearing a filled-in month here reverts it back to Triple Whale.</div>
+      <div style="overflow-x:auto;">
+        <table id="manualTable-Amazon"></table>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" onclick="saveManualActuals('Amazon')">Save Manual Actuals</button>
+        <span class="savestate" id="manualSavestate-Amazon" style="margin-left:10px;"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Income Statement Manual Entries</h2>
+      <div class="desc">All rate-driven items pull live from Business Central by default. Use this only to correct a month (e.g. a late-posted GL entry) — a manual entry overrides Business Central for that month; leaving a cell blank reverts back to the live value.</div>
+      <div style="overflow-x:auto;">
+        <table id="incomeManualTable-Amazon"></table>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" onclick="saveIncomeManualActuals('Amazon')">Save Income Statement Manual Entries</button>
+        <span class="savestate" id="incomeManualSavestate-Amazon" style="margin-left:10px;"></span>
+      </div>
+    </div>
+
+    <h2 class="group-title">Walmart</h2>
+    <div class="card">
+      <h2>Manual Actuals Entry</h2>
+      <div class="desc">For months Triple Whale has no Walmart Ads data for, enter actuals here. A month left blank here uses Triple Whale's live number instead; clearing a filled-in month here reverts it back to Triple Whale.</div>
+      <div style="overflow-x:auto;">
+        <table id="manualTable-Walmart"></table>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" onclick="saveManualActuals('Walmart')">Save Manual Actuals</button>
+        <span class="savestate" id="manualSavestate-Walmart" style="margin-left:10px;"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Income Statement Manual Entries</h2>
+      <div class="desc">All rate-driven items pull live from Business Central by default. Use this only to correct a month (e.g. a late-posted GL entry) — a manual entry overrides Business Central for that month; leaving a cell blank reverts back to the live value.</div>
+      <div style="overflow-x:auto;">
+        <table id="incomeManualTable-Walmart"></table>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" onclick="saveIncomeManualActuals('Walmart')">Save Income Statement Manual Entries</button>
+        <span class="savestate" id="incomeManualSavestate-Walmart" style="margin-left:10px;"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW TO -->
+  <section class="section" id="section-howto">
+    <div class="card">
+      <h2>How This Tool Works</h2>
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>The Bottoms-Up Model</h3>
+          <p>Every month's budget starts from four inputs: Clicks, CPC (cost per click), Conversion Rate, and AOV (average order value). From those, the tool calculates Spend (Clicks × CPC), Ad Orders (Clicks × Conversion Rate), Ad Sales (Ad Orders × AOV), and ROAS (Ad Sales ÷ Spend).</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Budget Versions</h3>
+          <p>Every set of budget numbers is saved as a named version. Use the version bar to switch, create, duplicate, or delete versions. "Save" writes whatever is on screen — for every channel — to the selected version.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Where Actuals Come From</h3>
+          <p>Amazon: Clicks, CPC, Conversion Rate, Spend, Ad Orders, and Ad Sales pull live from Triple Whale every time you load this page — no manual refresh needed, and never stale. Walmart: the same PPC metrics pull live from Triple Whale's Walmart Ads data. ROAS is calculated from those. Only the Every Body Eat accounts are included (not any other associated seller account).</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h3>Filling Data Gaps</h3>
+          <p>Amazon Ads was connected to Triple Whale partway through 2026, so earlier months have no live data — Amazon's own Ads API only serves a 60-day reporting window, so that history can't be pulled after the fact from any source. Use the "Manual Actuals" tab to type in those months from another record (e.g. a Seller Central export); a manual entry always takes priority over Triple Whale for that month. The same Manual Actuals mechanism is available for Walmart.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <h3>Variance and % Difference</h3>
+          <p>Variance is Actual minus Budget. For CPC and Spend, coming in under budget (a negative variance) is good, shown in green — the opposite of every other metric. % Difference is Variance divided by Budget.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const MONTHS = [
+  ['01','Jan'], ['02','Feb'], ['03','Mar'], ['04','Apr'], ['05','May'], ['06','Jun'],
+  ['07','Jul'], ['08','Aug'], ['09','Sep'], ['10','Oct'], ['11','Nov'], ['12','Dec'],
+];
+const CURRENT_MONTH = new Date().toISOString().slice(0, 7);
+const CHANNELS = ['Amazon', 'Walmart'];
+
+// Shared Monthly/Quarterly toggle for the Budget vs Actuals tables (Income
+// Statement, Traffic Budget by Product, PPC Budget) across every channel.
+// Input tables (PPC Budget, Traffic Budget) always stay monthly — a
+// bottoms-up model doesn't make sense typed at quarterly grain.
+let periodView = 'monthly'; // 'monthly' | 'quarterly'
+const QUARTER_DEFS = [
+  { key: 'Q1', months: ['01', '02', '03'] },
+  { key: 'Q2', months: ['04', '05', '06'] },
+  { key: 'Q3', months: ['07', '08', '09'] },
+  { key: 'Q4', months: ['10', '11', '12'] },
+];
+// One entry per displayed column: { label, months: [...] } — 12 single-month
+// entries in monthly view, or 4 three-month entries in quarterly view. Every
+// Budget vs Actuals render function aggregates over `.months` per column, so
+// a period of 1 month "aggregates" to just that month's own values.
+function periodsOfYear(year) {
+  if (periodView === 'quarterly') {
+    return QUARTER_DEFS.map(q => ({ label: q.key, months: q.months.map(mm => year + '-' + mm) }));
+  }
+  // Full month name (e.g. "January"), matching these tables' prior monthly
+  // header text — FULL_MONTH_NAMES is declared further down the file, but
+  // since this only runs at render time (well after the whole script has
+  // executed once), it's already assigned by the time this is called.
+  return MONTHS.map(([mm], i) => ({ label: FULL_MONTH_NAMES[i], months: [year + '-' + mm] }));
+}
+// The trailing Total column always sums year-to-date (through the current
+// month) regardless of monthly/quarterly view, same convention the PPC
+// Budget vs Actuals table already used before this toggle existed.
+function totalMonthsOfYear(year) {
+  return MONTHS.map(([mm]) => year + '-' + mm).filter(m => m <= CURRENT_MONTH);
+}
+function sumOverMonths(monthList, fn) {
+  let total = 0, has = false;
+  for (const m of monthList) {
+    const v = fn(m);
+    if (v != null) { total += v; has = true; }
+  }
+  return has ? total : null;
+}
+// One shared tab-style selector instance per Budget vs Actuals card (across
+// every channel) all drive the same shared `periodView` — clicking any one
+// re-renders every such table for every channel and syncs every instance's
+// active state.
+function setPeriodView(view) {
+  if (periodView === view) return;
+  periodView = view;
+  syncPeriodViewTabs();
+  for (const ch of CHANNELS) {
+    renderResultsTable(ch);
+    renderProductTrafficTable(ch);
+    renderIncomeStatementTable(ch);
+  }
+}
+function syncPeriodViewTabs() {
+  document.querySelectorAll('.periodview-tab').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.period === periodView);
+  });
+}
+
+let versions = [];
+let activeVersionId = null;
+let currentVersion = null;
+
+// Traffic Budget, split by product group. Amazon splits Thins/Cookies into
+// Full Size + Single Serve (6 ASINs); Walmart tracks at the category level
+// only (no per-pack-size Seller Central-style feed exists there), so its
+// "asin" values below are category slugs, not real ASINs — every function
+// downstream just treats `.asin` as an opaque per-group key, so this is a
+// safe, minimal-diff way to reuse the exact same code path.
+const AD_BUDGET_ASINS = [
+  { asin: 'B0HF1FS3QM', label: 'Snack Thins Full Size' },
+  { asin: 'B0GZ2Y9TYX', label: 'Snack Thins Single Serve' },
+  { asin: 'B0GP2VN4W5', label: 'Cookie Bites Full Size' },
+  { asin: 'B0F2TML2ZX', label: 'Cookie Bites Single Serve' },
+  { asin: 'B0GNWN9P1W', label: 'Crispbread Crackers' },
+  { asin: 'B0H12RRFS3', label: 'Pretzels' },
+];
+const WALMART_PRODUCT_GROUPS = [
+  { asin: 'thins', label: 'Thins' },
+  { asin: 'cookies', label: 'Cookies' },
+  { asin: 'pretzel', label: 'Pretzel' },
+  { asin: 'crispbread', label: 'Crispbread' },
+];
+
+// Income Statement: Amazon's 4 revenue lines roll up the 6 ASINs above into
+// product lines; Walmart's product groups already are the 4 categories, so
+// each rolls up just itself. Amazon Advertising/Walmart Advertising are
+// deliberately excluded from the rate items — their Budget/Actual come
+// straight from the PPC Budget tab (Spend) instead of a rate of Gross Revenue.
+const AD_BUDGET_INCOME_CATEGORIES = [
+  { key: 'thins', label: 'Thins Revenue', asins: ['B0HF1FS3QM', 'B0GZ2Y9TYX'] },
+  { key: 'cookies', label: 'Cookies Revenue', asins: ['B0GP2VN4W5', 'B0F2TML2ZX'] },
+  { key: 'pretzel', label: 'Pretzel Revenue', asins: ['B0H12RRFS3'] },
+  { key: 'crispbread', label: 'Crispbread Revenue', asins: ['B0GNWN9P1W'] },
+];
+const WALMART_INCOME_CATEGORIES = [
+  { key: 'thins', label: 'Thins Revenue', asins: ['thins'] },
+  { key: 'cookies', label: 'Cookies Revenue', asins: ['cookies'] },
+  { key: 'pretzel', label: 'Pretzel Revenue', asins: ['pretzel'] },
+  { key: 'crispbread', label: 'Crispbread Revenue', asins: ['crispbread'] },
+];
+const AD_BUDGET_INCOME_ITEMS = [
+  { key: 'shipping_income_chargeback', label: 'Shipping Income/Charge Back', group: 'revenue' },
+  { key: 'promotions', label: 'Promotions', group: 'revenue' },
+  { key: 'selling_fees', label: 'Amazon Selling Fees', group: 'revenue' },
+  { key: 'refunds_spoils', label: 'Refunds and Spoils', group: 'revenue' },
+  { key: 'fba_fees', label: 'Amazon FBA Fees', group: 'opex' },
+  { key: 'misc_other_fees', label: 'Amazon Misc Other Fees', group: 'opex' },
+  { key: 'shipping_freight_out', label: 'Amazon Shipping (Freight Out)', group: 'opex' },
+  { key: 'fba_fees_storage', label: 'Amazon FBA Fees - Storage', group: 'opex' },
+];
+// Walmart has no shipping_income_chargeback/promotions/refunds_spoils
+// equivalent — those 3 Amazon accounts are shared, whole-account numbers with
+// no channel filter, so reusing them for Walmart would double-count. Walmart
+// Net Commissions (selling_fees) plays the same "revenue" (contra-revenue
+// deduction) role as Amazon Selling Fees does above.
+const WALMART_INCOME_ITEMS = [
+  { key: 'selling_fees', label: 'Walmart Net Commissions', group: 'revenue' },
+  { key: 'fba_fees', label: 'Walmart Fulfillment Fees', group: 'opex' },
+  { key: 'misc_other_fees', label: 'Walmart Adjustments', group: 'opex' },
+  { key: 'shipping_freight_out', label: 'Walmart Freight', group: 'opex' },
+  { key: 'fba_fees_storage', label: 'Walmart Storage Fees', group: 'opex' },
+];
+// Opex row order matches the reference P&L: fee items, Advertising (pulled
+// from the PPC Budget tab), Freight Out, Storage.
+const INCOME_OPEX_ROW_ORDER = ['fba_fees', 'misc_other_fees', '__advertising__', 'shipping_freight_out', 'fba_fees_storage'];
+const WALMART_OPEX_ROW_ORDER = ['fba_fees', 'misc_other_fees', '__advertising__', 'shipping_freight_out', 'fba_fees_storage'];
+
+// Per-channel config: everything that differs in shape between Amazon and
+// Walmart (product groups, revenue categories, rate items, opex order, and
+// the Advertising row's label). Every render/calc function below takes a
+// `channel` argument and looks its shape up here plus its mutable data in
+// `state[channel]` — this is the one map to extend when a third channel
+// (TikTok Shop, Shopify) goes live.
+const CHANNEL_CONFIG = {
+  Amazon: {
+    productGroups: AD_BUDGET_ASINS,
+    incomeCategories: AD_BUDGET_INCOME_CATEGORIES,
+    incomeItems: AD_BUDGET_INCOME_ITEMS,
+    opexRowOrder: INCOME_OPEX_ROW_ORDER,
+    advertisingLabel: 'Amazon Advertising',
+    tabbar: 'amazonTabbar',
+    tabPrefix: 'amztab-',
+    trafficInputMode: 'sessions',
+  },
+  Walmart: {
+    productGroups: WALMART_PRODUCT_GROUPS,
+    incomeCategories: WALMART_INCOME_CATEGORIES,
+    incomeItems: WALMART_INCOME_ITEMS,
+    opexRowOrder: WALMART_OPEX_ROW_ORDER,
+    advertisingLabel: 'Walmart Advertising',
+    tabbar: 'walmartTabbar',
+    tabPrefix: 'walmarttab-',
+    // Amazon derives Units Ordered from Sessions x Conversion Rate (no direct
+    // order-count feed at the traffic level); Walmart has no session data at
+    // all, so Units Ordered is typed directly instead — see trafficUnitsOrdered.
+    trafficInputMode: 'direct',
+  },
+};
+
+// All mutable per-channel data, namespaced so Amazon and Walmart never share
+// state: line items (PPC Budget inputs), actuals (PPC Budget vs Actuals),
+// traffic line items/actuals (Traffic Budget), and income rates/actuals
+// (Income Statement). The version bar itself (versions/currentVersion above)
+// stays a single shared concept — one saved "version" bundles both channels'
+// line items together, tagged by the `channel` column in D1.
+const state = {};
+for (const ch of CHANNELS) {
+  state[ch] = {
+    currentLineItems: {},        // month -> { clicks, cpc, conversionRate, aov }
+    actuals: {},                 // month -> { clicks, cpc, conversionRate, spend, orders, adSales, roas, source }
+    twError: null,
+    manualActuals: {},           // month -> { clicks, spend, orders, adSales }
+    currentTrafficLineItems: {}, // asin -> month -> { sessions, conversionRate, aov, repeatSalesPct }
+    trafficActuals: {},          // asin -> month -> { sessions, unitsOrdered, salesAmount }
+    trafficTwError: null,
+    currentIncomeRates: {},      // itemKey -> rate (fraction, e.g. 0.08)
+    incomeActuals: {},           // month -> itemKey -> amount (live from Business Central)
+    incomeActualsManual: {},     // month -> itemKey -> amount (manual override; takes priority)
+    incomeBcError: null,
+  };
+}
+
+/* ---------- Nav ---------- */
+function setNavCollapsed(collapsed) {
+  document.getElementById('sidenav').classList.toggle('collapsed', collapsed);
+  document.getElementById('main').classList.toggle('expanded', collapsed);
+  document.getElementById('navtoggle').classList.toggle('collapsed-state', collapsed);
+}
+function toggleNav() {
+  const isCollapsed = document.getElementById('sidenav').classList.contains('collapsed');
+  setNavCollapsed(!isCollapsed);
+}
+if (window.innerWidth < 780) setNavCollapsed(true);
+
+const PAGE_TITLES = {
+  overview: ['Overview', 'Bottoms-up ad spend budgeting: Clicks, CPC, and Conversion Rate drive Spend, Ad Orders, Ad Sales, and ROAS.'],
+  'ch-Amazon': ['Amazon', 'Income Statement, Traffic Budget, and PPC Budget for Amazon.'],
+  'ch-Walmart': ['Walmart', 'Income Statement, Traffic Budget, and PPC Budget for Walmart.'],
+  manual: ['Manual Actuals', 'Fill in actuals for months Triple Whale has no data for.'],
+  howto: ['How It Works', 'A quick reference for using this tool.'],
+};
+
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.querySelectorAll('.sidenav a[data-section]').forEach(a => a.classList.remove('active'));
+  const active = document.querySelector('.sidenav a[data-section="' + name + '"]');
+  if (active) active.classList.add('active');
+  const [title, sub] = PAGE_TITLES[name] || [name, ''];
+  document.getElementById('pageTitle').textContent = title;
+  document.getElementById('pageSub').textContent = sub;
+  if (window.innerWidth < 780) setNavCollapsed(true);
+}
+
+function showChannelTab(channel, name) {
+  const cfg = CHANNEL_CONFIG[channel];
+  document.querySelectorAll('#section-ch-' + channel + ' .amztab').forEach(t => t.classList.remove('active'));
+  document.getElementById(cfg.tabPrefix + name).classList.add('active');
+  document.querySelectorAll('#' + cfg.tabbar + ' .tabbtn').forEach(b => b.classList.remove('active'));
+  const active = document.querySelector('#' + cfg.tabbar + ' .tabbtn[data-chtab="' + name + '"]');
+  if (active) active.classList.add('active');
+  if (name === 'traffic') syncStickyHeaderOffset('productTrafficTable-' + channel);
+  if (name === 'ppc') syncStickyHeaderOffset('resultsTable-' + channel);
+}
+
+/* ---------- Formatting ---------- */
+function money(n) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+function money2(n) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function int(n) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  return Math.round(n).toLocaleString('en-US');
+}
+function pctVal(n) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  return (n * 100).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+}
+function roasVal(n) {
+  if (n === null || n === undefined || Number.isNaN(n) || !Number.isFinite(n)) return '—';
+  return n.toFixed(2) + 'x';
+}
+function pctDiff(n) {
+  if (n === null || n === undefined || Number.isNaN(n) || !Number.isFinite(n)) return '—';
+  return (n >= 0 ? '+' : '') + (n * 100).toFixed(0) + '%';
+}
+function varClass(n, invert) {
+  if (n === null || n === undefined || Number.isNaN(n)) return '';
+  const good = invert ? n < 0 : n > 0;
+  const bad = invert ? n > 0 : n < 0;
+  return good ? 'var-pos' : (bad ? 'var-neg' : '');
+}
+
+/* ---------- Storage ---------- */
+async function loadAll() {
+  const el = document.getElementById('savestate');
+  try {
+    const vRes = await fetch('/api/marketing/ad-budget/versions');
+    if (!vRes.ok) throw new Error('load failed');
+    const vBody = await vRes.json();
+    versions = vBody.versions;
+    activeVersionId = vBody.activeVersionId;
+  } catch (e) {
+    el.textContent = 'Offline — could not load budget data';
+    return;
+  }
+
+  if (versions.length === 0) {
+    await createVersion('Original Budget', new Date().getFullYear(), true);
+  } else {
+    const toLoad = versions.find(v => v.id === activeVersionId) || versions[0];
+    await selectVersion(toLoad.id, false);
+  }
+}
+
+async function loadActuals(year) {
+  for (const channel of CHANNELS) {
+    const s = state[channel];
+    try {
+      const [aRes, mRes] = await Promise.all([
+        fetch('/api/marketing/ad-budget/actuals?channel=' + channel + '&year=' + year),
+        fetch('/api/marketing/ad-budget/actuals/manual?channel=' + channel),
+      ]);
+      const aBody = await aRes.json();
+      const mBody = await mRes.json();
+      s.actuals = {};
+      for (const a of (aBody.actuals || [])) s.actuals[a.month] = a;
+      s.twError = aBody.twError || null;
+      s.manualActuals = {};
+      for (const r of (mBody.rows || [])) s.manualActuals[r.month] = r;
+    } catch (e) {
+      s.twError = 'Could not reach the actuals API.';
+    }
+
+    try {
+      const tRes = await fetch('/api/marketing/ad-budget/traffic-actuals?channel=' + channel + '&year=' + year);
+      const tBody = await tRes.json();
+      s.trafficActuals = {};
+      for (const a of (tBody.actuals || [])) {
+        if (!s.trafficActuals[a.asin]) s.trafficActuals[a.asin] = {};
+        s.trafficActuals[a.asin][a.month] = a;
+      }
+      s.trafficTwError = tBody.twError || null;
+    } catch (e) {
+      s.trafficActuals = {};
+      s.trafficTwError = 'Could not reach the traffic actuals API.';
+    }
+
+    try {
+      const [iRes, imRes] = await Promise.all([
+        fetch('/api/marketing/ad-budget/income-actuals?channel=' + channel + '&year=' + year),
+        fetch('/api/marketing/ad-budget/income-actuals/manual?channel=' + channel),
+      ]);
+      const iBody = await iRes.json();
+      const imBody = await imRes.json();
+      s.incomeActuals = {};
+      for (const a of (iBody.actuals || [])) {
+        if (!s.incomeActuals[a.month]) s.incomeActuals[a.month] = {};
+        s.incomeActuals[a.month][a.itemKey] = a.amount;
+      }
+      s.incomeBcError = iBody.bcError || null;
+      s.incomeActualsManual = {};
+      for (const r of (imBody.rows || [])) {
+        if (!s.incomeActualsManual[r.month]) s.incomeActualsManual[r.month] = {};
+        s.incomeActualsManual[r.month][r.itemKey] = r.amount;
+      }
+    } catch (e) {
+      s.incomeActuals = {};
+      s.incomeActualsManual = {};
+      s.incomeBcError = 'Could not reach the income actuals API.';
+    }
+  }
+  renderActualsBanner();
+}
+
+async function selectVersion(id, save) {
+  const res = await fetch('/api/marketing/ad-budget/versions/' + encodeURIComponent(id));
+  if (!res.ok) return;
+  const detail = await res.json();
+  currentVersion = detail.version;
+  for (const ch of CHANNELS) {
+    const s = state[ch];
+    s.currentLineItems = {};
+    for (const li of detail.lineItems) if (li.channel === ch) s.currentLineItems[li.month] = li;
+    s.currentTrafficLineItems = {};
+    for (const ti of (detail.trafficLineItems || [])) {
+      if (ti.channel !== ch) continue;
+      if (!s.currentTrafficLineItems[ti.asin]) s.currentTrafficLineItems[ti.asin] = {};
+      s.currentTrafficLineItems[ti.asin][ti.month] = ti;
+    }
+    s.currentIncomeRates = {};
+    for (const ir of (detail.incomeRates || [])) if (ir.channel === ch) s.currentIncomeRates[ir.itemKey] = ir.rate;
+  }
+  activeVersionId = id;
+  if (save) {
+    try { await fetch('/api/marketing/ad-budget/active', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ versionId: id }) }); } catch (e) { /* non-critical */ }
+  }
+  await loadActuals(currentVersion.year);
+  renderAll();
+}
+
+async function createVersion(name, year, makeActive) {
+  const id = 'ABV' + Date.now().toString(36).toUpperCase();
+  const lineItems = [];
+  const trafficLineItems = [];
+  const incomeRates = [];
+  for (const channel of CHANNELS) {
+    for (const [mm] of MONTHS) lineItems.push({ channel, month: year + '-' + mm, ...EMPTY_LINE_ITEM });
+    for (const p of CHANNEL_CONFIG[channel].productGroups) {
+      for (const [mm] of MONTHS) trafficLineItems.push({ channel, asin: p.asin, month: year + '-' + mm, ...EMPTY_TRAFFIC_LINE_ITEM });
+    }
+    for (const i of CHANNEL_CONFIG[channel].incomeItems) incomeRates.push({ channel, itemKey: i.key, rate: null });
+  }
+  const body = { name, year, notes: '', lineItems, trafficLineItems, incomeRates };
+  const el = document.getElementById('savestate');
+  try {
+    el.textContent = 'Saving…';
+    const res = await fetch('/api/marketing/ad-budget/versions/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error('save failed');
+  } catch (e) {
+    el.textContent = 'Save failed — could not create version';
+    return;
+  }
+  const vRes = await fetch('/api/marketing/ad-budget/versions');
+  const vBody = await vRes.json();
+  versions = vBody.versions;
+  await selectVersion(id, !!makeActive);
+}
+
+async function saveCurrentVersion() {
+  if (!currentVersion) return;
+  for (const ch of CHANNELS) {
+    captureInputsIntoState(ch);
+    captureTrafficInputsIntoState(ch);
+    captureIncomeRatesIntoState(ch);
+  }
+  const el = document.getElementById('savestate');
+  try {
+    el.textContent = 'Saving…';
+    const lineItems = [];
+    const trafficLineItems = [];
+    const incomeRates = [];
+    for (const ch of CHANNELS) {
+      const s = state[ch];
+      for (const [month, li] of Object.entries(s.currentLineItems)) lineItems.push({ channel: ch, month, ...li });
+      for (const [asin, byMonth] of Object.entries(s.currentTrafficLineItems)) {
+        for (const [month, ti] of Object.entries(byMonth)) trafficLineItems.push({ channel: ch, asin, month, ...ti });
+      }
+      for (const [itemKey, rate] of Object.entries(s.currentIncomeRates)) incomeRates.push({ channel: ch, itemKey, rate });
+    }
+    const body = {
+      name: currentVersion.name,
+      year: currentVersion.year,
+      notes: currentVersion.notes,
+      lineItems,
+      trafficLineItems,
+      incomeRates,
+    };
+    const res = await fetch('/api/marketing/ad-budget/versions/' + encodeURIComponent(currentVersion.id), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error('save failed');
+    el.textContent = 'Synced · ' + currentVersion.name;
+  } catch (e) {
+    el.textContent = 'Save failed — changes are local only until retried';
+  }
+}
+
+async function newVersion() {
+  const name = prompt('Name for the new budget version:', '');
+  if (!name || !name.trim()) return;
+  const year = Number(prompt('Year:', String(currentVersion ? currentVersion.year : new Date().getFullYear())));
+  if (!Number.isInteger(year)) return;
+  await createVersion(name.trim(), year, true);
+}
+
+async function duplicateVersion() {
+  if (!currentVersion) return;
+  const name = prompt('Name for the duplicate:', currentVersion.name + ' (copy)');
+  if (!name || !name.trim()) return;
+  for (const ch of CHANNELS) {
+    captureInputsIntoState(ch);
+    captureTrafficInputsIntoState(ch);
+  }
+  await saveCurrentVersion();
+  const el = document.getElementById('savestate');
+  try {
+    el.textContent = 'Duplicating…';
+    const res = await fetch('/api/marketing/ad-budget/versions/' + encodeURIComponent(currentVersion.id) + '/duplicate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newName: name.trim() }),
+    });
+    if (!res.ok) throw new Error('duplicate failed');
+    const detail = await res.json();
+    const vRes = await fetch('/api/marketing/ad-budget/versions');
+    versions = (await vRes.json()).versions;
+    await selectVersion(detail.version.id, true);
+  } catch (e) {
+    el.textContent = 'Duplicate failed';
+  }
+}
+
+async function deleteVersion() {
+  if (!currentVersion) return;
+  if (versions.length <= 1) { alert('At least one budget version has to exist.'); return; }
+  if (!confirm('Delete budget version "' + currentVersion.name + '"? This cannot be undone.')) return;
+  const idToDelete = currentVersion.id;
+  await fetch('/api/marketing/ad-budget/versions/' + encodeURIComponent(idToDelete), { method: 'DELETE' });
+  const vRes = await fetch('/api/marketing/ad-budget/versions');
+  versions = (await vRes.json()).versions;
+  await selectVersion(versions[0].id, true);
+}
+
+function onVersionSelect() {
+  const id = document.getElementById('versionSelect').value;
+  if (id === currentVersion?.id) return;
+  selectVersion(id, true);
+}
+
+async function saveManualActuals(channel) {
+  const s = state[channel];
+  const rows = [];
+  document.querySelectorAll('#manualTable-' + channel + ' [data-manual-input]').forEach(input => {
+    const [month, field] = input.dataset.manualInput.split('|');
+    if (!rows.find(r => r.month === month)) {
+      const existing = s.manualActuals[month] || {};
+      rows.push({ channel, month, clicks: existing.clicks ?? null, spend: existing.spend ?? null, orders: existing.orders ?? null, adSales: existing.adSales ?? null });
+    }
+    const row = rows.find(r => r.month === month);
+    const digits = input.value.trim();
+    row[field] = digits === '' ? null : Number(digits);
+  });
+  const el = document.getElementById('manualSavestate-' + channel);
+  try {
+    el.textContent = 'Saving…';
+    const res = await fetch('/api/marketing/ad-budget/actuals/manual', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rows) });
+    if (!res.ok) throw new Error('save failed');
+    el.textContent = 'Saved';
+    await loadActuals(currentVersion.year);
+    renderAll();
+  } catch (e) {
+    el.textContent = 'Save failed';
+  }
+}
+
+/* ---------- Render ---------- */
+function renderVersionSelect() {
+  const sel = document.getElementById('versionSelect');
+  sel.innerHTML = versions.map(v => `<option value="${v.id}" ${currentVersion && v.id === currentVersion.id ? 'selected' : ''}>${v.name} (${v.year})</option>`).join('');
+  document.getElementById('yearDisplay').value = currentVersion ? currentVersion.year : '';
+}
+
+function renderActualsBanner() {
+  const el = document.getElementById('actualsBanner');
+  const errs = CHANNELS.map(ch => ({ ch, err: state[ch].twError })).filter(x => x.err);
+  if (errs.length) {
+    el.className = 'banner warn';
+    el.innerHTML = `<span>⚠️</span><span><strong>Actuals could not be loaded:</strong> ${errs.map(x => x.ch + ' — ' + x.err).join('; ')}. Months with a manual entry still show; try reloading the page.</span>`;
+    return;
+  }
+  el.className = 'banner';
+  el.innerHTML = `<span>ℹ️</span><span><strong>Amazon and Walmart actuals pull live from Triple Whale on every page load</strong> — no manual refresh needed. Months without Triple Whale data (before an account was connected there) show "—" unless filled in under Manual Actuals.</span>`;
+}
+
+const PCT_FIELDS = ['conversionRate'];
+const EMPTY_LINE_ITEM = { clicks: null, cpc: null, conversionRate: null, aov: null };
+
+// PPC Budget input display: commas for Clicks, $ + 2dp for CPC/AOV, % + 2dp
+// for Conversion Rate. `v` is already *100 for conversionRate by the time it
+// reaches these (see inputTableRow) — same convention the rest of the file uses.
+const PPC_INPUT_FORMAT = {
+  clicks: (v) => (v != null ? Math.round(v).toLocaleString('en-US') : ''),
+  cpc: (v) => (v != null ? '$' + Number(v).toFixed(2) : ''),
+  conversionRate: (v) => (v != null ? Number(v).toFixed(2) + '%' : ''),
+  aov: (v) => (v != null ? '$' + Number(v).toFixed(2) : ''),
+};
+// Strips $/%/commas back to a plain number for parsing and for editing (focus).
+function parseFormattedNumber(s) {
+  const cleaned = String(s).replace(/[^0-9.\-]/g, '');
+  if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
+  const n = Number(cleaned);
+  return Number.isNaN(n) ? null : n;
+}
+
+// Fraction -> percentage for display, e.g. 0.14 -> 14 rather than
+// 14.000000000000002. Only needed where the raw value is shown as-is (a
+// focus handler, so the user can edit the plain number); formatted display
+// elsewhere already rounds this away via toFixed().
+function pctFromFraction(v) { return v == null ? null : Math.round(v * 1e8) / 1e6; }
+
+const TRAFFIC_PCT_FIELDS = ['conversionRate', 'repeatSalesPct'];
+const EMPTY_TRAFFIC_LINE_ITEM = { sessions: null, conversionRate: null, aov: null, repeatSalesPct: null, unitsOrdered: null };
+
+// Traffic Budget input display: commas for Sessions/Units Ordered, % + 2dp
+// for Conversion Rate/Repeat Sales, $ + 2dp for AOV — same convention as
+// PPC_INPUT_FORMAT.
+const TRAFFIC_INPUT_FORMAT = {
+  sessions: (v) => (v != null ? Math.round(v).toLocaleString('en-US') : ''),
+  conversionRate: (v) => (v != null ? Number(v).toFixed(2) + '%' : ''),
+  aov: (v) => (v != null ? '$' + Number(v).toFixed(2) : ''),
+  repeatSalesPct: (v) => (v != null ? Number(v).toFixed(2) + '%' : ''),
+  unitsOrdered: (v) => (v != null ? Math.round(v).toLocaleString('en-US') : ''),
+};
+
+function trafficItemFor(channel, asin, month) {
+  const s = state[channel];
+  return (s.currentTrafficLineItems[asin] && s.currentTrafficLineItems[asin][month]) || {};
+}
+
+// Units Ordered: Amazon derives it (Sessions x Traffic Conversion Rate, no
+// direct order-count feed at the traffic level); Walmart has it typed
+// directly, per CHANNEL_CONFIG[channel].trafficInputMode.
+function trafficUnitsOrdered(ti, channel) {
+  if (CHANNEL_CONFIG[channel].trafficInputMode === 'direct') return ti.unitsOrdered ?? null;
+  const sessions = ti.sessions ?? null;
+  const cr = ti.conversionRate ?? null;
+  return sessions != null && cr != null ? sessions * cr : null;
+}
+
+// Gross Sales: Units Ordered x AOV (the Traffic Budget AOV).
+function trafficGrossSales(ti, channel) {
+  const units = trafficUnitsOrdered(ti, channel);
+  const aov = ti.aov ?? null;
+  return units != null && aov != null ? units * aov : null;
+}
+
+function captureInputsIntoState(channel) {
+  const s = state[channel];
+  document.querySelectorAll('#inputsTable-' + channel + ' [data-budget-input]').forEach(input => {
+    const [month, field] = input.dataset.budgetInput.split('|');
+    if (!s.currentLineItems[month]) s.currentLineItems[month] = { ...EMPTY_LINE_ITEM };
+    const num = parseFormattedNumber(input.value);
+    if (num == null) { s.currentLineItems[month][field] = null; return; }
+    s.currentLineItems[month][field] = PCT_FIELDS.includes(field) ? num / 100 : num;
+  });
+}
+
+function captureTrafficInputsIntoState(channel) {
+  const s = state[channel];
+  document.querySelectorAll('#organicTable-' + channel + ' [data-traffic-input]').forEach(input => {
+    const [asin, month, field] = input.dataset.trafficInput.split('|');
+    if (!s.currentTrafficLineItems[asin]) s.currentTrafficLineItems[asin] = {};
+    if (!s.currentTrafficLineItems[asin][month]) s.currentTrafficLineItems[asin][month] = { ...EMPTY_TRAFFIC_LINE_ITEM };
+    const num = parseFormattedNumber(input.value);
+    if (num == null) { s.currentTrafficLineItems[asin][month][field] = null; return; }
+    s.currentTrafficLineItems[asin][month][field] = TRAFFIC_PCT_FIELDS.includes(field) ? num / 100 : num;
+  });
+}
+
+function monthsOfYear(year) { return MONTHS.map(([mm, label]) => [year + '-' + mm, label]); }
+
+// Budget values computed from the four raw inputs for one month.
+function budgetFor(channel, month) {
+  const s = state[channel];
+  const li = s.currentLineItems[month] || {};
+  const clicks = li.clicks ?? null;
+  const cpc = li.cpc ?? null;
+  const conversionRate = li.conversionRate ?? null;
+  const aov = li.aov ?? null;
+  const spend = clicks != null && cpc != null ? clicks * cpc : null;
+  const orders = clicks != null && conversionRate != null ? clicks * conversionRate : null;
+  const adSales = orders != null && aov != null ? orders * aov : null;
+  const roas = spend ? (adSales != null ? adSales / spend : null) : null;
+  return { clicks, cpc, conversionRate, aov, spend, orders, adSales, roas };
+}
+
+// Aggregates a PPC Budget/Actuals row (clicks/spend/orders/adSales are
+// additive) over any list of months — a single month, a quarter, or the
+// year-to-date Total column — then re-derives the rate metrics (cpc,
+// conversionRate, aov, roas) from the summed values rather than averaging
+// each month's own rate. `getRow` returns a {clicks,spend,orders,adSales}
+// object (or null) for one month, e.g. budgetFor or a per-month actuals map.
+function aggregatePpcRow(monthList, getRow) {
+  let clicks = 0, spend = 0, orders = 0, adSales = 0, has = false;
+  for (const m of monthList) {
+    const row = getRow(m);
+    if (!row) continue;
+    if (row.clicks != null) { clicks += row.clicks; has = true; }
+    if (row.spend != null) spend += row.spend;
+    if (row.orders != null) orders += row.orders;
+    if (row.adSales != null) adSales += row.adSales;
+  }
+  if (!has) return null;
+  return {
+    clicks, spend, orders, adSales,
+    cpc: clicks ? spend / clicks : null,
+    conversionRate: clicks ? orders / clicks : null,
+    aov: orders ? adSales / orders : null,
+    roas: spend ? adSales / spend : null,
+  };
+}
+
+function inputTableRow(channel, months, field, label, placeholder) {
+  const s = state[channel];
+  const cells = months.map(([m]) => {
+    const li = s.currentLineItems[m] || {};
+    let v = li[field];
+    if (PCT_FIELDS.includes(field) && v != null) v = v * 100;
+    const display = PPC_INPUT_FORMAT[field](v);
+    return `<td class="numcell"><input type="text" inputmode="decimal" class="budget-input" data-budget-input="${m}|${field}" value="${display}" placeholder="${placeholder}"></td>`;
+  }).join('');
+  return `<tr><td class="rowlabel">${label}</td>${cells}</tr>`;
+}
+
+function renderInputsTable(channel) {
+  const year = currentVersion.year;
+  const months = monthsOfYear(year);
+  const table = document.getElementById('inputsTable-' + channel);
+  const head = `<thead><tr><th></th>${months.map(([, l]) => `<th class="month-head">${l}</th>`).join('')}</tr></thead>`;
+
+  table.innerHTML = head + `<tbody>
+    ${inputTableRow(channel, months, 'clicks', 'Clicks', '0')}
+    ${inputTableRow(channel, months, 'cpc', 'CPC', '$0.00')}
+    ${inputTableRow(channel, months, 'conversionRate', 'Conversion Rate', '0.00%')}
+    ${inputTableRow(channel, months, 'aov', 'AOV', '$0.00')}
+  </tbody>`;
+
+  const s = state[channel];
+  // Show a plain editable number on focus (stripped of $/%/commas), and
+  // reformat with the field's symbol/decimals on blur — formatting on every
+  // keystroke would fight the cursor position while typing.
+  table.querySelectorAll('[data-budget-input]').forEach(input => {
+    input.addEventListener('input', () => { captureInputsIntoState(channel); renderResultsTable(channel); renderOverview(); });
+    input.addEventListener('focus', () => {
+      const [month, field] = input.dataset.budgetInput.split('|');
+      let v = s.currentLineItems[month] ? s.currentLineItems[month][field] : null;
+      if (PCT_FIELDS.includes(field) && v != null) v = pctFromFraction(v);
+      input.value = v != null ? v : '';
+    });
+    input.addEventListener('blur', () => {
+      const [month, field] = input.dataset.budgetInput.split('|');
+      let v = s.currentLineItems[month] ? s.currentLineItems[month][field] : null;
+      if (PCT_FIELDS.includes(field) && v != null) v = v * 100;
+      input.value = PPC_INPUT_FORMAT[field](v);
+    });
+  });
+}
+
+function trafficInputRow(channel, asin, months, field, label, placeholder) {
+  const cells = months.map(([m]) => {
+    const ti = trafficItemFor(channel, asin, m);
+    let v = ti[field];
+    if (TRAFFIC_PCT_FIELDS.includes(field) && v != null) v = v * 100;
+    const display = TRAFFIC_INPUT_FORMAT[field](v);
+    return `<td class="numcell"><input type="text" inputmode="decimal" class="budget-input" data-traffic-input="${asin}|${m}|${field}" value="${display}" placeholder="${placeholder}"></td>`;
+  }).join('');
+  return `<tr><td class="rowlabel sub">${label}</td>${cells}</tr>`;
+}
+
+// Read-only computed row (Units Ordered or Gross Sales) under a product
+// group's inputs. Cells carry data-computed-cell so a keystroke can refresh
+// just these numbers (see updateTrafficComputedCells) without rebuilding the
+// whole table underneath the focused input.
+function trafficComputedRow(channel, asin, months, field, label, fmt, computeFn) {
+  const cells = months.map(([m]) => {
+    const ti = trafficItemFor(channel, asin, m);
+    return `<td class="numcell" style="font-weight:700;" data-computed-cell="${asin}|${field}|${m}">${fmt(computeFn(ti, channel))}</td>`;
+  }).join('');
+  return `<tr><td class="rowlabel sub" style="font-weight:600;">${label}</td>${cells}</tr>`;
+}
+
+function updateTrafficComputedCells(channel) {
+  document.querySelectorAll('#organicTable-' + channel + ' [data-computed-cell]').forEach(td => {
+    const [asin, field, m] = td.dataset.computedCell.split('|');
+    const ti = trafficItemFor(channel, asin, m);
+    td.textContent = field === 'unitsOrdered' ? int(trafficUnitsOrdered(ti, channel)) : money(trafficGrossSales(ti, channel));
+  });
+}
+
+// One group of input rows per product group (ASIN, or category slug for
+// Walmart), separated by a group-header row; matches the layout the "Budget
+// vs Actuals" per-product table below uses. Amazon (trafficInputMode
+// 'sessions'): Sessions, Conversion Rate, AOV, Repeat Sales % inputs, with
+// Units Ordered derived. Walmart (trafficInputMode 'direct'): Units Ordered
+// and AOV typed directly — no session data exists to derive it from. Either
+// way, Gross Sales is a read-only computed row.
+function renderOrganicTable(channel) {
+  const year = currentVersion.year;
+  const months = monthsOfYear(year);
+  const table = document.getElementById('organicTable-' + channel);
+  const head = `<thead><tr><th></th>${months.map(([, l]) => `<th class="month-head">${l}</th>`).join('')}</tr></thead>`;
+
+  const direct = CHANNEL_CONFIG[channel].trafficInputMode === 'direct';
+  const inputRows = direct
+    ? (p) => `
+    ${trafficInputRow(channel, p.asin, months, 'unitsOrdered', 'Units Ordered', '0')}
+    ${trafficInputRow(channel, p.asin, months, 'aov', 'AOV', '$0.00')}`
+    : (p) => `
+    ${trafficInputRow(channel, p.asin, months, 'sessions', 'Sessions', '0')}
+    ${trafficInputRow(channel, p.asin, months, 'conversionRate', 'Conversion Rate', '0.00%')}
+    ${trafficInputRow(channel, p.asin, months, 'aov', 'AOV', '$0.00')}
+    ${trafficInputRow(channel, p.asin, months, 'repeatSalesPct', 'Repeat Sales', '0.00%')}
+    ${trafficComputedRow(channel, p.asin, months, 'unitsOrdered', 'Units Ordered', int, trafficUnitsOrdered)}`;
+
+  const body = CHANNEL_CONFIG[channel].productGroups.map(p => `
+    <tr class="group-header"><td colspan="${months.length + 1}"><span class="sticky-label">${p.label}${channel === 'Amazon' ? ' — ' + p.asin : ''}</span></td></tr>
+    ${inputRows(p)}
+    ${trafficComputedRow(channel, p.asin, months, 'grossSales', 'Gross Sales', money, trafficGrossSales)}
+  `).join('');
+
+  table.innerHTML = head + `<tbody>${body}</tbody>`;
+
+  // Show a plain editable number on focus (stripped of $/%/commas), and
+  // reformat on blur — same pattern as the PPC Budget inputs.
+  table.querySelectorAll('[data-traffic-input]').forEach(input => {
+    input.addEventListener('input', () => {
+      captureTrafficInputsIntoState(channel);
+      updateTrafficComputedCells(channel);
+      renderProductTrafficTable(channel);
+      renderTrafficSummary(channel);
+    });
+    input.addEventListener('focus', () => {
+      const [asin, month, field] = input.dataset.trafficInput.split('|');
+      let v = trafficItemFor(channel, asin, month)[field];
+      if (TRAFFIC_PCT_FIELDS.includes(field) && v != null) v = pctFromFraction(v);
+      input.value = v != null ? v : '';
+    });
+    input.addEventListener('blur', () => {
+      const [asin, month, field] = input.dataset.trafficInput.split('|');
+      let v = trafficItemFor(channel, asin, month)[field];
+      if (TRAFFIC_PCT_FIELDS.includes(field) && v != null) v = v * 100;
+      input.value = TRAFFIC_INPUT_FORMAT[field](v);
+    });
+  });
+
+  renderProductTrafficTable(channel);
+  renderTrafficSummary(channel);
+}
+
+// Per-product Budget vs Actuals: Sessions, Conversion Rate, Units Ordered,
+// AOV, and Gross Sales for each product group. Amazon actuals come from
+// Triple Whale's Amazon Seller Central Sales & Traffic data; Walmart actuals
+// come from the Walmart Marketplace API orders data (see getWalmartStatus /
+// syncWalmartMarketplaceOrders in src/index.js) — Sessions/Conversion Rate
+// have no Walmart data source at all, so those two rows are dropped entirely
+// for Walmart rather than shown as permanent "—".
+const TRAFFIC_METRICS_BY_MODE = {
+  sessions: [
+    { key: 'sessions', label: 'Sessions', fmt: int, invert: false },
+    { key: 'conversionRate', label: 'Conversion Rate', fmt: pctVal, invert: false },
+    { key: 'unitsOrdered', label: 'Units Ordered', fmt: int, invert: false },
+    { key: 'aov', label: 'AOV', fmt: money2, invert: false },
+    { key: 'grossSales', label: 'Gross Sales', fmt: money, invert: false },
+  ],
+  direct: [
+    { key: 'unitsOrdered', label: 'Units Ordered', fmt: int, invert: false },
+    { key: 'aov', label: 'AOV', fmt: money2, invert: false },
+    { key: 'grossSales', label: 'Gross Sales', fmt: money, invert: false },
+  ],
+};
+
+function trafficBudgetMetrics(ti, channel) {
+  return {
+    sessions: ti.sessions ?? null,
+    conversionRate: ti.conversionRate ?? null,
+    unitsOrdered: trafficUnitsOrdered(ti, channel),
+    aov: ti.aov ?? null,
+    grossSales: trafficGrossSales(ti, channel),
+  };
+}
+function trafficActualMetrics(channel, asin, month) {
+  const s = state[channel];
+  const a = s.trafficActuals[asin] && s.trafficActuals[asin][month];
+  if (!a) return null;
+  return {
+    sessions: a.sessions,
+    conversionRate: a.sessions ? a.unitsOrdered / a.sessions : null,
+    unitsOrdered: a.unitsOrdered,
+    aov: a.unitsOrdered ? a.salesAmount / a.unitsOrdered : null,
+    grossSales: a.salesAmount,
+  };
+}
+
+// Same aggregate-then-rederive pattern as aggregatePpcRow: sessions/
+// unitsOrdered/grossSales are additive, conversionRate and aov are not (they
+// get recomputed from the summed values). `getMetrics` is
+// trafficBudgetMetrics/trafficActualMetrics for one product group + one month.
+function aggregateTrafficRow(monthList, getMetrics) {
+  let sessions = 0, unitsOrdered = 0, grossSales = 0, has = false;
+  for (const m of monthList) {
+    const row = getMetrics(m);
+    if (!row) continue;
+    // A row's presence (not specifically its sessions field) marks "has
+    // data" — Walmart has no session-level data source, so its actual rows
+    // always carry sessions: null while unitsOrdered/grossSales are real;
+    // gating solely on sessions (as this used to) silently discarded that
+    // real data as "—".
+    has = true;
+    if (row.sessions != null) sessions += row.sessions;
+    if (row.unitsOrdered != null) unitsOrdered += row.unitsOrdered;
+    if (row.grossSales != null) grossSales += row.grossSales;
+  }
+  if (!has) return null;
+  return {
+    sessions, unitsOrdered, grossSales,
+    conversionRate: sessions ? unitsOrdered / sessions : null,
+    aov: unitsOrdered ? grossSales / unitsOrdered : null,
+  };
+}
+
+function renderProductTrafficTable(channel) {
+  const year = currentVersion.year;
+  const periods = periodsOfYear(year);
+  const totalMonths = totalMonthsOfYear(year);
+  const table = document.getElementById('productTrafficTable-' + channel);
+
+  const groupHead = (label, isTotal) => `<th colspan="4" class="month-head ${isTotal ? 'total-col' : 'month-group'}">${label}</th>`;
+  const subHead = (isTotal) => `<th class="${isTotal ? 'total-col' : 'month-group'}">Budget</th><th>Actuals</th><th>Variance</th><th>%</th>`;
+  const head = `<thead>
+    <tr><th></th>${periods.map(p => groupHead(p.label, false)).join('')}${groupHead('Total (YTD)', true)}</tr>
+    <tr><th></th>${periods.map(() => subHead(false)).join('')}${subHead(true)}</tr>
+  </thead>`;
+
+  function cellsFor(metric, b, a, isTotal) {
+    const budgetCell = `<td class="numcell dim${isTotal ? ' total-col' : ' month-group'}">${b == null ? '—' : metric.fmt(b)}</td>`;
+    const actualCell = `<td class="numcell">${a == null ? '—' : metric.fmt(a)}</td>`;
+    if (a == null || b == null) return budgetCell + actualCell + `<td class="numcell dim">—</td><td class="numcell dim">—</td>`;
+    const diff = a - b;
+    const pct = b ? diff / b : null;
+    return budgetCell + actualCell +
+      `<td class="numcell ${varClass(diff, metric.invert)}">${metric.fmt(diff)}</td>` +
+      `<td class="numcell ${varClass(diff, metric.invert)}">${pct == null ? '—' : pctDiff(pct)}</td>`;
+  }
+
+  const metrics = TRAFFIC_METRICS_BY_MODE[CHANNEL_CONFIG[channel].trafficInputMode];
+  const body = CHANNEL_CONFIG[channel].productGroups.map(p => {
+    const rows = metrics.map(metric => {
+      const cells = periods.map(period => {
+        const budgets = aggregateTrafficRow(period.months, (m) => trafficBudgetMetrics(trafficItemFor(channel, p.asin, m), channel));
+        const acts = aggregateTrafficRow(period.months, (m) => trafficActualMetrics(channel, p.asin, m));
+        return cellsFor(metric, budgets ? budgets[metric.key] : null, acts ? acts[metric.key] : null, false);
+      }).join('');
+      const totalBudget = aggregateTrafficRow(totalMonths, (m) => trafficBudgetMetrics(trafficItemFor(channel, p.asin, m), channel));
+      const totalActual = aggregateTrafficRow(totalMonths, (m) => trafficActualMetrics(channel, p.asin, m));
+      const totalCell = cellsFor(metric, totalBudget ? totalBudget[metric.key] : null, totalActual ? totalActual[metric.key] : null, true);
+      return `<tr><td class="rowlabel sub">${metric.label}</td>${cells}${totalCell}</tr>`;
+    }).join('');
+    return `<tr class="group-header"><td colspan="${periods.length * 4 + 5}"><span class="sticky-label">${p.label}${channel === 'Amazon' ? ' — ' + p.asin : ''}</span></td></tr>${rows}`;
+  }).join('');
+
+  table.innerHTML = head + `<tbody>${body}</tbody>`;
+  renderTrafficActualsNote(channel);
+  syncStickyHeaderOffset('productTrafficTable-' + channel);
+}
+
+// The second header row must stick just below the first; its exact pixel
+// height depends on font metrics, so measure the rendered row rather than
+// hardcode a guess. This only measures correctly while the table's tab is
+// actually visible (a hidden `display:none` tab reports 0-height), so it's
+// called both after render and whenever that tab is shown. Shared by every
+// table here with a two-row header (productTrafficTable-*, resultsTable-*);
+// organicTable-* has only one header row and doesn't need this.
+function syncStickyHeaderOffset(tableId) {
+  const table = document.getElementById(tableId);
+  const firstRow = table && table.querySelector('thead tr:first-child');
+  if (!firstRow) return;
+  const h = firstRow.getBoundingClientRect().height;
+  if (!h) return;
+  table.querySelectorAll('thead tr:nth-child(2) th').forEach((th) => { th.style.top = h + 'px'; });
+}
+
+function renderTrafficActualsNote(channel) {
+  const el = document.getElementById('trafficActualsNote-' + channel);
+  if (!el) return;
+  const s = state[channel];
+  if (s.trafficTwError) {
+    el.className = 'banner warn';
+    el.innerHTML = `<span>⚠️</span><span><strong>${channel} traffic actuals could not be loaded:</strong> ${s.trafficTwError}</span>`;
+    return;
+  }
+  const hasAny = Object.values(s.trafficActuals).some(byMonth => Object.keys(byMonth).length > 0);
+  if (!hasAny) {
+    el.className = 'banner warn';
+    el.innerHTML = `<span>⚠️</span><span><strong>No traffic actuals cached yet</strong> — the metrics below stay "—" until data is available. Budget figures above still work normally.</span>`;
+    return;
+  }
+  el.className = 'banner';
+  if (channel === 'Amazon') {
+    el.innerHTML = `<span>ℹ️</span><span>Traffic Budget actuals are refreshed nightly from Amazon Seller Central (via Sophie Society) — not live on every page load.</span>`;
+  } else {
+    el.innerHTML = `<span>ℹ️</span><span>Traffic Budget actuals pull live from the Walmart Marketplace API's order data on every page load. Sessions and Conversion Rate have no Walmart data source and aren't tracked.</span>`;
+  }
+}
+
+// Blended across all product groups: Total Gross Sales, Ad Sales % (Actual
+// Ad Sales / Total Gross Sales — Ad Sales isn't product-specific here, so
+// this stays blended rather than per-product), Repeat Sales % (revenue-
+// weighted average of each product's Traffic Budget input), and Organic
+// Sales % (the remainder).
+function totalGrossSales(channel, month) {
+  let total = 0, has = false;
+  for (const p of CHANNEL_CONFIG[channel].productGroups) {
+    const g = trafficGrossSales(trafficItemFor(channel, p.asin, month), channel);
+    if (g != null) { total += g; has = true; }
+  }
+  return has ? total : null;
+}
+function blendedRepeatSalesPct(channel, month) {
+  let weightedSum = 0, weightTotal = 0;
+  for (const p of CHANNEL_CONFIG[channel].productGroups) {
+    const ti = trafficItemFor(channel, p.asin, month);
+    const gross = trafficGrossSales(ti, channel);
+    const pct = ti.repeatSalesPct ?? null;
+    if (gross != null && pct != null) { weightedSum += gross * pct; weightTotal += gross; }
+  }
+  return weightTotal ? weightedSum / weightTotal : null;
+}
+function adSalesPctFor(channel, month) {
+  const gross = totalGrossSales(channel, month);
+  const a = state[channel].actuals[month];
+  const actualAdSales = a ? a.adSales : null;
+  if (!gross || actualAdSales == null) return null;
+  return actualAdSales / gross;
+}
+function organicSalesPctFor(channel, month) {
+  const adPct = adSalesPctFor(channel, month);
+  const repeatPct = blendedRepeatSalesPct(channel, month);
+  if (adPct == null || repeatPct == null) return null;
+  return 1 - adPct - repeatPct;
+}
+
+function renderTrafficSummary(channel) {
+  const year = currentVersion.year;
+  const months = monthsOfYear(year);
+  const table = document.getElementById('trafficSummaryTable-' + channel);
+  const head = `<thead><tr><th></th>${months.map(([, l]) => `<th class="month-head">${l}</th>`).join('')}</tr></thead>`;
+
+  function row(label, fn, fmt, opts) {
+    const cells = months.map(([m]) => {
+      const v = fn(m);
+      return `<td class="numcell" style="font-weight:700;">${v == null ? '—' : fmt(v)}</td>`;
+    }).join('');
+    const trStyle = opts && opts.topBorder ? ' style="border-top:2px solid var(--ink);"' : '';
+    return `<tr${trStyle}><td class="rowlabel${opts && opts.sub ? ' sub' : ''}">${label}</td>${cells}</tr>`;
+  }
+
+  // A Total Gross Sales row for each product group, then the existing
+  // blended total as a sum row underneath (topBorder marks it as the total
+  // of the rows above rather than an extra product).
+  const perProductRows = CHANNEL_CONFIG[channel].productGroups.map(p =>
+    row(p.label, (m) => trafficGrossSales(trafficItemFor(channel, p.asin, m), channel), money, { sub: true })
+  ).join('');
+
+  table.innerHTML = head + `<tbody>
+    ${perProductRows}
+    ${row('Total Gross Sales', (m) => totalGrossSales(channel, m), money, { topBorder: true })}
+    ${row('Ad Sales %', (m) => adSalesPctFor(channel, m), pctVal)}
+    ${row('Repeat Sales %', (m) => blendedRepeatSalesPct(channel, m), pctVal)}
+    ${row('Organic Sales %', (m) => organicSalesPctFor(channel, m), pctVal)}
+  </tbody>`;
+}
+
+/* ---------- Income Statement ---------- */
+// Rate display: % + 2dp, same convention as PPC/Traffic Budget's Conversion
+// Rate and Repeat Sales inputs.
+function fmtIncomeRate(v) { return v != null ? Number(v).toFixed(2) + '%' : ''; }
+
+function renderIncomeRatesTable(channel) {
+  const s = state[channel];
+  const table = document.getElementById('incomeRatesTable-' + channel);
+  const rows = CHANNEL_CONFIG[channel].incomeItems.map(item => {
+    const v = s.currentIncomeRates[item.key];
+    const display = fmtIncomeRate(v != null ? v * 100 : null);
+    return `<tr><td class="rowlabel">${item.label}</td><td class="numcell"><input type="text" inputmode="decimal" class="budget-input" data-income-rate="${item.key}" value="${display}" placeholder="0.00%"></td></tr>`;
+  }).join('');
+  table.innerHTML = `<thead><tr><th></th><th>Rate (%)</th></tr></thead><tbody>${rows}</tbody>`;
+
+  // Show a plain editable number on focus (stripped of %), and reformat on
+  // blur — same pattern as the PPC/Traffic Budget inputs.
+  table.querySelectorAll('[data-income-rate]').forEach(input => {
+    input.addEventListener('input', () => { captureIncomeRatesIntoState(channel); renderIncomeStatementTable(channel); });
+    input.addEventListener('focus', () => {
+      const key = input.dataset.incomeRate;
+      const v = pctFromFraction(s.currentIncomeRates[key]);
+      input.value = v != null ? v : '';
+    });
+    input.addEventListener('blur', () => {
+      const key = input.dataset.incomeRate;
+      const v = s.currentIncomeRates[key];
+      input.value = fmtIncomeRate(v != null ? v * 100 : null);
+    });
+  });
+}
+
+function captureIncomeRatesIntoState(channel) {
+  const s = state[channel];
+  document.querySelectorAll('#incomeRatesTable-' + channel + ' [data-income-rate]').forEach(input => {
+    const key = input.dataset.incomeRate;
+    const num = parseFormattedNumber(input.value);
+    s.currentIncomeRates[key] = num == null ? null : num / 100;
+  });
+}
+
+// Revenue rolls up the existing Traffic Budget's per-product-group Gross
+// Sales (budget = Sessions x Conversion Rate x AOV; actual = each channel's
+// own Traffic Budget actuals source) into the channel's product-line
+// categories — no separate revenue input exists.
+function categoryRevenueBudget(channel, catKey, month) {
+  const cat = CHANNEL_CONFIG[channel].incomeCategories.find(c => c.key === catKey);
+  let total = 0, has = false;
+  for (const asin of cat.asins) {
+    const g = trafficGrossSales(trafficItemFor(channel, asin, month), channel);
+    if (g != null) { total += g; has = true; }
+  }
+  return has ? total : null;
+}
+// Pulls from Business Central (via that channel's own Sales Channel invoice
+// dimension — see getRevenueActualsFromBc in src/index.js), not the Traffic
+// Budget's own actuals source. Budget still rolls up Traffic Budget's Gross
+// Sales, unaffected — this only changes where the Actual comes from.
+function categoryRevenueActual(channel, catKey, month) {
+  const s = state[channel];
+  return s.incomeActuals[month] ? (s.incomeActuals[month][catKey] ?? null) : null;
+}
+function grossRevenueBudget(channel, month) {
+  let total = 0, has = false;
+  for (const c of CHANNEL_CONFIG[channel].incomeCategories) {
+    const v = categoryRevenueBudget(channel, c.key, month);
+    if (v != null) { total += v; has = true; }
+  }
+  return has ? total : null;
+}
+function grossRevenueActual(channel, month) {
+  let total = 0, has = false;
+  for (const c of CHANNEL_CONFIG[channel].incomeCategories) {
+    const v = categoryRevenueActual(channel, c.key, month);
+    if (v != null) { total += v; has = true; }
+  }
+  return has ? total : null;
+}
+
+// Budget for a rate-driven item = its single rate x that month's Gross
+// Revenue budget. Actual prefers a manual entry over the BC-sourced cache
+// (same override precedence as the existing Manual Actuals tab).
+function incomeItemBudget(channel, itemKey, month) {
+  const s = state[channel];
+  const rate = s.currentIncomeRates[itemKey];
+  const gross = grossRevenueBudget(channel, month);
+  return rate != null && gross != null ? rate * gross : null;
+}
+function incomeItemActual(channel, itemKey, month) {
+  const s = state[channel];
+  const manual = s.incomeActualsManual[month] ? s.incomeActualsManual[month][itemKey] : null;
+  if (manual != null) return manual;
+  const cached = s.incomeActuals[month] ? s.incomeActuals[month][itemKey] : null;
+  return cached != null ? cached : null;
+}
+
+// Advertising is pulled directly from the PPC Budget tab — not a rate of
+// Gross Revenue. `actuals[month]` is already the server-merged Triple
+// Whale/manual figure the PPC Budget vs Actuals table uses.
+function advertisingBudget(channel, month) { return budgetFor(channel, month).spend; }
+// Actual pulls from Business Central exclusively, like every other Income
+// Statement actual — not from Triple Whale/PPC Budget, even though the
+// Budget side above does mirror the PPC Budget tab.
+function advertisingActual(channel, month) {
+  const s = state[channel];
+  return s.incomeActuals[month] ? s.incomeActuals[month].advertising : null;
+}
+
+function netRevenueBudget(channel, month) {
+  const gross = grossRevenueBudget(channel, month);
+  if (gross == null) return null;
+  let ded = 0;
+  for (const item of CHANNEL_CONFIG[channel].incomeItems.filter(i => i.group === 'revenue')) {
+    const v = incomeItemBudget(channel, item.key, month);
+    if (v != null) ded += v;
+  }
+  return gross - ded;
+}
+function netRevenueActual(channel, month) {
+  const gross = grossRevenueActual(channel, month);
+  if (gross == null) return null;
+  let ded = 0;
+  for (const item of CHANNEL_CONFIG[channel].incomeItems.filter(i => i.group === 'revenue')) {
+    const v = incomeItemActual(channel, item.key, month);
+    if (v != null) ded += v;
+  }
+  return gross - ded;
+}
+
+function opexItemBudget(channel, key, month) { return key === '__advertising__' ? advertisingBudget(channel, month) : incomeItemBudget(channel, key, month); }
+function opexItemActual(channel, key, month) { return key === '__advertising__' ? advertisingActual(channel, month) : incomeItemActual(channel, key, month); }
+
+function totalOpExBudget(channel, month) {
+  let total = 0, has = false;
+  for (const key of CHANNEL_CONFIG[channel].opexRowOrder) {
+    const v = opexItemBudget(channel, key, month);
+    if (v != null) { total += v; has = true; }
+  }
+  return has ? total : null;
+}
+function totalOpExActual(channel, month) {
+  let total = 0, has = false;
+  for (const key of CHANNEL_CONFIG[channel].opexRowOrder) {
+    const v = opexItemActual(channel, key, month);
+    if (v != null) { total += v; has = true; }
+  }
+  return has ? total : null;
+}
+
+function netOperatingIncomeBudget(channel, month) {
+  const nr = netRevenueBudget(channel, month);
+  if (nr == null) return null;
+  const ope = totalOpExBudget(channel, month);
+  return nr - (ope ?? 0);
+}
+function netOperatingIncomeActual(channel, month) {
+  const nr = netRevenueActual(channel, month);
+  if (nr == null) return null;
+  const ope = totalOpExActual(channel, month);
+  return nr - (ope ?? 0);
+}
+// budgetPeriodFn/actualPeriodFn each take a list of months (one month for a
+// normal column, three for a quarter, the year-to-date set for the Total
+// column) and return one aggregated value — callers wrap a per-month
+// function with sumOverMonths for additive $ rows, or pass a dedicated
+// period-level function for a ratio row like Gross Margin % that can't just
+// be summed.
+function incomeRow(label, budgetPeriodFn, actualPeriodFn, fmt, invert, periods, totalMonths, bold) {
+  function cellFor(monthList, isTotal) {
+    const b = budgetPeriodFn(monthList), a = actualPeriodFn(monthList);
+    const budgetCell = `<td class="numcell dim ${isTotal ? 'total-col' : 'month-group'}">${b == null ? '—' : fmt(b)}</td>`;
+    const actualCell = `<td class="numcell">${a == null ? '—' : fmt(a)}</td>`;
+    if (a == null || b == null) return budgetCell + actualCell + `<td class="numcell dim">—</td><td class="numcell dim">—</td>`;
+    const diff = a - b;
+    const pct = b ? diff / b : null;
+    return budgetCell + actualCell +
+      `<td class="numcell ${varClass(diff, invert)}">${fmt(diff)}</td>` +
+      `<td class="numcell ${varClass(diff, invert)}">${pct == null ? '—' : pctDiff(pct)}</td>`;
+  }
+  const cells = periods.map(p => cellFor(p.months, false)).join('');
+  const totalCell = cellFor(totalMonths, true);
+  return `<tr${bold ? ' style="font-weight:700;"' : ''}><td class="rowlabel${bold ? '' : ' sub'}">${label}</td>${cells}${totalCell}</tr>`;
+}
+
+function grossMarginPctBudgetForPeriod(channel, monthList) {
+  const noi = sumOverMonths(monthList, (m) => netOperatingIncomeBudget(channel, m));
+  const nr = sumOverMonths(monthList, (m) => netRevenueBudget(channel, m));
+  return nr ? noi / nr : null;
+}
+function grossMarginPctActualForPeriod(channel, monthList) {
+  const noi = sumOverMonths(monthList, (m) => netOperatingIncomeActual(channel, m));
+  const nr = sumOverMonths(monthList, (m) => netRevenueActual(channel, m));
+  return nr ? noi / nr : null;
+}
+
+function renderIncomeStatementTable(channel) {
+  const year = currentVersion.year;
+  const periods = periodsOfYear(year);
+  const totalMonths = totalMonthsOfYear(year);
+  const table = document.getElementById('incomeStatementTable-' + channel);
+  const cfg = CHANNEL_CONFIG[channel];
+
+  const groupHead = (label, isTotal) => `<th colspan="4" class="month-head ${isTotal ? 'total-col' : 'month-group'}">${label}</th>`;
+  const subHead = (isTotal) => `<th class="${isTotal ? 'total-col' : 'month-group'}">Budget</th><th>Actuals</th><th>Variance</th><th>%</th>`;
+  const head = `<thead>
+    <tr><th></th>${periods.map(p => groupHead(p.label, false)).join('')}${groupHead('Total (YTD)', true)}</tr>
+    <tr><th></th>${periods.map(() => subHead(false)).join('')}${subHead(true)}</tr>
+  </thead>`;
+
+  const revenueRows = cfg.incomeCategories.map(c =>
+    incomeRow(c.label,
+      (ml) => sumOverMonths(ml, (m) => categoryRevenueBudget(channel, c.key, m)),
+      (ml) => sumOverMonths(ml, (m) => categoryRevenueActual(channel, c.key, m)),
+      money, false, periods, totalMonths, false)
+  ).join('');
+  const grossRevenueRow = incomeRow('Gross Revenue',
+    (ml) => sumOverMonths(ml, (m) => grossRevenueBudget(channel, m)), (ml) => sumOverMonths(ml, (m) => grossRevenueActual(channel, m)),
+    money, false, periods, totalMonths, true);
+
+  const deductionRows = cfg.incomeItems.filter(i => i.group === 'revenue').map(item =>
+    incomeRow(item.label,
+      (ml) => sumOverMonths(ml, (m) => incomeItemBudget(channel, item.key, m)),
+      (ml) => sumOverMonths(ml, (m) => incomeItemActual(channel, item.key, m)),
+      money, true, periods, totalMonths, false)
+  ).join('');
+  const netRevenueRow = incomeRow('Net Revenue',
+    (ml) => sumOverMonths(ml, (m) => netRevenueBudget(channel, m)), (ml) => sumOverMonths(ml, (m) => netRevenueActual(channel, m)),
+    money, false, periods, totalMonths, true);
+
+  const opexRows = cfg.opexRowOrder.map(key => {
+    const label = key === '__advertising__' ? cfg.advertisingLabel : cfg.incomeItems.find(i => i.key === key).label;
+    return incomeRow(label,
+      (ml) => sumOverMonths(ml, (m) => opexItemBudget(channel, key, m)),
+      (ml) => sumOverMonths(ml, (m) => opexItemActual(channel, key, m)),
+      money, true, periods, totalMonths, false);
+  }).join('');
+  const totalOpExRow = incomeRow('Total Operating Expenses',
+    (ml) => sumOverMonths(ml, (m) => totalOpExBudget(channel, m)), (ml) => sumOverMonths(ml, (m) => totalOpExActual(channel, m)),
+    money, true, periods, totalMonths, true);
+  const noiRow = incomeRow('Net Operating Income',
+    (ml) => sumOverMonths(ml, (m) => netOperatingIncomeBudget(channel, m)), (ml) => sumOverMonths(ml, (m) => netOperatingIncomeActual(channel, m)),
+    money, false, periods, totalMonths, true);
+  const marginRow = incomeRow('Gross Margin %',
+    (ml) => grossMarginPctBudgetForPeriod(channel, ml), (ml) => grossMarginPctActualForPeriod(channel, ml),
+    pctVal, false, periods, totalMonths, true);
+
+  const body = `
+    <tr class="group-header"><td colspan="${periods.length * 4 + 5}">Revenue</td></tr>
+    ${revenueRows}
+    ${grossRevenueRow}
+    ${deductionRows}
+    ${netRevenueRow}
+    <tr class="group-header"><td colspan="${periods.length * 4 + 5}">Operating Expenses</td></tr>
+    ${opexRows}
+    ${totalOpExRow}
+    ${noiRow}
+    ${marginRow}
+  `;
+
+  table.innerHTML = head + `<tbody>${body}</tbody>`;
+  renderIncomeActualsNote(channel);
+}
+
+function renderIncomeActualsNote(channel) {
+  const el = document.getElementById('incomeActualsNote-' + channel);
+  if (!el) return;
+  const s = state[channel];
+  if (s.incomeBcError) {
+    el.className = 'banner warn';
+    el.innerHTML = `<span>⚠️</span><span><strong>Business Central actuals could not be loaded:</strong> ${s.incomeBcError}. Manual entries and Budget rows still show; try reloading the page.</span>`;
+    return;
+  }
+  el.className = 'banner';
+  el.innerHTML = `<span>ℹ️</span><span><strong>Every Actual on this table pulls live from Business Central only</strong> — no other MCP/data source, and no manual refresh needed. Revenue is scoped to ${channel} via each sales invoice's Sales Channel dimension; the other items are ${channel}-only accounts by definition. Budget rows still roll up the Traffic Budget tab (Revenue) and the PPC Budget tab (Advertising). A Manual Actual (see "Manual Actuals") overrides Business Central for that month.</span>`;
+}
+
+const METRICS = [
+  { key: 'clicks', label: 'Clicks', fmt: int, invert: false },
+  { key: 'cpc', label: 'CPC', fmt: money2, invert: true },
+  { key: 'conversionRate', label: 'Conversion Rate', fmt: pctVal, invert: false },
+  { key: 'aov', label: 'AOV', fmt: money2, invert: false },
+  { key: 'roas', label: 'ROAS', fmt: roasVal, invert: false },
+  { key: 'spend', label: 'Spend', fmt: money, invert: true },
+  { key: 'orders', label: 'Ad Orders', fmt: int, invert: false },
+  { key: 'adSales', label: 'Ad Sales', fmt: money, invert: false },
+];
+
+const FULL_MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// Side-by-side layout: each month is a group of 4 columns (Budget, Actuals,
+// Variance, %), with one row per metric — matches the existing spreadsheet
+// budget trackers this replaces, rather than stacking Budget/Actuals/
+// Variance/% as separate rows under each month.
+function renderResultsTable(channel) {
+  const year = currentVersion.year;
+  const periods = periodsOfYear(year);
+  const totalMonths = totalMonthsOfYear(year);
+  const table = document.getElementById('resultsTable-' + channel);
+  const s = state[channel];
+
+  const groupHead = (label, isTotal) =>
+    `<th colspan="4" class="month-head ${isTotal ? 'total-col' : 'month-group'}">${label}</th>`;
+  const subHead = (isTotal) => `
+    <th class="${isTotal ? 'total-col' : 'month-group'}">Budget</th>
+    <th>Actuals</th>
+    <th>Variance</th>
+    <th>%</th>
+  `;
+  const head = `<thead>
+    <tr><th></th>${periods.map(p => groupHead(p.label, false)).join('')}${groupHead('Total (YTD)', true)}</tr>
+    <tr><th></th>${periods.map(() => subHead(false)).join('')}${subHead(true)}</tr>
+  </thead>`;
+
+  // Per-month actuals with aov derived (Triple Whale/manual rows carry
+  // clicks/spend/orders/adSales only), built for every month of the year so
+  // a quarter or the YTD Total can aggregate across whichever months it needs.
+  const actsByMonth = {};
+  for (const [mm] of MONTHS) {
+    const m = year + '-' + mm;
+    actsByMonth[m] = s.actuals[m] ? { ...s.actuals[m], aov: s.actuals[m].orders ? s.actuals[m].adSales / s.actuals[m].orders : null } : null;
+  }
+
+  const budgetTotal = aggregatePpcRow(totalMonths, (m) => budgetFor(channel, m));
+  const actualTotal = aggregatePpcRow(totalMonths, (m) => actsByMonth[m]);
+
+  function groupCells(metric, b, a, source, isTotal) {
+    const budgetCell = `<td class="numcell dim${isTotal ? ' total-col' : ' month-group'}">${b == null ? '—' : metric.fmt(b)}</td>`;
+    const srcTitle = source === 'triplewhale' ? 'Triple Whale (live)' : (source === 'manual' ? 'Manual entry' : '');
+    const actualCell = `<td class="numcell"${srcTitle ? ` title="${srcTitle}"` : ''}>${a == null ? '—' : metric.fmt(a)}</td>`;
+    if (a == null || b == null) {
+      return budgetCell + actualCell + `<td class="numcell dim">—</td><td class="numcell dim">—</td>`;
+    }
+    const diff = a - b;
+    const pct = b ? diff / b : null;
+    const varCell = `<td class="numcell ${varClass(diff, metric.invert)}">${metric.fmt(diff)}</td>`;
+    const pctCell = `<td class="numcell ${varClass(diff, metric.invert)}">${pct == null ? '—' : pctDiff(pct)}</td>`;
+    return budgetCell + actualCell + varCell + pctCell;
+  }
+
+  const rows = METRICS.map(metric => {
+    const cells = periods.map(period => {
+      const b = aggregatePpcRow(period.months, (m) => budgetFor(channel, m));
+      const a = aggregatePpcRow(period.months, (m) => actsByMonth[m]);
+      // A source badge only makes sense for a single month; a quarter blends
+      // Triple Whale + manual, so no single title applies there.
+      const src = period.months.length === 1 ? actsByMonth[period.months[0]]?.source : null;
+      return groupCells(metric, b ? b[metric.key] : null, a ? a[metric.key] : null, src, false);
+    }).join('');
+    const totalCells = groupCells(metric, budgetTotal ? budgetTotal[metric.key] : null, actualTotal ? actualTotal[metric.key] : null, null, true);
+    return `<tr><td class="rowlabel">${metric.label}</td>${cells}${totalCells}</tr>`;
+  }).join('');
+
+  table.innerHTML = head + `<tbody>${rows}</tbody>`;
+  syncStickyHeaderOffset('resultsTable-' + channel);
+}
+
+function renderManualTable(channel) {
+  const year = currentVersion.year;
+  const months = monthsOfYear(year);
+  const table = document.getElementById('manualTable-' + channel);
+  const s = state[channel];
+  const head = `<thead><tr><th></th>${months.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>`;
+
+  function inputRow(field, label) {
+    const cells = months.map(([m]) => {
+      const v = s.manualActuals[m] ? s.manualActuals[m][field] : null;
+      const display = v != null ? v : '';
+      return `<td class="numcell"><input type="text" inputmode="decimal" class="budget-input" data-manual-input="${m}|${field}" value="${display}" placeholder="—"></td>`;
+    }).join('');
+    return `<tr><td class="rowlabel">${label}</td>${cells}</tr>`;
+  }
+
+  table.innerHTML = head + `<tbody>
+    ${inputRow('clicks', 'Clicks')}
+    ${inputRow('spend', 'Spend ($)')}
+    ${inputRow('orders', 'Ad Orders')}
+    ${inputRow('adSales', 'Ad Sales ($)')}
+  </tbody>`;
+}
+
+function renderIncomeManualTable(channel) {
+  const year = currentVersion.year;
+  const months = monthsOfYear(year);
+  const table = document.getElementById('incomeManualTable-' + channel);
+  const s = state[channel];
+  const head = `<thead><tr><th></th>${months.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>`;
+
+  const rows = CHANNEL_CONFIG[channel].incomeItems.map(item => {
+    const cells = months.map(([m]) => {
+      const v = s.incomeActualsManual[m] ? s.incomeActualsManual[m][item.key] : null;
+      const display = v != null ? v : '';
+      return `<td class="numcell"><input type="text" inputmode="decimal" class="budget-input" data-income-manual-input="${m}|${item.key}" value="${display}" placeholder="—"></td>`;
+    }).join('');
+    return `<tr><td class="rowlabel">${item.label}</td>${cells}</tr>`;
+  }).join('');
+
+  table.innerHTML = head + `<tbody>${rows}</tbody>`;
+}
+
+async function saveIncomeManualActuals(channel) {
+  const rows = [];
+  document.querySelectorAll('#incomeManualTable-' + channel + ' [data-income-manual-input]').forEach(input => {
+    const [month, itemKey] = input.dataset.incomeManualInput.split('|');
+    const digits = input.value.trim();
+    rows.push({ month, itemKey, amount: digits === '' ? null : Number(digits) });
+  });
+  const el = document.getElementById('incomeManualSavestate-' + channel);
+  try {
+    el.textContent = 'Saving…';
+    const res = await fetch('/api/marketing/ad-budget/income-actuals/manual?channel=' + channel, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rows),
+    });
+    if (!res.ok) throw new Error('save failed');
+    el.textContent = 'Saved';
+    await loadActuals(currentVersion.year);
+    renderAll();
+  } catch (e) {
+    el.textContent = 'Save failed';
+  }
+}
+
+function renderOverview() {
+  for (const ch of CHANNELS) captureInputsIntoState(ch);
+  const year = currentVersion.year;
+  const months = monthsOfYear(year);
+  const cappedMonths = months.filter(([m]) => m <= CURRENT_MONTH);
+
+  let budgetSpend = 0, budgetSales = 0, actualSpend = 0, actualSales = 0, hasActual = false;
+  for (const [m] of cappedMonths) {
+    for (const ch of CHANNELS) {
+      const s = state[ch];
+      const b = budgetFor(ch, m);
+      if (b.spend != null) budgetSpend += b.spend;
+      if (b.adSales != null) budgetSales += b.adSales;
+      const a = s.actuals[m];
+      if (a) {
+        hasActual = true;
+        if (a.spend != null) actualSpend += a.spend;
+        if (a.adSales != null) actualSales += a.adSales;
+      }
+    }
+  }
+
+  document.getElementById('overviewStats').innerHTML = `
+    <div class="stat"><div class="label">Budget Ad Spend (YTD)</div><div class="value">${money(budgetSpend)}</div></div>
+    <div class="stat"><div class="label">Actual Ad Spend (YTD)</div><div class="value">${hasActual ? money(actualSpend) : '—'}</div></div>
+    <div class="stat"><div class="label">Budget Ad Sales (YTD)</div><div class="value">${money(budgetSales)}</div></div>
+    <div class="stat"><div class="label">Actual Ad Sales (YTD)</div><div class="value">${hasActual ? money(actualSales) : '—'}</div></div>
+  `;
+}
+
+function renderAll() {
+  renderVersionSelect();
+  for (const ch of CHANNELS) {
+    renderInputsTable(ch);
+    renderOrganicTable(ch);
+    renderResultsTable(ch);
+    renderManualTable(ch);
+    renderIncomeManualTable(ch);
+    renderIncomeRatesTable(ch);
+    renderIncomeStatementTable(ch);
+  }
+  renderOverview();
+  document.getElementById('savestate').textContent = 'Synced · ' + currentVersion.name;
+}
+
+loadAll();
+</script>
+</body>
+</html>
