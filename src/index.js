@@ -2708,6 +2708,72 @@ async function getAmazonTrafficActualsFromCache(env, year) {
   }));
 }
 
+// Daily PPC actuals (Helium 10 Ads, 14-day attribution), relayed through the
+// same cfuoss/ebe-data-cache GitHub repo as traffic actuals — see
+// migrations/0024_ad_budget_ad_actuals_cache.sql. Replaces the live Triple
+// Whale ads_table query, which stopped returning Amazon/Walmart ad data.
+function validAdActualsRow(r) {
+  return (
+    r &&
+    AD_BUDGET_CHANNELS.includes(r.channel) &&
+    typeof r.date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(r.date)
+  );
+}
+
+async function upsertAdActuals(env, rows) {
+  const db = env.secure_cpg_marketing;
+  const statements = rows.map((r) =>
+    db
+      .prepare(
+        `INSERT INTO ad_budget_ad_actuals (channel, event_date, spend, clicks, orders, ad_sales, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(channel, event_date) DO UPDATE SET
+           spend=excluded.spend, clicks=excluded.clicks, orders=excluded.orders, ad_sales=excluded.ad_sales, updated_at=datetime('now')`,
+      )
+      .bind(r.channel, r.date, r.spend ?? 0, r.clicks ?? 0, r.orders ?? 0, r.adSales ?? 0),
+  );
+  if (statements.length) await db.batch(statements);
+  return statements.length;
+}
+
+async function syncAdActualsFromGithub(env) {
+  const res = await fetch("https://api.github.com/repos/cfuoss/ebe-data-cache/contents/ad-actuals-latest.json", {
+    headers: {
+      Authorization: `Bearer ${env.GITHUB_DATA_CACHE_TOKEN}`,
+      Accept: "application/vnd.github.raw+json",
+      "User-Agent": "secure-cpg-demo-worker",
+    },
+  });
+  if (!res.ok) throw new Error(`GitHub fetch failed: ${res.status} ${await res.text()}`);
+  const rows = await res.json();
+  if (!Array.isArray(rows)) throw new Error("Expected ad-actuals-latest.json to be a JSON array.");
+  const validRows = rows.filter(validAdActualsRow);
+  const count = await upsertAdActuals(env, validRows);
+  return { pulled: rows.length, cached: count };
+}
+
+// Sums the daily cache up to months, same shape the old Triple Whale query
+// returned so getAdChannelActuals doesn't care where it came from.
+async function getAdActualsFromCache(env, channel, year) {
+  const { results } = await env.secure_cpg_marketing
+    .prepare(
+      `SELECT substr(event_date, 1, 7) AS month, SUM(spend) AS spend, SUM(clicks) AS clicks, SUM(orders) AS orders, SUM(ad_sales) AS ad_sales
+       FROM ad_budget_ad_actuals
+       WHERE channel = ? AND event_date BETWEEN ? AND ?
+       GROUP BY month ORDER BY month ASC`,
+    )
+    .bind(channel, `${year}-01-01`, `${year}-12-31`)
+    .all();
+  return results.map((r) => ({
+    month: r.month,
+    clicks: Number(r.clicks) || 0,
+    spend: Number(r.spend) || 0,
+    orders: Number(r.orders) || 0,
+    adSales: Number(r.ad_sales) || 0,
+  }));
+}
+
 // Income Statement actuals, live from Business Central (env.ebe_bc_database —
 // a synced mirror kept by the separate ebe-bc-mcp Worker) exclusively — no
 // other MCP/data source feeds this endpoint. Same "query fresh every
@@ -2914,30 +2980,23 @@ function deriveAdMetrics(row) {
   };
 }
 
-// Combines live Triple Whale actuals with manual overrides (for months TW
-// has no data for, e.g. before Amazon Ads was connected there). A manual row
-// always wins for its month when present, so re-entering a month after TW
-// picks it up just means clearing the manual row.
-const AD_CHANNEL_TRIPLEWHALE_FN = {
-  Amazon: getAmazonAdActualsFromTriplewhale,
-  Walmart: getWalmartAdActualsFromTriplewhale,
-};
-
+// Combines cached Helium 10 Ads actuals (see getAdActualsFromCache) with
+// manual overrides. A manual row always wins for its month when present, so
+// letting a month fall back to Helium 10 just means clearing its manual row.
+// The response field stays `twError` so the page's existing banner logic
+// keeps working; it now reports a cache-read failure.
 async function getAdChannelActuals(env, channel, year) {
-  const twSourceFn = AD_CHANNEL_TRIPLEWHALE_FN[channel];
-  if (!twSourceFn) return { actuals: [], twError: null }; // no live source wired up for this channel
-
-  let twRows = [];
+  let cacheRows = [];
   let twError = null;
   try {
-    twRows = await twSourceFn(env, year);
+    cacheRows = await getAdActualsFromCache(env, channel, year);
   } catch (err) {
     twError = err.message;
   }
   const manualRows = await getManualAdActuals(env, channel);
 
   const byMonth = new Map();
-  for (const r of twRows) byMonth.set(r.month, { ...r, source: "triplewhale" });
+  for (const r of cacheRows) byMonth.set(r.month, { ...r, source: "helium10" });
   for (const r of manualRows) {
     if (r.clicks == null && r.spend == null && r.orders == null && r.adSales == null) continue;
     byMonth.set(r.month, {
@@ -4829,7 +4888,8 @@ export default {
     if (url.pathname === "/api/marketing/ad-budget/traffic-actuals/sync-github" && request.method === "POST") {
       try {
         const result = await syncAmazonTrafficActualsFromGithub(env);
-        return jsonResponse({ ok: true, ...result });
+        const ads = await syncAdActualsFromGithub(env);
+        return jsonResponse({ ok: true, ...result, ads });
       } catch (err) {
         return jsonResponse({ ok: false, error: err.message }, 502);
       }
@@ -4931,6 +4991,11 @@ export default {
     ctx.waitUntil(
       syncAmazonTrafficActualsFromGithub(env).catch((err) => {
         console.error("ad-budget traffic actuals GitHub sync failed:", err.message);
+      }),
+    );
+    ctx.waitUntil(
+      syncAdActualsFromGithub(env).catch((err) => {
+        console.error("ad-budget ad actuals GitHub sync failed:", err.message);
       }),
     );
     if (env.WALMART_CLIENT_ID && env.WALMART_CLIENT_SECRET) {

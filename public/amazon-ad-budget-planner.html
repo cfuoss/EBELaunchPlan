@@ -213,6 +213,31 @@ tr.group-header td { background: var(--bg-soft); font-family: 'IBM Plex Mono', m
 .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dimmer); font-family: 'IBM Plex Mono', monospace; margin-bottom: 6px; }
 .stat .value { font-size: 22px; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-variant-numeric: tabular-nums; }
 
+/* Overview KPI cards — one row per channel, background driven by each
+   metric's green/yellow/red threshold (see KPI_RULES in renderOverview). */
+.kpi-channel { margin-bottom: 22px; }
+.kpi-channel-title { font-size: 16px; font-weight: 700; display: flex; align-items: center; margin-bottom: 10px; }
+.kpi-channel { padding-bottom: 20px; border-bottom: 1px solid var(--card-border); }
+.kpi-period { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dimmer); margin: 14px 0 8px; }
+/* Six columns on wide screens so the 10 cards sit as 6 ad/revenue + 4 traffic,
+   aligned under each other; auto-fit below that. */
+.kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 1400px) { .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); } }
+.kpi { --kpi-accent: #78766E; --kpi-bg: var(--bg-soft); --kpi-border: var(--card-border);
+  background: var(--kpi-bg); border: 1px solid var(--kpi-border); border-left: 3px solid var(--kpi-accent);
+  border-radius: 8px; padding: 16px 18px 14px; display: flex; flex-direction: column; align-items: flex-start; }
+.kpi.green  { --kpi-accent: #1E8A4C; --kpi-bg: #EAF6EE; --kpi-border: #BFE3CB; }
+.kpi.yellow { --kpi-accent: #B8860B; --kpi-bg: #FDF6E3; --kpi-border: #EED9A0; }
+.kpi.red    { --kpi-accent: #C62828; --kpi-bg: #FDECEC; --kpi-border: #F3C0C0; }
+.kpi-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--kpi-accent); margin-bottom: 8px; }
+.kpi-value { font-size: 28px; font-weight: 800; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.kpi-sub { font-size: 12px; color: var(--text-dim); margin: 4px 0 8px; }
+.kpi-pill { display: inline-block; background: var(--kpi-accent); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 11px; border-radius: 999px; }
+.kpi-trend { font-size: 12px; font-weight: 600; margin-top: 10px; color: var(--text-dim); }
+.kpi-trend.good { color: #1E8A4C; }
+.kpi-trend.bad { color: #C62828; }
+.kpi-legend { font-size: 10.5px; font-style: italic; color: var(--text-dimmer); margin-top: 8px; }
+
 .soon-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
 .soon-card { border: 1px dashed var(--card-border); border-radius: 12px; padding: 16px; text-align: center; color: var(--text-dimmer); font-size: 13px; }
 
@@ -282,7 +307,7 @@ tr.group-header td { background: var(--bg-soft); font-family: 'IBM Plex Mono', m
   <!-- OVERVIEW -->
   <section class="section active" id="section-overview">
     <div class="banner" id="actualsBanner"></div>
-    <div class="summary-grid" id="overviewStats"></div>
+    <div id="overviewStats"></div>
     <div class="card">
       <h2>Channels</h2>
       <div class="desc">Bottoms-up budgeting is live for Amazon and Walmart. Other channels are planned next.</div>
@@ -370,7 +395,7 @@ tr.group-header td { background: var(--bg-soft); font-family: 'IBM Plex Mono', m
 
       <div class="card">
         <h2>Amazon Ad Spend Budget vs Actuals</h2>
-        <div class="desc">Actuals pull live from Triple Whale (Every Body Eat Amazon Ads account) on every load; a month with a manual entry (see "Manual Actuals") uses that instead.</div>
+        <div class="desc">Actuals come from Helium 10 Ads (Every Body Eat Amazon Ads account, 14-day attribution), refreshed nightly; a month with a manual entry (see "Manual Actuals") uses that instead.</div>
         <div class="tabbar periodview-tabbar">
           <button class="tabbtn periodview-tab active" data-period="monthly" onclick="setPeriodView('monthly')">Monthly</button>
           <button class="tabbtn periodview-tab" data-period="quarterly" onclick="setPeriodView('quarterly')">Quarterly</button>
@@ -457,7 +482,7 @@ tr.group-header td { background: var(--bg-soft); font-family: 'IBM Plex Mono', m
 
       <div class="card">
         <h2>Walmart Ad Spend Budget vs Actuals</h2>
-        <div class="desc">Actuals pull live from Triple Whale (Walmart Ads) on every load; a month with a manual entry (see "Manual Actuals") uses that instead.</div>
+        <div class="desc">Actuals come from Helium 10 Ads (Walmart), refreshed nightly; a month with a manual entry (see "Manual Actuals") uses that instead.</div>
         <div class="tabbar periodview-tabbar">
           <button class="tabbtn periodview-tab active" data-period="monthly" onclick="setPeriodView('monthly')">Monthly</button>
           <button class="tabbtn periodview-tab" data-period="quarterly" onclick="setPeriodView('quarterly')">Quarterly</button>
@@ -474,7 +499,7 @@ tr.group-header td { background: var(--bg-soft); font-family: 'IBM Plex Mono', m
     <h2 class="group-title" style="margin-top:0;">Amazon</h2>
     <div class="card">
       <h2>Manual Actuals Entry</h2>
-      <div class="desc">For months Triple Whale has no Amazon Ads data for (e.g. before the account was connected there), enter actuals here. A month left blank here uses Triple Whale's live number instead; clearing a filled-in month here reverts it back to Triple Whale.</div>
+      <div class="desc">For months Helium 10 has no Amazon Ads data for, enter actuals here. A month left blank here uses Helium 10's number instead; clearing a filled-in month here reverts it back to Helium 10.</div>
       <div style="overflow-x:auto;">
         <table id="manualTable-Amazon"></table>
       </div>
@@ -499,7 +524,7 @@ tr.group-header td { background: var(--bg-soft); font-family: 'IBM Plex Mono', m
     <h2 class="group-title">Walmart</h2>
     <div class="card">
       <h2>Manual Actuals Entry</h2>
-      <div class="desc">For months Triple Whale has no Walmart Ads data for, enter actuals here. A month left blank here uses Triple Whale's live number instead; clearing a filled-in month here reverts it back to Triple Whale.</div>
+      <div class="desc">For months Helium 10 has no Walmart Ads data for, enter actuals here. A month left blank here uses Helium 10's number instead; clearing a filled-in month here reverts it back to Helium 10.</div>
       <div style="overflow-x:auto;">
         <table id="manualTable-Walmart"></table>
       </div>
@@ -544,14 +569,14 @@ tr.group-header td { background: var(--bg-soft); font-family: 'IBM Plex Mono', m
         <div class="step-num">3</div>
         <div class="step-body">
           <h3>Where Actuals Come From</h3>
-          <p>Amazon: Clicks, CPC, Conversion Rate, Spend, Ad Orders, and Ad Sales pull live from Triple Whale every time you load this page — no manual refresh needed, and never stale. Walmart: the same PPC metrics pull live from Triple Whale's Walmart Ads data. ROAS is calculated from those. Only the Every Body Eat accounts are included (not any other associated seller account).</p>
+          <p>Amazon and Walmart: Clicks, CPC, Conversion Rate, Spend, Ad Orders, and Ad Sales come from Helium 10 Ads (14-day attribution), refreshed nightly — typically complete through yesterday. ROAS is calculated from those. Only the Every Body Eat accounts are included (not any other associated seller account).</p>
         </div>
       </div>
       <div class="step">
         <div class="step-num">4</div>
         <div class="step-body">
           <h3>Filling Data Gaps</h3>
-          <p>Amazon Ads was connected to Triple Whale partway through 2026, so earlier months have no live data — Amazon's own Ads API only serves a 60-day reporting window, so that history can't be pulled after the fact from any source. Use the "Manual Actuals" tab to type in those months from another record (e.g. a Seller Central export); a manual entry always takes priority over Triple Whale for that month. The same Manual Actuals mechanism is available for Walmart.</p>
+          <p>Helium 10 has Amazon Ads history back to January 2026, so every month fills in automatically. Use the "Manual Actuals" tab only to override a month; a manual entry always takes priority over Helium 10 for that month, and clearing it reverts to Helium 10. The same Manual Actuals mechanism is available for Walmart.</p>
         </div>
       </div>
       <div class="step">
@@ -772,7 +797,7 @@ const PAGE_TITLES = {
   overview: ['Overview', 'Bottoms-up ad spend budgeting: Clicks, CPC, and Conversion Rate drive Spend, Ad Orders, Ad Sales, and ROAS.'],
   'ch-Amazon': ['Amazon', 'Income Statement, Traffic Budget, and PPC Budget for Amazon.'],
   'ch-Walmart': ['Walmart', 'Income Statement, Traffic Budget, and PPC Budget for Walmart.'],
-  manual: ['Manual Actuals', 'Fill in actuals for months Triple Whale has no data for.'],
+  manual: ['Manual Actuals', 'Fill in actuals for months Helium 10 has no data for.'],
   howto: ['How It Works', 'A quick reference for using this tool.'],
 };
 
@@ -1098,7 +1123,7 @@ function renderActualsBanner() {
     return;
   }
   el.className = 'banner';
-  el.innerHTML = `<span>ℹ️</span><span><strong>Amazon and Walmart actuals pull live from Triple Whale on every page load</strong> — no manual refresh needed. Months without Triple Whale data (before an account was connected there) show "—" unless filled in under Manual Actuals.</span>`;
+  el.innerHTML = `<span>ℹ️</span><span><strong>Amazon and Walmart ad actuals come from Helium 10, refreshed nightly</strong> — no manual refresh needed. Months without Helium 10 data show "—" unless filled in under Manual Actuals.</span>`;
 }
 
 const PCT_FIELDS = ['conversionRate'];
@@ -1916,7 +1941,7 @@ function renderResultsTable(channel) {
 
   function groupCells(metric, b, a, source, isTotal) {
     const budgetCell = `<td class="numcell dim${isTotal ? ' total-col' : ' month-group'}">${b == null ? '—' : metric.fmt(b)}</td>`;
-    const srcTitle = source === 'triplewhale' ? 'Triple Whale (live)' : (source === 'manual' ? 'Manual entry' : '');
+    const srcTitle = source === 'helium10' ? 'Helium 10 (nightly)' : (source === 'manual' ? 'Manual entry' : '');
     const actualCell = `<td class="numcell"${srcTitle ? ` title="${srcTitle}"` : ''}>${a == null ? '—' : metric.fmt(a)}</td>`;
     if (a == null || b == null) {
       return budgetCell + actualCell + `<td class="numcell dim">—</td><td class="numcell dim">—</td>`;
@@ -2010,34 +2035,245 @@ async function saveIncomeManualActuals(channel) {
   }
 }
 
-function renderOverview() {
-  for (const ch of CHANNELS) captureInputsIntoState(ch);
-  const year = currentVersion.year;
-  const months = monthsOfYear(year);
-  const cappedMonths = months.filter(([m]) => m <= CURRENT_MONTH);
+const CHANNEL_COLORS = { Amazon: '#F99420', Walmart: '#0099F3' };
 
-  let budgetSpend = 0, budgetSales = 0, actualSpend = 0, actualSales = 0, hasActual = false;
-  for (const [m] of cappedMonths) {
-    for (const ch of CHANNELS) {
-      const s = state[ch];
-      const b = budgetFor(ch, m);
-      if (b.spend != null) budgetSpend += b.spend;
-      if (b.adSales != null) budgetSales += b.adSales;
-      const a = s.actuals[m];
-      if (a) {
-        hasActual = true;
-        if (a.spend != null) actualSpend += a.spend;
-        if (a.adSales != null) actualSales += a.adSales;
-      }
+function trafficGrossSalesActual(channel, month) {
+  let total = 0, has = false;
+  for (const p of CHANNEL_CONFIG[channel].productGroups) {
+    const a = trafficActualMetrics(channel, p.asin, month);
+    if (a && a.grossSales != null) { total += a.grossSales; has = true; }
+  }
+  return has ? total : null;
+}
+function overviewRevenueActual(channel, month) {
+  const bc = month === CURRENT_MONTH ? null : grossRevenueActual(channel, month);
+  return bc != null ? bc : trafficGrossSalesActual(channel, month);
+}
+
+// Actual vs plan for one channel over a list of months. Each metric only
+// counts months that actually have an actual for it, and its plan sums the
+// same months — so YTD compares like-for-like instead of penalising months
+// Business Central / Helium 10 haven't reported yet. Revenue is the Income
+// Statement's Gross Revenue (Business Central); Spend/Ad Sales are the PPC
+// actuals (Helium 10/manual), matching the PPC Budget vs Actuals table.
+//
+// Revenue actual: Business Central for closed months, but BC only has what's
+// been invoiced, so the in-progress month (or any month BC hasn't posted)
+// falls back to the Traffic Budget's actual Gross Sales (the same daily
+// feed the Traffic tab shows). The revenue *plan* already is the Traffic
+// Budget's Gross Sales, so that fallback compares like with like.
+//
+// `planFactor` scales every additive plan figure (MTD prorates the current
+// month's budget by days elapsed). Ratio metrics (TACOS, ACOS, ROAS,
+// Conversion Rate, AOV) are re-derived from the scaled sums, so proration
+// cancels out for them — as it should.
+function overviewAgg(channel, monthList, planFactor = 1) {
+  const s = state[channel];
+  const r = { revA: 0, revB: 0, revMonths: [], spendA: 0, spendB: 0, salesA: 0, salesB: 0, ppcMonths: [], tSpendA: 0, tRevA: 0, tSpendB: 0, tRevB: 0, tMonths: 0 };
+  // Traffic: summed across every product group, like the Traffic Budget
+  // table's own totals. Walmart has no session feed, so sessions stay null.
+  const tr = { sessA: 0, unitsA: 0, grossA: 0, sessB: 0, unitsB: 0, grossB: 0, hasSessA: false, months: [] };
+  for (const m of monthList) {
+    let monthHas = false;
+    for (const p of CHANNEL_CONFIG[channel].productGroups) {
+      const a = trafficActualMetrics(channel, p.asin, m);
+      if (!a) continue;
+      monthHas = true;
+      if (a.sessions != null) { tr.sessA += a.sessions; tr.hasSessA = true; }
+      tr.unitsA += a.unitsOrdered || 0;
+      tr.grossA += a.grossSales || 0;
+    }
+    if (!monthHas) continue;
+    tr.months.push(m);
+    for (const p of CHANNEL_CONFIG[channel].productGroups) {
+      const b = trafficBudgetMetrics(trafficItemFor(channel, p.asin, m), channel);
+      tr.sessB += (b.sessions || 0) * planFactor;
+      tr.unitsB += (b.unitsOrdered || 0) * planFactor;
+      tr.grossB += (b.grossSales || 0) * planFactor;
     }
   }
+  for (const m of monthList) {
+    const raw = budgetFor(channel, m);
+    const b = { spend: raw.spend != null ? raw.spend * planFactor : null, adSales: raw.adSales != null ? raw.adSales * planFactor : null };
+    const revA = overviewRevenueActual(channel, m);
+    const rawRevB = grossRevenueBudget(channel, m);
+    const revB = rawRevB != null ? rawRevB * planFactor : null;
+    if (revA != null) { r.revA += revA; r.revB += revB || 0; r.revMonths.push(m); }
+    const a = s.actuals[m];
+    const hasPpc = a && a.spend != null;
+    if (hasPpc) {
+      r.spendA += a.spend; r.spendB += b.spend || 0;
+      r.salesA += a.adSales || 0; r.salesB += b.adSales || 0;
+      r.ppcMonths.push(m);
+    }
+    if (hasPpc && revA != null) {
+      r.tSpendA += a.spend; r.tRevA += revA;
+      r.tSpendB += b.spend || 0; r.tRevB += revB || 0;
+      r.tMonths++;
+    }
+  }
+  const div = (n, d) => d ? n / d : null;
+  return {
+    revenue: r.revMonths.length ? { a: r.revA, b: r.revB || null } : null,
+    spend: r.ppcMonths.length ? { a: r.spendA, b: r.spendB || null } : null,
+    adSales: r.ppcMonths.length ? { a: r.salesA, b: r.salesB || null } : null,
+    tacos: r.tMonths ? { a: div(r.tSpendA, r.tRevA), b: r.tSpendB ? div(r.tSpendB, r.tRevB) : null } : null,
+    acos: r.ppcMonths.length ? { a: div(r.spendA, r.salesA), b: div(r.spendB, r.salesB) } : null,
+    roas: r.ppcMonths.length ? { a: div(r.salesA, r.spendA), b: div(r.salesB, r.spendB) } : null,
+    sessions: tr.hasSessA ? { a: tr.sessA, b: tr.sessB || null } : null,
+    conversionRate: tr.hasSessA ? { a: div(tr.unitsA, tr.sessA), b: div(tr.unitsB, tr.sessB) } : null,
+    aov: tr.months.length ? { a: div(tr.grossA, tr.unitsA), b: div(tr.grossB, tr.unitsB) } : null,
+    unitsOrdered: tr.months.length ? { a: tr.unitsA, b: tr.unitsB || null } : null,
+    revMonths: r.revMonths, ppcMonths: r.ppcMonths, trafficMonths: tr.months,
+  };
+}
 
-  document.getElementById('overviewStats').innerHTML = `
-    <div class="stat"><div class="label">Budget Ad Spend (YTD)</div><div class="value">${money(budgetSpend)}</div></div>
-    <div class="stat"><div class="label">Actual Ad Spend (YTD)</div><div class="value">${hasActual ? money(actualSpend) : '—'}</div></div>
-    <div class="stat"><div class="label">Budget Ad Sales (YTD)</div><div class="value">${money(budgetSales)}</div></div>
-    <div class="stat"><div class="label">Actual Ad Sales (YTD)</div><div class="value">${hasActual ? money(actualSales) : '—'}</div></div>
-  `;
+// Card definitions, in display order. `status` returns green/yellow/red from
+// the actual (a) and plan (b); `higherIsBetter` drives the month-over-month
+// trend colour (null = neutral, e.g. Ad Spend).
+const KPI_RULES = [
+  { key: 'revenue', label: 'Gross Revenue', fmt: money, higherIsBetter: true, kind: 'dollar',
+    status: (a, b) => b ? (a / b >= 0.95 ? 'green' : a / b >= 0.90 ? 'yellow' : 'red') : '',
+    pill: (a, b) => b ? Math.round(a / b * 100) + '% of plan' : 'No plan',
+    legend: 'Green ≥95% of plan, yellow 90–95%, red below 90%.' },
+  { key: 'spend', label: 'Ad Spend', fmt: money, higherIsBetter: null, kind: 'dollar',
+    status: (a, b) => b ? (a <= b ? 'green' : a / b - 1 <= 0.05 ? 'yellow' : 'red') : '',
+    pill: (a, b) => b ? Math.round(a / b * 100) + '% of budget' : 'No budget',
+    legend: 'Green at/under budget, yellow 1–5% over, red more than 5% over.' },
+  { key: 'tacos', label: 'TACOS', fmt: pctVal, higherIsBetter: false, kind: 'pct',
+    status: (a) => a >= 0.20 ? 'red' : a >= 0.15 ? 'yellow' : 'green',
+    pill: (a, b) => b != null ? ppVsPlan(a, b) : 'No plan',
+    legend: 'Green below 15%, yellow 15–19%, red 20% or above.' },
+  { key: 'adSales', label: 'Ad Sales', fmt: money, higherIsBetter: true, kind: 'dollar',
+    status: (a, b) => b ? (a / b >= 0.95 ? 'green' : a / b >= 0.90 ? 'yellow' : 'red') : '',
+    pill: (a, b) => b ? Math.round(a / b * 100) + '% of plan' : 'No plan',
+    legend: 'Green ≥95% of plan, yellow 90–95%, red below 90%.' },
+  { key: 'acos', label: 'ACOS', fmt: pctVal, higherIsBetter: false, kind: 'pct',
+    status: (a) => a > 0.60 ? 'red' : a >= 0.50 ? 'yellow' : 'green',
+    pill: (a, b) => b != null ? ppVsPlan(a, b) : 'No plan',
+    legend: 'Green below 50%, yellow 50–60%, red above 60%.' },
+  // ROAS = 1 / ACOS, so the ACOS bands map to 2.00x and 1.67x.
+  { key: 'roas', label: 'ROAS', fmt: roasVal, higherIsBetter: true, kind: 'x',
+    status: (a) => a >= 2.0 ? 'green' : a >= 1 / 0.6 ? 'yellow' : 'red',
+    pill: (a, b) => b ? Math.round(a / b * 100) + '% of plan' : 'No plan',
+    legend: 'Green ≥2.00x, yellow 1.67–1.99x, red below 1.67x (ACOS 50% / 60%).' },
+  // Traffic (Traffic Budget tab, summed across product groups).
+  ...[
+    { key: 'sessions', label: 'Sessions', fmt: int, kind: 'count' },
+    { key: 'conversionRate', label: 'Conversion Rate', fmt: pctVal, kind: 'pct' },
+    { key: 'aov', label: 'AOV', fmt: money2, kind: 'count' },
+    { key: 'unitsOrdered', label: 'Units Ordered', fmt: int, kind: 'count' },
+  ].map(r => ({ ...r, higherIsBetter: true, traffic: true,
+    status: (a, b) => b ? (a / b >= 0.95 ? 'green' : a / b >= 0.90 ? 'yellow' : 'red') : '',
+    pill: (a, b) => b ? Math.round(a / b * 100) + '% of plan' : 'No plan',
+    legend: 'Green ≥95% of plan, yellow 90–95%, red below 90%.' })),
+];
+
+// MTD prorates the current month's plan by complete days (through
+// yesterday), e.g. Sep 27 → 26/30 of September's budget — the traffic
+// actuals feed is nightly, so today is never in it yet. On the 1st, one
+// day is used so the cards still render.
+function mtdFactor() {
+  const now = new Date();
+  const days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const day = Math.max(now.getDate() - 1, 1);
+  return { day, days, factor: day / days };
+}
+
+function ppVsPlan(a, b) {
+  const pp = (a - b) * 100;
+  return Math.abs(pp).toFixed(1) + 'pp ' + (pp <= 0 ? 'under' : 'over') + ' plan';
+}
+
+function monthLabel(m) { return MONTHS.find(([mm]) => mm === m.slice(5))[1]; }
+
+function periodLabel(monthList) {
+  if (!monthList.length) return '';
+  const first = monthLabel(monthList[0]), last = monthLabel(monthList[monthList.length - 1]);
+  const partial = monthList[monthList.length - 1] === CURRENT_MONTH ? ` (${last} partial)` : '';
+  return (first === last ? first : first + '–' + last) + ' ' + currentVersion.year + partial;
+}
+
+// Latest complete month vs the one before it (e.g. Aug vs Jul) — the
+// in-progress month is skipped so a partial month never reads as a drop.
+function kpiTrend(rule, last, prev, lastM, prevM) {
+  const cur = last && last[rule.key], old = prev && prev[rule.key];
+  if (!cur || !old || cur.a == null || old.a == null) return '';
+  const d = cur.a - old.a;
+  let text;
+  if (rule.kind === 'dollar' || rule.kind === 'count') text = old.a ? Math.abs(d / old.a * 100).toFixed(1) + '%' : money(Math.abs(d));
+  else if (rule.kind === 'pct') text = Math.abs(d * 100).toFixed(1) + 'pp';
+  else text = Math.abs(d).toFixed(2) + 'x';
+  if (!/[1-9]/.test(text)) return `<div class="kpi-trend">■ Flat ${monthLabel(lastM)} vs ${monthLabel(prevM)}</div>`;
+  const arrow = d >= 0 ? '▲' : '▼';
+  let cls = '', verdict = '';
+  if (rule.higherIsBetter !== null) {
+    const good = rule.higherIsBetter ? d > 0 : d < 0;
+    cls = good ? 'good' : 'bad';
+    verdict = good ? ' — improved' : ' — declined';
+  }
+  return `<div class="kpi-trend ${cls}">${arrow} ${text} ${monthLabel(lastM)} vs ${monthLabel(prevM)}${verdict}</div>`;
+}
+
+function renderOverview() {
+  for (const ch of CHANNELS) captureInputsIntoState(ch);
+  const months = monthsOfYear(currentVersion.year).map(([m]) => m);
+  const ytdMonths = months.filter(m => m <= CURRENT_MONTH);
+  const completeMonths = months.filter(m => m < CURRENT_MONTH);
+  const lastM = completeMonths[completeMonths.length - 1];
+  const prevM = completeMonths[completeMonths.length - 2];
+
+  // MTD only applies when the selected version's year is the current year.
+  const showMtd = ytdMonths.includes(CURRENT_MONTH);
+  const mtd = mtdFactor();
+
+  const card = (rule, agg, suffix, sub, extra) => {
+    const v = agg[rule.key];
+    const label = rule.label + ' — ' + suffix;
+    if (!v || v.a == null) {
+      const why = rule.key === 'sessions' || rule.key === 'conversionRate' ? 'No session data' : 'No actuals yet';
+      return `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value">—</div>
+        <div class="kpi-sub">${why}</div><div class="kpi-legend">${rule.legend}</div></div>`;
+    }
+    return `<div class="kpi ${rule.status(v.a, v.b)}">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value">${rule.fmt(v.a)}</div>
+      <div class="kpi-sub">vs ${v.b != null ? rule.fmt(v.b) : '—'} plan · ${sub(rule)}</div>
+      <span class="kpi-pill">${rule.pill(v.a, v.b)}</span>
+      ${extra(rule, v)}
+      <div class="kpi-legend">${rule.legend}</div>
+    </div>`;
+  };
+  const monthsFor = (agg, rule) => rule.traffic ? agg.trafficMonths : rule.key === 'revenue' ? agg.revMonths : agg.ppcMonths;
+
+  document.getElementById('overviewStats').innerHTML = CHANNELS.map(ch => {
+    const ytd = overviewAgg(ch, ytdMonths);
+    const last = lastM ? overviewAgg(ch, [lastM]) : null;
+    const prev = prevM ? overviewAgg(ch, [prevM]) : null;
+    const ytdCards = KPI_RULES.map(rule => card(rule, ytd, 'YTD',
+      r => periodLabel(monthsFor(ytd, r)),
+      r => lastM && prevM ? kpiTrend(r, last, prev, lastM, prevM) : '')).join('');
+
+    let mtdBlock = '';
+    if (showMtd) {
+      const m = overviewAgg(ch, [CURRENT_MONTH], mtd.factor);
+      const mLabel = monthLabel(CURRENT_MONTH);
+      // Additive metrics get a straight-line month-end pace; ratios don't.
+      const pace = (rule, v) => (rule.kind === 'dollar' || (rule.kind === 'count' && rule.key !== 'aov'))
+        ? `<div class="kpi-trend">Pacing to ${rule.fmt(v.a / mtd.factor)} for ${mLabel}</div>` : '';
+      const mtdCards = KPI_RULES.map(rule => card(rule, m, 'MTD',
+        r => `${mLabel} 1–${mtd.day} (${Math.round(mtd.factor * 100)}% of month)${r.key === 'revenue' ? ' · Traffic gross sales' : ''}`, pace)).join('');
+      mtdBlock = `<div class="kpi-period">Month to date — ${mLabel} ${currentVersion.year}, plan prorated ${mtd.day}/${mtd.days} days</div>
+        <div class="kpi-grid">${mtdCards}</div>`;
+    }
+
+    return `<div class="kpi-channel">
+      <div class="kpi-channel-title"><span class="channel-dot" style="background:${CHANNEL_COLORS[ch] || '#878787'};"></span>${ch}</div>
+      <div class="kpi-period">Year to date</div>
+      <div class="kpi-grid">${ytdCards}</div>
+      ${mtdBlock}
+    </div>`;
+  }).join('');
 }
 
 function renderAll() {
